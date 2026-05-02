@@ -1,0 +1,241 @@
+{
+    "Summary": {
+        "YooVersion": "2.3.16",
+        "UnityVersion": "6000.2.6f2",
+        "BuildDate": "2025/11/2 14:53:03",
+        "BuildSeconds": 2,
+        "BuildTarget": 19,
+        "BuildPipeline": "ScriptableBuildPipeline",
+        "BuildBundleType": 2,
+        "BuildPackageName": "DefaultPackage",
+        "BuildPackageVersion": "2025-11-02-892",
+        "BuildPackageNote": "2025/11/2 14:53:00",
+        "UniqueBundleName": true,
+        "EnableAddressable": true,
+        "SupportExtensionless": true,
+        "LocationToLower": false,
+        "IncludeAssetGUID": false,
+        "AutoCollectShaders": true,
+        "IgnoreRuleName": "YooAsset.Editor.NormalIgnoreRule",
+        "ClearBuildCacheFiles": false,
+        "UseAssetDependencyDB": false,
+        "EnableSharePackRule": true,
+        "SingleReferencedPackAlone": true,
+        "EncryptionServicesClassName": "YooAsset.Editor.EncryptionNone",
+        "ManifestProcessServicesClassName": "YooAsset.Editor.ManifestProcessNone",
+        "ManifestRestoreServicesClassName": "YooAsset.Editor.ManifestRestoreNone",
+        "FileNameStyle": 0,
+        "CompressOption": 2,
+        "DisableWriteTypeTree": false,
+        "IgnoreTypeTreeChanges": true,
+        "WriteLinkXML": true,
+        "CacheServerHost": "",
+        "CacheServerPort": 0,
+        "BuiltinShadersBundleName": "defaultpackage_unityshaders.bundle",
+        "MonoScriptsBundleName": "",
+        "AssetFileTotalCount": 11,
+        "MainAssetTotalCount": 11,
+        "AllBundleTotalCount": 3,
+        "AllBundleTotalSize": 1724893,
+        "EncryptedBundleTotalCount": 0,
+        "EncryptedBundleTotalSize": 0
+    },
+    "AssetInfos": [
+        {
+            "Address": "image",
+            "AssetPath": "Assets/Art/ArtRaw/image.png",
+            "AssetGUID": "00645e75bbcfc31429a7324401e003bd",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_art_artraw.bundle",
+            "MainBundleSize": 42985,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "item_tbitem",
+            "AssetPath": "Assets/AssetRaw/Configs/bytes/item_tbitem.bytes",
+            "AssetGUID": "305858cb263cf0242a3cc2f0d0d3106e",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_assetraw_configs_bytes.bundle",
+            "MainBundleSize": 1540,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "DOTween.dll",
+            "AssetPath": "Assets/AssetRaw/DLL/DOTween.dll.bytes",
+            "AssetGUID": "17ed7a64f376387458672fd202e48e38",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_assetraw_dll.bundle",
+            "MainBundleSize": 1680368,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "EF.Runtime.dll",
+            "AssetPath": "Assets/AssetRaw/DLL/EF.Runtime.dll.bytes",
+            "AssetGUID": "59bd275c632ffbe4cb860e99ec993929",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_assetraw_dll.bundle",
+            "MainBundleSize": 1680368,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "GameLogic.dll",
+            "AssetPath": "Assets/AssetRaw/DLL/GameLogic.dll.bytes",
+            "AssetGUID": "142d03ef19cc34040852a8d9075e9c5c",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_assetraw_dll.bundle",
+            "MainBundleSize": 1680368,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "GameProto.dll",
+            "AssetPath": "Assets/AssetRaw/DLL/GameProto.dll.bytes",
+            "AssetGUID": "76bdde8c9360edf48907e650545f81cd",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_assetraw_dll.bundle",
+            "MainBundleSize": 1680368,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "mscorlib.dll",
+            "AssetPath": "Assets/AssetRaw/DLL/mscorlib.dll.bytes",
+            "AssetGUID": "08a86d63ac1e8244a809cdd8fca80b55",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_assetraw_dll.bundle",
+            "MainBundleSize": 1680368,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "System.Core.dll",
+            "AssetPath": "Assets/AssetRaw/DLL/System.Core.dll.bytes",
+            "AssetGUID": "5baa0903a369c614b8124bfe2d45323b",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_assetraw_dll.bundle",
+            "MainBundleSize": 1680368,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "System.dll",
+            "AssetPath": "Assets/AssetRaw/DLL/System.dll.bytes",
+            "AssetGUID": "a7c0c5b57d8158646b07ac784cb759b2",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_assetraw_dll.bundle",
+            "MainBundleSize": 1680368,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "UniTask.dll",
+            "AssetPath": "Assets/AssetRaw/DLL/UniTask.dll.bytes",
+            "AssetGUID": "e18986cecf723e448bc84b754064ba0f",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_assetraw_dll.bundle",
+            "MainBundleSize": 1680368,
+            "DependAssets": [],
+            "DependBundles": []
+        },
+        {
+            "Address": "YooAsset.dll",
+            "AssetPath": "Assets/AssetRaw/DLL/YooAsset.dll.bytes",
+            "AssetGUID": "add48beb9549d7d438e5909263993dab",
+            "AssetTags": [],
+            "MainBundleName": "defaultpackage_assets_assetraw_dll.bundle",
+            "MainBundleSize": 1680368,
+            "DependAssets": [],
+            "DependBundles": []
+        }
+    ],
+    "BundleInfos": [
+        {
+            "BundleName": "defaultpackage_assets_art_artraw.bundle",
+            "FileName": "16a9a8a143efbd7d34124f0aba4ce85c.bundle",
+            "FileHash": "16a9a8a143efbd7d34124f0aba4ce85c",
+            "FileCRC": 0,
+            "FileSize": 42985,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/Art/ArtRaw/image.png",
+                    "AssetGUID": "00645e75bbcfc31429a7324401e003bd"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_assets_assetraw_configs_bytes.bundle",
+            "FileName": "fdc9db209d063246e98edc637df02381.bundle",
+            "FileHash": "fdc9db209d063246e98edc637df02381",
+            "FileCRC": 0,
+            "FileSize": 1540,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/AssetRaw/Configs/bytes/item_tbitem.bytes",
+                    "AssetGUID": "305858cb263cf0242a3cc2f0d0d3106e"
+                }
+            ]
+        },
+        {
+            "BundleName": "defaultpackage_assets_assetraw_dll.bundle",
+            "FileName": "aeb6a963f435a7df46b52ae31aa2ee42.bundle",
+            "FileHash": "aeb6a963f435a7df46b52ae31aa2ee42",
+            "FileCRC": 0,
+            "FileSize": 1680368,
+            "Encrypted": false,
+            "Tags": [],
+            "DependBundles": [],
+            "ReferenceBundles": [],
+            "BundleContents": [
+                {
+                    "AssetPath": "Assets/AssetRaw/DLL/DOTween.dll.bytes",
+                    "AssetGUID": "17ed7a64f376387458672fd202e48e38"
+                },
+                {
+                    "AssetPath": "Assets/AssetRaw/DLL/EF.Runtime.dll.bytes",
+                    "AssetGUID": "59bd275c632ffbe4cb860e99ec993929"
+                },
+                {
+                    "AssetPath": "Assets/AssetRaw/DLL/GameLogic.dll.bytes",
+                    "AssetGUID": "142d03ef19cc34040852a8d9075e9c5c"
+                },
+                {
+                    "AssetPath": "Assets/AssetRaw/DLL/GameProto.dll.bytes",
+                    "AssetGUID": "76bdde8c9360edf48907e650545f81cd"
+                },
+                {
+                    "AssetPath": "Assets/AssetRaw/DLL/mscorlib.dll.bytes",
+                    "AssetGUID": "08a86d63ac1e8244a809cdd8fca80b55"
+                },
+                {
+                    "AssetPath": "Assets/AssetRaw/DLL/System.Core.dll.bytes",
+                    "AssetGUID": "5baa0903a369c614b8124bfe2d45323b"
+                },
+                {
+                    "AssetPath": "Assets/AssetRaw/DLL/System.dll.bytes",
+                    "AssetGUID": "a7c0c5b57d8158646b07ac784cb759b2"
+                },
+                {
+                    "AssetPath": "Assets/AssetRaw/DLL/UniTask.dll.bytes",
+                    "AssetGUID": "e18986cecf723e448bc84b754064ba0f"
+                },
+                {
+                    "AssetPath": "Assets/AssetRaw/DLL/YooAsset.dll.bytes",
+                    "AssetGUID": "add48beb9549d7d438e5909263993dab"
+                }
+            ]
+        }
+    ],
+    "IndependAssets": []
+}

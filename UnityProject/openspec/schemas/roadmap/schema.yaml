@@ -1,0 +1,24 @@
+name: roadmap
+version: 1
+description: Roadmap-only workflow - proposal → design → tasks
+artifacts:
+  - id: proposal
+    generates: proposal.md
+    description: High-level description of the change, its motivation, and scope
+    template: proposal.md
+    requires: []
+  - id: design
+    generates: design.md
+    description: Technical design decisions and implementation approach
+    template: design.md
+    requires: []
+  - id: tasks
+    generates: tasks.md
+    description: Implementation checklist with trackable tasks
+    template: tasks.md
+    requires:
+      - design
+apply:
+  requires:
+    - tasks
+  tracks: tasks.md

@@ -1,0 +1,40 @@
+# Unity
+UnityProject/Library/
+UnityProject/HybridCLRData/
+UnityProject/Logs/
+UnityProject/Temp/
+UnityProject/Bundles/
+UnityProject/yoo/
+Build/
+
+# IDE
+.vs/
+.idea/
+.vscode/
+*.user
+*.suo
+*.userprefs
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Claude Code
+.claude/
+
+# Serena
+.serena/
+
+# MemPalace / harness
+.mempalace/
+.mempalace_local/
+.mcp_data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OpenSpec local
+openspec/local/
