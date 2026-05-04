@@ -14,16 +14,46 @@ namespace GameConfig
 public partial class Tables
 {
     public item.TbItem TbItem {get; }
+    /// <summary>
+    /// 关卡主表
+    /// </summary>
+    public level.TbLevel TbLevel {get; }
+    /// <summary>
+    /// 关卡波次表
+    /// </summary>
+    public level.TbLevelWave TbLevelWave {get; }
+    /// <summary>
+    /// 怪物配置表
+    /// </summary>
+    public monster.TbMonster TbMonster {get; }
+    /// <summary>
+    /// 战斗波次刷怪方案表
+    /// </summary>
+    public battle.TbBattleWaveSpawn TbBattleWaveSpawn {get; }
+    /// <summary>
+    /// 战斗波次刷怪批次表
+    /// </summary>
+    public battle.TbBattleWaveSpawnBatch TbBattleWaveSpawnBatch {get; }
 
     public Tables(System.Func<string, ByteBuf> loader)
     {
         TbItem = new item.TbItem(loader("item_tbitem"));
+        TbLevel = new level.TbLevel(loader("level_tblevel"));
+        TbLevelWave = new level.TbLevelWave(loader("level_tblevelwave"));
+        TbMonster = new monster.TbMonster(loader("monster_tbmonster"));
+        TbBattleWaveSpawn = new battle.TbBattleWaveSpawn(loader("battle_tbbattlewavespawn"));
+        TbBattleWaveSpawnBatch = new battle.TbBattleWaveSpawnBatch(loader("battle_tbbattlewavespawnbatch"));
         ResolveRef();
     }
     
     private void ResolveRef()
     {
         TbItem.ResolveRef(this);
+        TbLevel.ResolveRef(this);
+        TbLevelWave.ResolveRef(this);
+        TbMonster.ResolveRef(this);
+        TbBattleWaveSpawn.ResolveRef(this);
+        TbBattleWaveSpawnBatch.ResolveRef(this);
     }
 }
 

@@ -1,7 +1,7 @@
+using EF.Resource;
 using GameConfig;
 using Luban;
 using UnityEngine;
-using EF.Resrouce;
 using YooAsset;
 
 /// <summary>
