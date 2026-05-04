@@ -16,11 +16,11 @@ public sealed partial class Level : Luban.BeanBase
 {
     public Level(ByteBuf _buf) 
     {
-        Id = _buf.ReadString();
+        Id = _buf.ReadInt();
         Name = _buf.ReadString();
         Desc = _buf.ReadString();
         IsDefault = _buf.ReadBool();
-        {int n0 = _buf.ReadSize(); WaveIds = new System.Collections.Generic.List<string>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { string _e0;  _e0 = _buf.ReadString(); WaveIds.Add(_e0);}}
+        {int n0 = _buf.ReadSize(); WaveIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); WaveIds.Add(_e0);}}
     }
 
     public static Level DeserializeLevel(ByteBuf _buf)
@@ -31,7 +31,7 @@ public sealed partial class Level : Luban.BeanBase
     /// <summary>
     /// 关卡标识
     /// </summary>
-    public readonly string Id;
+    public readonly int Id;
     /// <summary>
     /// 关卡名称
     /// </summary>
@@ -47,13 +47,17 @@ public sealed partial class Level : Luban.BeanBase
     /// <summary>
     /// 波次标识列表
     /// </summary>
-    public readonly System.Collections.Generic.List<string> WaveIds;
+    public readonly System.Collections.Generic.List<int> WaveIds;
+    public System.Collections.Generic.List<level.LevelWave> WaveIds_Ref;
    
     public const int __ID__ = 685080698;
     public override int GetTypeId() => __ID__;
 
     public  void ResolveRef(Tables tables)
     {
+        WaveIds_Ref = new System.Collections.Generic.List<level.LevelWave>();
+        foreach (var _v in WaveIds) { WaveIds_Ref.Add(tables.TbLevelWave.GetOrDefault(_v)); }
+
     }
 
     public override string ToString()

@@ -17,13 +17,13 @@ namespace GameConfig.level
 /// </summary>
 public partial class TbLevel
 {
-    private readonly System.Collections.Generic.Dictionary<string, level.Level> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, level.Level> _dataMap;
     private readonly System.Collections.Generic.List<level.Level> _dataList;
     
     public TbLevel(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, level.Level>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, level.Level>(n);
         _dataList = new System.Collections.Generic.List<level.Level>(n);
         for(int i = n ; i > 0 ; --i)
         {
@@ -34,12 +34,12 @@ public partial class TbLevel
         }
     }
 
-    public System.Collections.Generic.Dictionary<string, level.Level> DataMap => _dataMap;
+    public System.Collections.Generic.Dictionary<int, level.Level> DataMap => _dataMap;
     public System.Collections.Generic.List<level.Level> DataList => _dataList;
 
-    public level.Level GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public level.Level Get(string key) => _dataMap[key];
-    public level.Level this[string key] => _dataMap[key];
+    public level.Level GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public level.Level Get(int key) => _dataMap[key];
+    public level.Level this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {

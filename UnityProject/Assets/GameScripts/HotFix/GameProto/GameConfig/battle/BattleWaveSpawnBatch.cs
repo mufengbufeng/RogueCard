@@ -16,11 +16,11 @@ public sealed partial class BattleWaveSpawnBatch : Luban.BeanBase
 {
     public BattleWaveSpawnBatch(ByteBuf _buf) 
     {
-        Id = _buf.ReadString();
-        SpawnId = _buf.ReadString();
+        Id = _buf.ReadInt();
+        SpawnId = _buf.ReadInt();
         SpawnId_Ref = null;
         Order = _buf.ReadInt();
-        MonsterId = _buf.ReadString();
+        MonsterId = _buf.ReadInt();
         MonsterId_Ref = null;
         Count = _buf.ReadInt();
     }
@@ -33,11 +33,11 @@ public sealed partial class BattleWaveSpawnBatch : Luban.BeanBase
     /// <summary>
     /// 批次标识
     /// </summary>
-    public readonly string Id;
+    public readonly int Id;
     /// <summary>
     /// 所属刷怪方案标识
     /// </summary>
-    public readonly string SpawnId;
+    public readonly int SpawnId;
     public battle.BattleWaveSpawn SpawnId_Ref;
     /// <summary>
     /// 批次顺序
@@ -46,7 +46,7 @@ public sealed partial class BattleWaveSpawnBatch : Luban.BeanBase
     /// <summary>
     /// 怪物标识
     /// </summary>
-    public readonly string MonsterId;
+    public readonly int MonsterId;
     public monster.Monster MonsterId_Ref;
     /// <summary>
     /// 怪物数量

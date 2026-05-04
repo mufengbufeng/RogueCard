@@ -16,7 +16,7 @@ public sealed partial class Monster : Luban.BeanBase
 {
     public Monster(ByteBuf _buf) 
     {
-        Id = _buf.ReadString();
+        Id = _buf.ReadInt();
         Name = _buf.ReadString();
         Desc = _buf.ReadString();
         AssetId = _buf.ReadString();
@@ -30,7 +30,7 @@ public sealed partial class Monster : Luban.BeanBase
     /// <summary>
     /// 怪物标识
     /// </summary>
-    public readonly string Id;
+    public readonly int Id;
     /// <summary>
     /// 怪物名称
     /// </summary>

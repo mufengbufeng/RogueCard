@@ -17,13 +17,13 @@ namespace GameConfig.monster
 /// </summary>
 public partial class TbMonster
 {
-    private readonly System.Collections.Generic.Dictionary<string, monster.Monster> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, monster.Monster> _dataMap;
     private readonly System.Collections.Generic.List<monster.Monster> _dataList;
     
     public TbMonster(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, monster.Monster>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, monster.Monster>(n);
         _dataList = new System.Collections.Generic.List<monster.Monster>(n);
         for(int i = n ; i > 0 ; --i)
         {
@@ -34,12 +34,12 @@ public partial class TbMonster
         }
     }
 
-    public System.Collections.Generic.Dictionary<string, monster.Monster> DataMap => _dataMap;
+    public System.Collections.Generic.Dictionary<int, monster.Monster> DataMap => _dataMap;
     public System.Collections.Generic.List<monster.Monster> DataList => _dataList;
 
-    public monster.Monster GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public monster.Monster Get(string key) => _dataMap[key];
-    public monster.Monster this[string key] => _dataMap[key];
+    public monster.Monster GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public monster.Monster Get(int key) => _dataMap[key];
+    public monster.Monster this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {

@@ -16,15 +16,15 @@ public sealed partial class LevelWave : Luban.BeanBase
 {
     public LevelWave(ByteBuf _buf) 
     {
-        Id = _buf.ReadString();
-        LevelId = _buf.ReadString();
+        Id = _buf.ReadInt();
+        LevelId = _buf.ReadInt();
         LevelId_Ref = null;
         Order = _buf.ReadInt();
         Type = (level.WaveType)_buf.ReadInt();
         Title = _buf.ReadString();
         Desc = _buf.ReadString();
         ContinueText = _buf.ReadString();
-        if(_buf.ReadBool()){ PayloadId = _buf.ReadString(); } else { PayloadId = null; }
+        if(_buf.ReadBool()){ PayloadId = _buf.ReadInt(); } else { PayloadId = null; }
     }
 
     public static LevelWave DeserializeLevelWave(ByteBuf _buf)
@@ -35,11 +35,11 @@ public sealed partial class LevelWave : Luban.BeanBase
     /// <summary>
     /// 波次标识
     /// </summary>
-    public readonly string Id;
+    public readonly int Id;
     /// <summary>
     /// 所属关卡标识
     /// </summary>
-    public readonly string LevelId;
+    public readonly int LevelId;
     public level.Level LevelId_Ref;
     /// <summary>
     /// 波次顺序
@@ -64,7 +64,7 @@ public sealed partial class LevelWave : Luban.BeanBase
     /// <summary>
     /// 可选负载标识
     /// </summary>
-    public readonly string PayloadId;
+    public readonly int? PayloadId;
    
     public const int __ID__ = -923420013;
     public override int GetTypeId() => __ID__;

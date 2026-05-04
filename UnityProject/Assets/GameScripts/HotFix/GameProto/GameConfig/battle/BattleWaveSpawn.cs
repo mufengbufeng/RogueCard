@@ -16,10 +16,10 @@ public sealed partial class BattleWaveSpawn : Luban.BeanBase
 {
     public BattleWaveSpawn(ByteBuf _buf) 
     {
-        Id = _buf.ReadString();
+        Id = _buf.ReadInt();
         Name = _buf.ReadString();
         Desc = _buf.ReadString();
-        {int n0 = _buf.ReadSize(); BatchIds = new System.Collections.Generic.List<string>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { string _e0;  _e0 = _buf.ReadString(); BatchIds.Add(_e0);}}
+        {int n0 = _buf.ReadSize(); BatchIds = new System.Collections.Generic.List<int>(n0);for(var i0 = 0 ; i0 < n0 ; i0++) { int _e0;  _e0 = _buf.ReadInt(); BatchIds.Add(_e0);}}
     }
 
     public static BattleWaveSpawn DeserializeBattleWaveSpawn(ByteBuf _buf)
@@ -30,7 +30,7 @@ public sealed partial class BattleWaveSpawn : Luban.BeanBase
     /// <summary>
     /// 刷怪方案标识
     /// </summary>
-    public readonly string Id;
+    public readonly int Id;
     /// <summary>
     /// 刷怪方案名称
     /// </summary>
@@ -42,7 +42,7 @@ public sealed partial class BattleWaveSpawn : Luban.BeanBase
     /// <summary>
     /// 刷怪批次标识列表
     /// </summary>
-    public readonly System.Collections.Generic.List<string> BatchIds;
+    public readonly System.Collections.Generic.List<int> BatchIds;
     public System.Collections.Generic.List<battle.BattleWaveSpawnBatch> BatchIds_Ref;
    
     public const int __ID__ = 137754836;

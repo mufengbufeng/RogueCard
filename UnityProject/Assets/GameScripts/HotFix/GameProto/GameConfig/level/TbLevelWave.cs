@@ -17,13 +17,13 @@ namespace GameConfig.level
 /// </summary>
 public partial class TbLevelWave
 {
-    private readonly System.Collections.Generic.Dictionary<string, level.LevelWave> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, level.LevelWave> _dataMap;
     private readonly System.Collections.Generic.List<level.LevelWave> _dataList;
     
     public TbLevelWave(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, level.LevelWave>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, level.LevelWave>(n);
         _dataList = new System.Collections.Generic.List<level.LevelWave>(n);
         for(int i = n ; i > 0 ; --i)
         {
@@ -34,12 +34,12 @@ public partial class TbLevelWave
         }
     }
 
-    public System.Collections.Generic.Dictionary<string, level.LevelWave> DataMap => _dataMap;
+    public System.Collections.Generic.Dictionary<int, level.LevelWave> DataMap => _dataMap;
     public System.Collections.Generic.List<level.LevelWave> DataList => _dataList;
 
-    public level.LevelWave GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public level.LevelWave Get(string key) => _dataMap[key];
-    public level.LevelWave this[string key] => _dataMap[key];
+    public level.LevelWave GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public level.LevelWave Get(int key) => _dataMap[key];
+    public level.LevelWave this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {

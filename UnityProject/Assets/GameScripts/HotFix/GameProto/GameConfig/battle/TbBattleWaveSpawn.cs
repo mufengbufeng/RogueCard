@@ -17,13 +17,13 @@ namespace GameConfig.battle
 /// </summary>
 public partial class TbBattleWaveSpawn
 {
-    private readonly System.Collections.Generic.Dictionary<string, battle.BattleWaveSpawn> _dataMap;
+    private readonly System.Collections.Generic.Dictionary<int, battle.BattleWaveSpawn> _dataMap;
     private readonly System.Collections.Generic.List<battle.BattleWaveSpawn> _dataList;
     
     public TbBattleWaveSpawn(ByteBuf _buf)
     {
         int n = _buf.ReadSize();
-        _dataMap = new System.Collections.Generic.Dictionary<string, battle.BattleWaveSpawn>(n);
+        _dataMap = new System.Collections.Generic.Dictionary<int, battle.BattleWaveSpawn>(n);
         _dataList = new System.Collections.Generic.List<battle.BattleWaveSpawn>(n);
         for(int i = n ; i > 0 ; --i)
         {
@@ -34,12 +34,12 @@ public partial class TbBattleWaveSpawn
         }
     }
 
-    public System.Collections.Generic.Dictionary<string, battle.BattleWaveSpawn> DataMap => _dataMap;
+    public System.Collections.Generic.Dictionary<int, battle.BattleWaveSpawn> DataMap => _dataMap;
     public System.Collections.Generic.List<battle.BattleWaveSpawn> DataList => _dataList;
 
-    public battle.BattleWaveSpawn GetOrDefault(string key) => _dataMap.TryGetValue(key, out var v) ? v : default;
-    public battle.BattleWaveSpawn Get(string key) => _dataMap[key];
-    public battle.BattleWaveSpawn this[string key] => _dataMap[key];
+    public battle.BattleWaveSpawn GetOrDefault(int key) => _dataMap.TryGetValue(key, out var v) ? v : default;
+    public battle.BattleWaveSpawn Get(int key) => _dataMap[key];
+    public battle.BattleWaveSpawn this[int key] => _dataMap[key];
 
     public void ResolveRef(Tables tables)
     {
