@@ -75,6 +75,7 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 ### 运行测试
 
 测试使用 Unity Test Runner（NUnit），EditMode 测试在 `GameLogic.Tests.EditMode` 程序集中。
+"D:\DocApp\UnityEditor\6000.3.12f1\Editor\Unity.exe"
 
 命令行运行：
 ```bash
