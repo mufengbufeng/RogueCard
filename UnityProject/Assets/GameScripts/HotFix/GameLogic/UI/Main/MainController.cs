@@ -69,12 +69,14 @@ namespace GameLogic
             string levelName = _mainModel?.DefaultLevelName ?? MainModel.DefaultLevelDisplayName;
             var requestEvent = new StartLevelRequestedEvent(levelId, levelName);
 
+            _mainModel?.SetStatusText($"正在进入：{levelName}");
+            RefreshViewFromModel();
+            _mainView?.SetFeedbackText($"正在进入默认关卡：{levelId}");
+            _mainView?.SetStartButtonInteractable(false);
+
             GameLogicEntry.Event?.StartLevelRequestedEvent.Publish(requestEvent);
 
-            _mainModel?.SetStatusText($"准备进入：{levelName}");
-            RefreshViewFromModel();
-            _mainView?.SetFeedbackText($"已发起默认关卡进入请求：{levelId}");
-            Log.Info($"[MainController] 已发起默认关卡进入请求：{levelId}");
+            Log.Info($"[MainController] 已请求进入默认关卡：{levelId}");
         }
 
         /// <summary>

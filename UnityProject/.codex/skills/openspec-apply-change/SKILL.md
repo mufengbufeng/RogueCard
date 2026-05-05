@@ -1,6 +1,6 @@
 ---
 name: openspec-apply-change
-description: Implement tasks from an OpenSpec change. Use when the user wants to start implementing, continue implementation, or work through tasks.
+description: Implement tasks from an OpenSpec change with TDD. Use when the user wants to start implementing, continue implementation, or work through tasks; during implementation, use /tdd or the red-green-refactor workflow for code changes.
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
@@ -66,9 +66,13 @@ Implement tasks from an OpenSpec change.
 
 6. **Implement tasks (loop until done or blocked)**
 
-   For each pending task:
+   For each pending task, use a TDD loop:
    - Show which task is being worked on
-   - Make the code changes required
+   - Start with `/tdd`-style development: write or update the failing test that defines the required behavior before changing production code
+   - Run the focused test and confirm the red state when practical
+   - Make the minimal code changes required to pass the test
+   - Run the focused test again and confirm the green state
+   - Refactor only if it keeps the test suite green and stays within the task scope
    - Keep changes minimal and focused
    - Mark task complete in the tasks file: `- [ ]` → `- [x]`
    - Continue to next task
@@ -144,6 +148,8 @@ What would you like to do?
 - If task is ambiguous, pause and ask before implementing
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
+- Use TDD for implementation tasks: add or update tests first, observe/describe red when practical, implement the smallest green change, then refactor only while green
+- If a pending task cannot be covered by an automated test, state why before implementing and use the narrowest manual verification instead
 - Update task checkbox immediately after completing each task
 - Pause on errors, blockers, or unclear requirements - don't guess
 - Use contextFiles from CLI output, don't assume specific file names

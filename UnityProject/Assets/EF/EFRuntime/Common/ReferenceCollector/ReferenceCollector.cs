@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 //Object并非C#基础中的Object，而是 UnityEngine.Object
 using Object = UnityEngine.Object;
@@ -73,179 +74,60 @@ public class ReferenceCollector : MonoBehaviour, ISerializationCallbackReceiver
 	}
 
 	/// <summary>
-	/// 基于命名规范自动收集组件
-	/// 遵循 UHub 命名规范：Button 后缀为 "Btn"，Text 后缀为 "Text" 等
+	/// 基于项目级规则自动收集子节点引用。
 	/// </summary>
 	public int AutoCollectByNamingRules()
 	{
-		int collectedCount = 0;
-		var allChildren = GetComponentsInChildren<Transform>(true);
-
-		foreach (var childTransform in allChildren)
-		{
-			if (childTransform == this.transform) continue; // 跳过自己
-
-			var childName = childTransform.name;
-			if (string.IsNullOrEmpty(childName)) continue;
-
-			// 检查是否符合命名规范
-			if (ShouldCollectByName(childName))
-			{
-				var targetComponent = GetTargetComponent(childTransform);
-				if (targetComponent != null)
-				{
-					// 检查是否已存在
-					bool exists = false;
-					foreach (var existingData in data)
-					{
-						if (existingData.key == childName)
-						{
-							exists = true;
-							break;
-						}
-					}
-
-					if (!exists)
-					{
-						Add(childName, targetComponent);
-						collectedCount++;
-						UnityEngine.Debug.Log($"[ReferenceCollector] 自动收集: {childName} -> {targetComponent.GetType().Name}");
-					}
-				}
-			}
-		}
-
-		if (collectedCount > 0)
-		{
-			Sort(); // 自动排序
-			UnityEngine.Debug.Log($"[ReferenceCollector] 自动收集完成，共收集 {collectedCount} 个组件");
-		}
-		else
-		{
-			UnityEngine.Debug.Log("[ReferenceCollector] 未找到符合命名规范的组件");
-		}
-
-		return collectedCount;
+		return InvokeEditorRuleService("AutoCollect");
 	}
 
 	/// <summary>
-	/// 判断是否应该根据名称收集此组件
-	/// 基于 UHub 命名规范的后缀匹配
-	/// </summary>
-	private bool ShouldCollectByName(string objectName)
-	{
-		if (string.IsNullOrEmpty(objectName)) return false;
-
-		// 定义 UHub 支持的后缀
-		string[] supportedSuffixes =
-		{
-			"Btn", "Button",           // Button 组件
-			"Text", "Label",           // Text 组件  
-			"Img",            			// Image 组件
-			"Slider",                  // Slider 组件
-			"Toggle",                  // Toggle 组件
-			"Input", "InputField",     // InputField 组件
-			"Dropdown",                // Dropdown 组件
-			"Go", "Obj", // GameObject
-			"SpriteRenderer"    // SpriteRenderer 组件
-		};
-
-		foreach (var suffix in supportedSuffixes)
-		{
-			if (objectName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase))
-			{
-				return true;
-			}
-		}
-
-		return false;
-	}
-
-	/// <summary>
-	/// 根据命名获取目标组件
-	/// 优先获取具体组件，如果没有则返回 GameObject
-	/// </summary>
-	private Object GetTargetComponent(Transform transform)
-	{
-		var objectName = transform.name;
-
-		// 根据后缀推断组件类型
-		if (objectName.EndsWith("Btn", StringComparison.OrdinalIgnoreCase) ||
-			objectName.EndsWith("Button", StringComparison.OrdinalIgnoreCase))
-		{
-			var button = transform.GetComponent<UnityEngine.UI.Button>();
-			if (button != null) return button;
-		}
-		else if (objectName.EndsWith("Text", StringComparison.OrdinalIgnoreCase) ||
-				 objectName.EndsWith("Label", StringComparison.OrdinalIgnoreCase))
-		{
-			var text = transform.GetComponent<UnityEngine.UI.Text>();
-			if (text != null) return text;
-		}
-		else if (objectName.EndsWith("Img", StringComparison.OrdinalIgnoreCase) ||
-				 objectName.EndsWith("Image", StringComparison.OrdinalIgnoreCase))
-		{
-			var image = transform.GetComponent<UnityEngine.UI.Image>();
-			if (image != null) return image;
-		}
-		else if (objectName.EndsWith("Slider", StringComparison.OrdinalIgnoreCase))
-		{
-			var slider = transform.GetComponent<UnityEngine.UI.Slider>();
-			if (slider != null) return slider;
-		}
-		else if (objectName.EndsWith("Toggle", StringComparison.OrdinalIgnoreCase))
-		{
-			var toggle = transform.GetComponent<UnityEngine.UI.Toggle>();
-			if (toggle != null) return toggle;
-		}
-		else if (objectName.EndsWith("Input", StringComparison.OrdinalIgnoreCase) ||
-				 objectName.EndsWith("InputField", StringComparison.OrdinalIgnoreCase))
-		{
-			var inputField = transform.GetComponent<UnityEngine.UI.InputField>();
-			if (inputField != null) return inputField;
-		}
-		else if (objectName.EndsWith("Dropdown", StringComparison.OrdinalIgnoreCase))
-		{
-			var dropdown = transform.GetComponent<UnityEngine.UI.Dropdown>();
-			if (dropdown != null) return dropdown;
-		}else if (objectName.EndsWith("SpriteRenderer", StringComparison.OrdinalIgnoreCase))
-		{
-			var spriteRenderer = transform.GetComponent<SpriteRenderer>();
-			if (spriteRenderer != null) return spriteRenderer;
-		}
-
-		// 如果没有找到特定组件，返回 GameObject
-		return transform.gameObject;
-	}
-
-	/// <summary>
-	/// 清除所有自动收集的组件（保留手动添加的）
-	/// 基于命名规范判断是否为自动收集的组件
+	/// 清除所有符合项目级规则的自动收集引用。
 	/// </summary>
 	public int ClearAutoCollected()
 	{
-		var toRemove = new List<string>();
+		return InvokeEditorRuleService("ClearAutoCollected");
+	}
 
-		foreach (var item in data)
+	/// <summary>
+	/// 调用编辑器侧规则服务。
+	/// </summary>
+	private int InvokeEditorRuleService(string methodName)
+	{
+		var serviceType = ResolveEditorRuleServiceType();
+		if (serviceType == null)
 		{
-			if (ShouldCollectByName(item.key))
+			Debug.LogWarning("[ReferenceCollector] 未找到编辑器自动收集服务");
+			return 0;
+		}
+
+		var method = serviceType.GetMethod(methodName, BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public);
+		if (method == null)
+		{
+			Debug.LogWarning($"[ReferenceCollector] 编辑器自动收集服务缺少方法：{methodName}");
+			return 0;
+		}
+
+		return (int)method.Invoke(null, new object[] { this });
+	}
+
+	/// <summary>
+	/// 从已加载程序集查找编辑器侧规则服务类型。
+	/// </summary>
+	private Type ResolveEditorRuleServiceType()
+	{
+		foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+		{
+			var type = assembly.GetType("GT.ReferenceCollectorAutoCollectService");
+			if (type != null)
 			{
-				toRemove.Add(item.key);
+				return type;
 			}
 		}
 
-		foreach (var key in toRemove)
-		{
-			Remove(key);
-		}
-
-		if (toRemove.Count > 0)
-		{
-			UnityEngine.Debug.Log($"[ReferenceCollector] 清除自动收集的组件，共清除 {toRemove.Count} 个");
-		}
-
-		return toRemove.Count;
+		return null;
 	}
+
 	//删除元素，知识点与上面的添加相似
 	public void Remove(string key)
 	{

@@ -1,192 +1,414 @@
 using System;
-using System.Collections.Generic;
+using GT;
 using UnityEditor;
+using UnityEditor.UIElements;
 using UnityEngine;
-//Object并非C#基础中的Object，而是 UnityEngine.Object
+using UnityEngine.UIElements;
 using Object = UnityEngine.Object;
 
-//自定义ReferenceCollector类在界面中的显示与功能
-[CustomEditor(typeof (ReferenceCollector))]
-public class ReferenceCollectorEditor: Editor
+[CustomEditor(typeof(ReferenceCollector))]
+public class ReferenceCollectorEditor : Editor
 {
-    //输入在textfield中的字符串
-    private string searchKey
-	{
-		get
-		{
-			return _searchKey;
-		}
-		set
-		{
-			if (_searchKey != value)
-			{
-				_searchKey = value;
-				heroPrefab = referenceCollector.Get<Object>(searchKey);
-			}
-		}
-	}
+    private ReferenceCollector referenceCollector;
+    private SerializedProperty dataProperty;
+    private VisualElement referenceList;
+    private ObjectField searchObjectField;
+    private string searchKey = string.Empty;
 
-	private ReferenceCollector referenceCollector;
+    /// <summary>
+    /// 初始化当前 Inspector 目标。
+    /// </summary>
+    private void OnEnable()
+    {
+        referenceCollector = (ReferenceCollector)target;
+    }
 
-	private Object heroPrefab;
+    /// <summary>
+    /// 创建 ReferenceCollector 的 UIElements Inspector。
+    /// </summary>
+    public override VisualElement CreateInspectorGUI()
+    {
+        serializedObject.Update();
+        dataProperty = serializedObject.FindProperty("data");
 
-	private string _searchKey = "";
+        var root = new VisualElement();
+        root.style.paddingLeft = 6;
+        root.style.paddingRight = 6;
+        root.style.paddingTop = 6;
+        root.style.paddingBottom = 6;
 
-	private void DelNullReference()
-	{
-		var dataProperty = serializedObject.FindProperty("data");
-		for (int i = dataProperty.arraySize - 1; i >= 0; i--)
-		{
-			var gameObjectProperty = dataProperty.GetArrayElementAtIndex(i).FindPropertyRelative("gameObject");
-			if (gameObjectProperty.objectReferenceValue == null)
-			{
-				dataProperty.DeleteArrayElementAtIndex(i);
-				EditorUtility.SetDirty(referenceCollector);
-				serializedObject.ApplyModifiedProperties();
-				serializedObject.UpdateIfRequiredOrScript();
-			}
-		}
-	}
+        BuildMainOperations(root);
+        BuildAutoCollectOperations(root);
+        BuildRuleSummary(root);
+        BuildSearchDelete(root);
+        BuildReferenceList(root);
 
-	private void OnEnable()
-	{
-        //将被选中的gameobject所挂载的ReferenceCollector赋值给编辑器类中的ReferenceCollector，方便操作
-        referenceCollector = (ReferenceCollector) target;
-	}
+        return root;
+    }
 
-	public override void OnInspectorGUI()
-	{
-        //使ReferenceCollector支持撤销操作，还有Redo，不过没有在这里使用
-        Undo.RecordObject(referenceCollector, "Changed Settings");
-		var dataProperty = serializedObject.FindProperty("data");
-        //开始水平布局，如果是比较新版本学习U3D的，可能不知道这东西，这个是老GUI系统的知识，除了用在编辑器里，还可以用在生成的游戏中
-		GUILayout.BeginHorizontal();
-        //下面几个if都是点击按钮就会返回true调用里面的东西
-		if (GUILayout.Button("添加引用"))
-		{
-            //添加新的元素，具体的函数注释
-            // Guid.NewGuid().GetHashCode().ToString() 就是新建后默认的key
-            AddReference(dataProperty, Guid.NewGuid().GetHashCode().ToString(), null);
-		}
-		if (GUILayout.Button("全部删除"))
-		{
-			referenceCollector.Clear();
-		}
-		if (GUILayout.Button("删除空引用"))
-		{
-			DelNullReference();
-		}
-		if (GUILayout.Button("排序"))
-		{
-			referenceCollector.Sort();
-		}
-		EditorGUILayout.EndHorizontal();
-		
-		// 自动收集功能区域
-		EditorGUILayout.Space();
-		GUILayout.Label("自动收集 (基于命名规范)", EditorStyles.boldLabel);
-		EditorGUILayout.BeginHorizontal();
-		if (GUILayout.Button("自动收集"))
-		{
-			int collectedCount = referenceCollector.AutoCollectByNamingRules();
-			if (collectedCount > 0)
-			{
-				EditorUtility.SetDirty(referenceCollector);
-				serializedObject.ApplyModifiedProperties();
-				serializedObject.UpdateIfRequiredOrScript();
-			}
-		}
-		if (GUILayout.Button("清除自动收集"))
-		{
-			if (EditorUtility.DisplayDialog("确认清除", "确定要清除所有自动收集的组件吗？\n这将删除所有符合命名规范的组件引用。", "确认", "取消"))
-			{
-				int removedCount = referenceCollector.ClearAutoCollected();
-				if (removedCount > 0)
-				{
-					EditorUtility.SetDirty(referenceCollector);
-					serializedObject.ApplyModifiedProperties();
-					serializedObject.UpdateIfRequiredOrScript();
-				}
-			}
-		}
-		EditorGUILayout.EndHorizontal();
-		
-		// 显示命名规范说明
-		EditorGUILayout.HelpBox("命名规范：\n" +
-		                        "• Button 组件：以 Btn 或 Button 结尾\n" +
-		                        "• Text 组件：以 Text 或 Label 结尾\n" +
-		                        "• Image 组件：以 Img 或 Image 结尾\n" +
-		                        "• 其他：Slider, Toggle, Input/InputField, Dropdown\n" +
-		                        "• GameObject：以 Go/Obj/GameObject 结尾", 
-		                        MessageType.Info);
-		EditorGUILayout.BeginHorizontal();
-        //可以在编辑器中对searchKey进行赋值，只要输入对应的Key值，就可以点后面的删除按钮删除相对应的元素
-        searchKey = EditorGUILayout.TextField(searchKey);
-        //添加的可以用于选中Object的框，这里的object也是(UnityEngine.Object
-        //第三个参数为是否只能引用scene中的Object
-        EditorGUILayout.ObjectField(heroPrefab, typeof (Object), false);
-		if (GUILayout.Button("删除"))
-		{
-			referenceCollector.Remove(searchKey);
-			heroPrefab = null;
-		}
-		GUILayout.EndHorizontal();
-		EditorGUILayout.Space();
+    /// <summary>
+    /// 构建手动引用操作按钮。
+    /// </summary>
+    private void BuildMainOperations(VisualElement root)
+    {
+        var row = CreateRow();
+        row.Add(CreateButton("添加引用", () =>
+        {
+            AddReference(Guid.NewGuid().GetHashCode().ToString(), null);
+            RefreshReferenceList();
+        }));
+        row.Add(CreateButton("全部删除", () =>
+        {
+            Undo.RecordObject(referenceCollector, "清空 ReferenceCollector 引用");
+            referenceCollector.Clear();
+            serializedObject.Update();
+            RefreshReferenceList();
+        }));
+        row.Add(CreateButton("删除空引用", () =>
+        {
+            DeleteNullReferences();
+            RefreshReferenceList();
+        }));
+        row.Add(CreateButton("排序", () =>
+        {
+            Undo.RecordObject(referenceCollector, "排序 ReferenceCollector 引用");
+            referenceCollector.Sort();
+            serializedObject.Update();
+            RefreshReferenceList();
+        }));
+        root.Add(row);
+    }
 
-		var delList = new List<int>();
-        SerializedProperty property;
-        //遍历ReferenceCollector中data list的所有元素，显示在编辑器中
-        for (int i = referenceCollector.data.Count - 1; i >= 0; i--)
-		{
-			GUILayout.BeginHorizontal();
-            //这里的知识点在ReferenceCollector中有说
-            property = dataProperty.GetArrayElementAtIndex(i).FindPropertyRelative("key");
-            property.stringValue = EditorGUILayout.TextField(property.stringValue, GUILayout.Width(150));
-            property = dataProperty.GetArrayElementAtIndex(i).FindPropertyRelative("gameObject");
-            property.objectReferenceValue = EditorGUILayout.ObjectField(property.objectReferenceValue, typeof(Object), true);
-			if (GUILayout.Button("X"))
-			{
-                //将元素添加进删除list
-				delList.Add(i);
-			}
-			GUILayout.EndHorizontal();
-		}
-		var eventType = Event.current.type;
-        //在Inspector 窗口上创建区域，向区域拖拽资源对象，获取到拖拽到区域的对象
-        if (eventType == EventType.DragUpdated || eventType == EventType.DragPerform)
-		{
-			// Show a copy icon on the drag
-			DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+    /// <summary>
+    /// 构建自动收集操作区。
+    /// </summary>
+    private void BuildAutoCollectOperations(VisualElement root)
+    {
+        root.Add(CreateTitle("自动收集（基于项目规则）"));
 
-			if (eventType == EventType.DragPerform)
-			{
-				DragAndDrop.AcceptDrag();
-				foreach (var o in DragAndDrop.objectReferences)
-				{
-					AddReference(dataProperty, o.name, o);
-				}
-			}
+        var row = CreateRow();
+        row.Add(CreateButton("自动收集", () =>
+        {
+            Undo.RecordObject(referenceCollector, "自动收集 ReferenceCollector 引用");
+            referenceCollector.AutoCollectByNamingRules();
+            serializedObject.Update();
+            RefreshReferenceList();
+        }));
+        row.Add(CreateButton("清除自动收集", () =>
+        {
+            if (!EditorUtility.DisplayDialog("确认清除", "确定要清除所有符合项目规则的自动收集引用吗？", "确认", "取消"))
+            {
+                return;
+            }
 
-			Event.current.Use();
-		}
+            Undo.RecordObject(referenceCollector, "清除自动收集 ReferenceCollector 引用");
+            referenceCollector.ClearAutoCollected();
+            serializedObject.Update();
+            RefreshReferenceList();
+        }));
+        root.Add(row);
+    }
 
-        //遍历删除list，将其删除掉
-		foreach (var i in delList)
-		{
-			dataProperty.DeleteArrayElementAtIndex(i);
-		}
-		serializedObject.ApplyModifiedProperties();
-		serializedObject.UpdateIfRequiredOrScript();
-	}
+    /// <summary>
+    /// 构建只读项目规则摘要。
+    /// </summary>
+    private void BuildRuleSummary(VisualElement root)
+    {
+        var container = new VisualElement();
+        container.style.marginTop = 8;
+        container.style.marginBottom = 8;
+        container.style.paddingLeft = 6;
+        container.style.paddingRight = 6;
+        container.style.paddingTop = 6;
+        container.style.paddingBottom = 6;
+        container.style.borderTopWidth = 1;
+        container.style.borderBottomWidth = 1;
+        container.style.borderLeftWidth = 1;
+        container.style.borderRightWidth = 1;
+        container.style.borderTopColor = Color.gray;
+        container.style.borderBottomColor = Color.gray;
+        container.style.borderLeftColor = Color.gray;
+        container.style.borderRightColor = Color.gray;
 
-    //添加元素，具体知识点在ReferenceCollector中说了
-    private void AddReference(SerializedProperty dataProperty, string key, Object obj)
-	{
-		int index = dataProperty.arraySize;
-		dataProperty.InsertArrayElementAtIndex(index);
-		var element = dataProperty.GetArrayElementAtIndex(index);
-		element.FindPropertyRelative("key").stringValue = key;
-		element.FindPropertyRelative("gameObject").objectReferenceValue = obj;
-	}
+        container.Add(CreateTitle("项目收集规则（只读）"));
+        foreach (var line in ReferenceCollectorRuleService.BuildRuleSummaryLines())
+        {
+            var label = new Label(line);
+            label.style.whiteSpace = WhiteSpace.Normal;
+            container.Add(label);
+        }
+
+        root.Add(container);
+    }
+
+    /// <summary>
+    /// 构建按 key 搜索删除区域。
+    /// </summary>
+    private void BuildSearchDelete(VisualElement root)
+    {
+        var row = CreateRow();
+        var searchField = new TextField();
+        searchField.style.flexGrow = 1;
+        searchField.RegisterValueChangedCallback(evt =>
+        {
+            searchKey = evt.newValue ?? string.Empty;
+            searchObjectField.value = FindReferenceByKey(searchKey);
+        });
+        row.Add(searchField);
+
+        searchObjectField = new ObjectField();
+        searchObjectField.objectType = typeof(Object);
+        searchObjectField.allowSceneObjects = true;
+        searchObjectField.SetEnabled(false);
+        searchObjectField.style.flexGrow = 1;
+        row.Add(searchObjectField);
+
+        row.Add(CreateButton("删除", () =>
+        {
+            referenceCollector.Remove(searchKey);
+            serializedObject.Update();
+            searchObjectField.value = null;
+            RefreshReferenceList();
+        }));
+        root.Add(row);
+    }
+
+    /// <summary>
+    /// 构建引用列表与拖拽区域。
+    /// </summary>
+    private void BuildReferenceList(VisualElement root)
+    {
+        root.Add(CreateTitle("引用列表"));
+        referenceList = new VisualElement();
+        referenceList.style.minHeight = 80;
+        referenceList.style.paddingTop = 4;
+        referenceList.style.paddingBottom = 4;
+        referenceList.style.borderTopWidth = 1;
+        referenceList.style.borderBottomWidth = 1;
+        referenceList.style.borderLeftWidth = 1;
+        referenceList.style.borderRightWidth = 1;
+        referenceList.style.borderTopColor = Color.gray;
+        referenceList.style.borderBottomColor = Color.gray;
+        referenceList.style.borderLeftColor = Color.gray;
+        referenceList.style.borderRightColor = Color.gray;
+        referenceList.RegisterCallback<DragUpdatedEvent>(HandleDragUpdated);
+        referenceList.RegisterCallback<DragPerformEvent>(HandleDragPerform);
+        root.Add(referenceList);
+        RefreshReferenceList();
+    }
+
+    /// <summary>
+    /// 刷新引用列表显示。
+    /// </summary>
+    private void RefreshReferenceList()
+    {
+        if (referenceList == null)
+        {
+            return;
+        }
+
+        serializedObject.Update();
+        dataProperty = serializedObject.FindProperty("data");
+        referenceList.Clear();
+
+        for (int i = dataProperty.arraySize - 1; i >= 0; i--)
+        {
+            AddReferenceRow(i);
+        }
+
+        if (dataProperty.arraySize == 0)
+        {
+            var emptyLabel = new Label("暂无引用，可拖拽对象到此区域添加。");
+            emptyLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            emptyLabel.style.marginTop = 16;
+            referenceList.Add(emptyLabel);
+        }
+    }
+
+    /// <summary>
+    /// 添加单条引用编辑行。
+    /// </summary>
+    private void AddReferenceRow(int index)
+    {
+        var row = CreateRow();
+        var element = dataProperty.GetArrayElementAtIndex(index);
+        var keyProperty = element.FindPropertyRelative("key");
+        var objectProperty = element.FindPropertyRelative("gameObject");
+
+        var keyField = new TextField();
+        keyField.value = keyProperty.stringValue;
+        keyField.style.width = 160;
+        keyField.RegisterValueChangedCallback(evt =>
+        {
+            serializedObject.Update();
+            var property = serializedObject.FindProperty("data").GetArrayElementAtIndex(index).FindPropertyRelative("key");
+            property.stringValue = evt.newValue;
+            serializedObject.ApplyModifiedProperties();
+            EditorUtility.SetDirty(referenceCollector);
+        });
+        row.Add(keyField);
+
+        var objectField = new ObjectField();
+        objectField.objectType = typeof(Object);
+        objectField.allowSceneObjects = true;
+        objectField.value = objectProperty.objectReferenceValue;
+        objectField.style.flexGrow = 1;
+        objectField.RegisterValueChangedCallback(evt =>
+        {
+            serializedObject.Update();
+            var property = serializedObject.FindProperty("data").GetArrayElementAtIndex(index).FindPropertyRelative("gameObject");
+            property.objectReferenceValue = evt.newValue;
+            serializedObject.ApplyModifiedProperties();
+            EditorUtility.SetDirty(referenceCollector);
+        });
+        row.Add(objectField);
+
+        row.Add(CreateButton("X", () =>
+        {
+            DeleteReferenceAt(index);
+            RefreshReferenceList();
+        }));
+        referenceList.Add(row);
+    }
+
+    /// <summary>
+    /// 处理拖拽更新事件。
+    /// </summary>
+    private void HandleDragUpdated(DragUpdatedEvent evt)
+    {
+        DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+        evt.StopPropagation();
+    }
+
+    /// <summary>
+    /// 处理拖拽添加引用事件。
+    /// </summary>
+    private void HandleDragPerform(DragPerformEvent evt)
+    {
+        DragAndDrop.AcceptDrag();
+        foreach (var draggedObject in DragAndDrop.objectReferences)
+        {
+            if (draggedObject == null)
+            {
+                continue;
+            }
+
+            AddReference(draggedObject.name, draggedObject);
+        }
+
+        RefreshReferenceList();
+        evt.StopPropagation();
+    }
+
+    /// <summary>
+    /// 添加一条引用数据。
+    /// </summary>
+    private void AddReference(string key, Object obj)
+    {
+        serializedObject.Update();
+        dataProperty = serializedObject.FindProperty("data");
+        int index = dataProperty.arraySize;
+        dataProperty.InsertArrayElementAtIndex(index);
+        var element = dataProperty.GetArrayElementAtIndex(index);
+        element.FindPropertyRelative("key").stringValue = key;
+        element.FindPropertyRelative("gameObject").objectReferenceValue = obj;
+        serializedObject.ApplyModifiedProperties();
+        EditorUtility.SetDirty(referenceCollector);
+    }
+
+    /// <summary>
+    /// 删除指定索引的引用数据。
+    /// </summary>
+    private void DeleteReferenceAt(int index)
+    {
+        serializedObject.Update();
+        dataProperty = serializedObject.FindProperty("data");
+        if (index < 0 || index >= dataProperty.arraySize)
+        {
+            return;
+        }
+
+        dataProperty.DeleteArrayElementAtIndex(index);
+        serializedObject.ApplyModifiedProperties();
+        EditorUtility.SetDirty(referenceCollector);
+    }
+
+    /// <summary>
+    /// 删除所有空引用数据。
+    /// </summary>
+    private void DeleteNullReferences()
+    {
+        serializedObject.Update();
+        dataProperty = serializedObject.FindProperty("data");
+        for (int i = dataProperty.arraySize - 1; i >= 0; i--)
+        {
+            var gameObjectProperty = dataProperty.GetArrayElementAtIndex(i).FindPropertyRelative("gameObject");
+            if (gameObjectProperty.objectReferenceValue != null)
+            {
+                continue;
+            }
+
+            dataProperty.DeleteArrayElementAtIndex(i);
+        }
+
+        serializedObject.ApplyModifiedProperties();
+        EditorUtility.SetDirty(referenceCollector);
+    }
+
+    /// <summary>
+    /// 按 key 查找当前引用对象。
+    /// </summary>
+    private Object FindReferenceByKey(string key)
+    {
+        if (string.IsNullOrEmpty(key) || referenceCollector.data == null)
+        {
+            return null;
+        }
+
+        foreach (var item in referenceCollector.data)
+        {
+            if (item != null && item.key == key)
+            {
+                return item.gameObject;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// 创建横向布局容器。
+    /// </summary>
+    private VisualElement CreateRow()
+    {
+        var row = new VisualElement();
+        row.style.flexDirection = FlexDirection.Row;
+        row.style.marginBottom = 4;
+        return row;
+    }
+
+    /// <summary>
+    /// 创建通用按钮。
+    /// </summary>
+    private Button CreateButton(string text, Action clicked)
+    {
+        var button = new Button(clicked)
+        {
+            text = text
+        };
+        button.style.marginRight = 4;
+        return button;
+    }
+
+    /// <summary>
+    /// 创建分区标题。
+    /// </summary>
+    private Label CreateTitle(string text)
+    {
+        var label = new Label(text);
+        label.style.unityFontStyleAndWeight = FontStyle.Bold;
+        label.style.marginTop = 6;
+        label.style.marginBottom = 4;
+        return label;
+    }
 }
-

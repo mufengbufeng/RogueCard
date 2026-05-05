@@ -4,6 +4,7 @@ using EF.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using UIElements = UnityEngine.UIElements;
 
 namespace GameLogic
 {

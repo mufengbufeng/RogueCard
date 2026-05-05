@@ -29,7 +29,7 @@ namespace GameLogic.Tests.EditMode
         }
 
         [Test]
-        public void HandleStartGame_WhenGameplayIsNotConnected_ShouldPublishDefaultLevelRequest()
+        public void HandleStartGame_WhenRequested_ShouldPublishDefaultLevelRequest()
         {
             using var harness = new ControllerHarness();
             StartLevelRequestedEvent? receivedEvent = null;
@@ -40,9 +40,10 @@ namespace GameLogic.Tests.EditMode
             Assert.That(receivedEvent.HasValue, Is.True);
             Assert.That(receivedEvent.Value.LevelId, Is.EqualTo(MainModel.DefaultLevelIdentifier));
             Assert.That(receivedEvent.Value.LevelName, Is.EqualTo(MainModel.DefaultLevelDisplayName));
-            Assert.That(harness.Model.StatusText, Is.EqualTo($"准备进入：{MainModel.DefaultLevelDisplayName}"));
-            Assert.That(harness.View._statusText.text, Is.EqualTo($"准备进入：{MainModel.DefaultLevelDisplayName}"));
-            Assert.That(harness.View._feedbackText.text, Is.EqualTo($"已发起默认关卡进入请求：{MainModel.DefaultLevelIdentifier}"));
+            Assert.That(harness.Model.StatusText, Is.EqualTo($"正在进入：{MainModel.DefaultLevelDisplayName}"));
+            Assert.That(harness.View._statusText.text, Is.EqualTo($"正在进入：{MainModel.DefaultLevelDisplayName}"));
+            Assert.That(harness.View._feedbackText.text, Is.EqualTo($"正在进入默认关卡：{MainModel.DefaultLevelIdentifier}"));
+            Assert.That(harness.View._startGameBtn.interactable, Is.False);
         }
 
         [Test]

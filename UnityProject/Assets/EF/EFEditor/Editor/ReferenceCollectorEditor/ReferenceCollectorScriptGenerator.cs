@@ -1,5 +1,4 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -14,10 +13,6 @@ namespace GT
 {
     internal static class ReferenceCollectorScriptGenerator
     {
-        private const string RegionWithParticle = "#region 脚本工具生成的代码";
-        private const string RegionEnd = "#endregion";
-        // Template strings to build code via replacements instead of AppendLine chains.
-        // Keep indentation consistent with generated code.
         private const string NewScriptTemplate =
             "{0}" +
             "namespace GameLogic\n" +
@@ -46,7 +41,6 @@ namespace GT
             "#endregion";
 
         private static readonly UTF8Encoding Utf8EncodingNoBom = new UTF8Encoding(false);
-        private static readonly Dictionary<string, Type> TypeCacheByName = new Dictionary<string, Type>(StringComparer.Ordinal);
 
         internal static void Generate(ReferenceCollector collector)
         {
@@ -88,18 +82,16 @@ namespace GT
 
         private static GenerationResult BuildGenerationData(ReferenceCollector collector)
         {
-            var rules = ScriptGeneratorSettingProxy.GetRules();
             var codeStyle = ScriptGeneratorSettingProxy.GetCodeStyle();
             var requiredUsings = new HashSet<string>(StringComparer.Ordinal) { "EF", "UnityEngine", "GT.Runtime" };
             var fieldNames = new HashSet<string>(StringComparer.Ordinal);
             var fields = new List<FieldBinding>();
-            var matchMode = ScriptGeneratorSettingProxy.GetRuleMatchMode();
 
             if (collector.data != null)
             {
                 foreach (var entry in collector.data.Where(d => !string.IsNullOrEmpty(d.key)).OrderBy(d => d.key, StringComparer.Ordinal))
                 {
-                    var binding = CreateBinding(entry, codeStyle, rules, fieldNames, matchMode);
+                    var binding = CreateBinding(entry, codeStyle, fieldNames);
                     if (binding != null)
                     {
                         if (!string.IsNullOrEmpty(binding.Namespace))
@@ -222,7 +214,6 @@ namespace GT
 
         private static string BuildNewScriptContent(string objectName, string className, GenerationResult generation)
         {
-            // Build using block with a trailing blank line when non-empty.
             var usings = generation.RequiredUsings
                 .OrderBy(u => u, StringComparer.Ordinal)
                 .Select(u => $"using {u};")
@@ -232,7 +223,6 @@ namespace GT
                 ? string.Join("\n", usings) + "\n\n"
                 : string.Empty;
 
-            // Plug parts into the template: {0}=usings, {1}=objectName, {2}=className, {3}=region block
             return string.Format(NewScriptTemplate, usingBlock, objectName, className, generation.RegionBlock + "\n");
         }
 
@@ -245,20 +235,20 @@ namespace GT
             if (fields.Count > 0)
             {
                 var declLines = fields.Select(f => $"        private {f.TypeName} {f.FieldName};");
-                fieldDeclBlock = "\n" + string.Join("\n", declLines) + "\n\n"; // blank line before and after decls
+                fieldDeclBlock = "\n" + string.Join("\n", declLines) + "\n\n";
 
                 var assignLines = fields.Select(f => $"            {f.Assignment}");
-                assignBlock = "\n" + string.Join("\n", assignLines) + "\n"; // blank line before assignments
+                assignBlock = "\n" + string.Join("\n", assignLines) + "\n";
             }
             else
             {
-                fieldDeclBlock = "\n"; // keep single blank line to match previous output
+                fieldDeclBlock = "\n";
             }
 
             return string.Format(RegionTemplate, fieldDeclBlock, assignBlock);
         }
 
-        private static FieldBinding CreateBinding(ReferenceCollectorData entry, FieldCodeStyle codeStyle, List<Rule> rules, HashSet<string> fieldNames, RuleMatchMode matchMode)
+        private static FieldBinding CreateBinding(ReferenceCollectorData entry, FieldCodeStyle codeStyle, HashSet<string> fieldNames)
         {
             var key = entry.key?.Trim();
             if (string.IsNullOrEmpty(key))
@@ -273,10 +263,10 @@ namespace GT
                 return null;
             }
 
-            var rule = FindRule(rules, key, matchMode);
+            var projectRule = ReferenceCollectorRuleService.FindFirstMatchingRule(key);
             if (target is GameObject go)
             {
-                return CreateBindingForGameObject(fieldName, key, go, rule);
+                return CreateBindingForGameObject(fieldName, key, go, projectRule);
             }
 
             var objectType = target.GetType();
@@ -285,55 +275,22 @@ namespace GT
             return new FieldBinding(fieldName, typeName, ns, fieldName + " = _referenceCollector.GetObject(\"" + key + "\") as " + typeName + ";");
         }
 
-        private static FieldBinding CreateBindingForGameObject(string fieldName, string key, GameObject go, Rule rule)
+        private static FieldBinding CreateBindingForGameObject(string fieldName, string key, GameObject go, ReferenceCollectorRule rule)
         {
-            if (rule != null && !string.IsNullOrEmpty(rule.ComponentName) && !string.Equals(rule.ComponentName, "GameObject", StringComparison.Ordinal))
+            if (rule != null)
             {
-                var component = go.GetComponent(rule.ComponentName);
-                if (component != null)
+                var resolvedRule = ReferenceCollectorRuleService.ResolveRule(rule);
+                if (resolvedRule.IsValid && resolvedRule.ComponentType != typeof(GameObject))
                 {
-                    var componentType = component.GetType();
+                    var component = go.GetComponent(resolvedRule.ComponentType);
+                    var componentType = component != null ? component.GetType() : resolvedRule.ComponentType;
                     var typeName = componentType.Name;
                     var ns = componentType.Namespace ?? string.Empty;
                     return new FieldBinding(fieldName, typeName, ns, fieldName + " = _referenceCollector.Get<" + typeName + ">(\"" + key + "\");");
                 }
-
-                var resolvedType = ResolveType(rule.ComponentName);
-                if (resolvedType != null)
-                {
-                    var typeName = resolvedType.Name;
-                    var ns = resolvedType.Namespace ?? string.Empty;
-                    return new FieldBinding(fieldName, typeName, ns, fieldName + " = _referenceCollector.Get<" + typeName + ">(\"" + key + "\");");
-                }
-
-                var guessedNamespace = GuessNamespace(rule.ComponentName);
-                return new FieldBinding(fieldName, rule.ComponentName, guessedNamespace, fieldName + " = _referenceCollector.Get<" + rule.ComponentName + ">(\"" + key + "\");");
             }
 
             return new FieldBinding(fieldName, "GameObject", "UnityEngine", fieldName + " = _referenceCollector.GetObject(\"" + key + "\") as GameObject;");
-        }
-
-        private static string GuessNamespace(string typeName)
-        {
-            var resolved = ResolveType(typeName);
-            return resolved != null ? resolved.Namespace ?? string.Empty : string.Empty;
-        }
-
-        private static Type ResolveType(string typeName)
-        {
-            if (string.IsNullOrEmpty(typeName))
-            {
-                return null;
-            }
-
-            if (TypeCacheByName.TryGetValue(typeName, out var cached))
-            {
-                return cached;
-            }
-
-            var type = TypeCache.GetTypesDerivedFrom<UnityEngine.Object>().FirstOrDefault(t => t.Name == typeName);
-            TypeCacheByName[typeName] = type;
-            return type;
         }
 
         private static string SanitizeClassName(string name)
@@ -419,30 +376,6 @@ namespace GT
             MPrefix = 1,
         }
 
-        private enum RuleMatchMode
-        {
-            Prefix = 0,
-            Regex = 1,
-        }
-
-        private sealed class Rule
-        {
-            internal Rule(string prefix, string componentName, bool isUiWidget)
-            {
-                Prefix = prefix;
-                ComponentName = componentName;
-                IsUIWidget = isUiWidget;
-            }
-
-            internal string Prefix { get; }
-
-            internal string ComponentName { get; }
-
-            internal bool IsUIWidget { get; }
-
-            internal Regex CompiledRegex { get; set; }
-        }
-
         private sealed class FieldBinding
         {
             internal FieldBinding(string fieldName, string typeName, string ns, string assignment)
@@ -479,36 +412,6 @@ namespace GT
         {
             private static readonly Type SettingType = ResolveSettingType();
 
-            internal static List<Rule> GetRules()
-            {
-                var list = new List<Rule>();
-                var raw = Invoke("GetScriptGenerateRule") as IEnumerable;
-                if (raw == null)
-                {
-                    return list;
-                }
-
-                foreach (var item in raw)
-                {
-                    if (item == null)
-                    {
-                        continue;
-                    }
-
-                    var prefix = ReadString(item, "uiElementRegex");
-                    var component = ReadString(item, "componentName");
-                    var isWidget = ReadBool(item, "isUIWidget");
-                    if (string.IsNullOrEmpty(prefix) || string.IsNullOrEmpty(component))
-                    {
-                        continue;
-                    }
-
-                    list.Add(new Rule(prefix, component, isWidget));
-                }
-
-                return list;
-            }
-
             internal static FieldCodeStyle GetCodeStyle()
             {
                 var value = Invoke("GetCodeStyle");
@@ -535,69 +438,6 @@ namespace GT
                 return path ?? string.Empty;
             }
 
-            internal static RuleMatchMode GetRuleMatchMode()
-            {
-                // Prefer explicit setting from host settings if available
-                var modeObj = Invoke("GetRuleMatchMode");
-                if (modeObj != null)
-                {
-                    return (RuleMatchMode)Convert.ToInt32(modeObj);
-                }
-
-                var useRegexObj = Invoke("GetUseRegex");
-                if (useRegexObj != null)
-                {
-                    var flag = false;
-                    if (useRegexObj is bool b) flag = b;
-                    else bool.TryParse(useRegexObj.ToString(), out flag);
-                    return flag ? RuleMatchMode.Regex : RuleMatchMode.Prefix;
-                }
-
-#if UNITY_EDITOR
-                // Fallback to EditorPrefs toggle
-                try
-                {
-                    var val = UnityEditor.EditorPrefs.GetInt("GT.ReferenceCollector.RuleMatchMode", 0);
-                    return (RuleMatchMode)val;
-                }
-                catch
-                {
-                    return RuleMatchMode.Prefix;
-                }
-#else
-                return RuleMatchMode.Prefix;
-#endif
-            }
-
-#if UNITY_EDITOR
-            // Simple menu toggles to switch match mode from Unity menu
-            [UnityEditor.MenuItem("GT/ScriptGen/Rule Match Mode/Prefix", priority = 1000)]
-            private static void SetPrefixMode()
-            {
-                UnityEditor.EditorPrefs.SetInt("GT.ReferenceCollector.RuleMatchMode", (int)RuleMatchMode.Prefix);
-            }
-
-            [UnityEditor.MenuItem("GT/ScriptGen/Rule Match Mode/Prefix", true)]
-            private static bool SetPrefixModeValidate()
-            {
-                UnityEditor.Menu.SetChecked("GT/ScriptGen/Rule Match Mode/Prefix", GetRuleMatchMode() == RuleMatchMode.Prefix);
-                return true;
-            }
-
-            [UnityEditor.MenuItem("GT/ScriptGen/Rule Match Mode/Regex", priority = 1001)]
-            private static void SetRegexMode()
-            {
-                UnityEditor.EditorPrefs.SetInt("GT.ReferenceCollector.RuleMatchMode", (int)RuleMatchMode.Regex);
-            }
-
-            [UnityEditor.MenuItem("GT/ScriptGen/Rule Match Mode/Regex", true)]
-            private static bool SetRegexModeValidate()
-            {
-                UnityEditor.Menu.SetChecked("GT/ScriptGen/Rule Match Mode/Regex", GetRuleMatchMode() == RuleMatchMode.Regex);
-                return true;
-            }
-#endif
-
             private static object Invoke(string methodName)
             {
                 if (SettingType == null)
@@ -622,87 +462,6 @@ namespace GT
 
                 return null;
             }
-
-            private static string ReadString(object instance, string memberName)
-            {
-                return ReadMember(instance, memberName) as string ?? string.Empty;
-            }
-
-            private static bool ReadBool(object instance, string memberName)
-            {
-                var value = ReadMember(instance, memberName);
-                if (value is bool boolean)
-                {
-                    return boolean;
-                }
-
-                if (value != null && bool.TryParse(value.ToString(), out var parsed))
-                {
-                    return parsed;
-                }
-
-                return false;
-            }
-
-            private static object ReadMember(object instance, string memberName)
-            {
-                if (instance == null)
-                {
-                    return null;
-                }
-
-                var type = instance.GetType();
-                var field = type.GetField(memberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                if (field != null)
-                {
-                    return field.GetValue(instance);
-                }
-
-                var property = type.GetProperty(memberName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                if (property != null)
-                {
-                    return property.GetValue(instance);
-                }
-
-                return null;
-            }
         }
-        private static Rule FindRule(List<Rule> rules, string key, RuleMatchMode mode)
-        {
-            if (rules == null || rules.Count == 0 || string.IsNullOrEmpty(key))
-            {
-                return null;
-            }
-
-            if (mode == RuleMatchMode.Regex)
-            {
-                foreach (var r in rules)
-                {
-                    var rx = r.CompiledRegex ?? (r.CompiledRegex = CompileRegexSafe(r.Prefix));
-                    if (rx != null && rx.IsMatch(key))
-                    {
-                        return r;
-                    }
-                }
-                return null;
-            }
-
-            // Prefix match (original behavior)
-            return rules.FirstOrDefault(r => key.StartsWith(r.Prefix, StringComparison.Ordinal));
-        }
-
-        private static Regex CompileRegexSafe(string pattern)
-        {
-            if (string.IsNullOrEmpty(pattern)) return null;
-            try
-            {
-                return new Regex(pattern, RegexOptions.Compiled);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
     }
 }

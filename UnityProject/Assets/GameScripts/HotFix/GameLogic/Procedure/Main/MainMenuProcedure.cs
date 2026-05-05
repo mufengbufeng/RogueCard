@@ -11,6 +11,7 @@ namespace GameLogic
     public class MainMenuProcedure : ProcedureBase
     {
         private EF.UI.IUIManager _uiManager;
+        private ProcedureOwner _procedureOwner;
 
         /// <summary>
         /// 初始化主菜单流程。
@@ -28,6 +29,8 @@ namespace GameLogic
         protected override async void OnEnter(ProcedureOwner procedureOwner)
         {
             base.OnEnter(procedureOwner);
+            _procedureOwner = procedureOwner;
+            GameLogicEntry.Event?.StartLevelRequestedEvent.Subscribe(HandleStartLevelRequested);
             Log.Info("[MainMenuProcedure] OnEnter - 打开主界面");
 
             try
@@ -51,6 +54,7 @@ namespace GameLogic
         protected override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
         {
             base.OnLeave(procedureOwner, isShutdown);
+            UnsubscribeStartLevelRequestedEvent();
             Log.Info("[MainMenuProcedure] OnLeave - 关闭主界面");
 
             try
@@ -68,8 +72,33 @@ namespace GameLogic
         /// </summary>
         protected override void OnDestroy(ProcedureOwner procedureOwner)
         {
+            UnsubscribeStartLevelRequestedEvent();
             base.OnDestroy(procedureOwner);
             Log.Info("[MainMenuProcedure] OnDestroy");
+        }
+
+        /// <summary>
+        /// 处理默认关卡进入请求。
+        /// </summary>
+        private void HandleStartLevelRequested(StartLevelRequestedEvent requestEvent)
+        {
+            if (_procedureOwner == null)
+            {
+                Log.Warning("[MainMenuProcedure] 流程状态机未就绪，无法进入局内流程");
+                return;
+            }
+
+            Log.Info($"[MainMenuProcedure] 收到默认关卡进入请求：{requestEvent.LevelId}，切换到局内流程");
+            ChangeState<GameProcedure>(_procedureOwner);
+        }
+
+        /// <summary>
+        /// 取消订阅默认关卡进入请求。
+        /// </summary>
+        private void UnsubscribeStartLevelRequestedEvent()
+        {
+            GameLogicEntry.Event?.StartLevelRequestedEvent.Unsubscribe(HandleStartLevelRequested);
+            _procedureOwner = null;
         }
     }
 }

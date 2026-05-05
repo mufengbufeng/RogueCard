@@ -3,6 +3,7 @@
     "com.code-philosophy.hybridclr": "https://github.com/focus-creative-games/hybridclr_unity.git",
     "com.code-philosophy.luban": "https://github.com/focus-creative-games/luban_unity.git",
     "com.cysharp.unitask": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
+    "com.besty.unity-skills": "https://github.com/Besty0728/Unity-Skills.git?path=/SkillsForUnity",
     "com.tuyoogame.yooasset": "2.3.18",
     "com.unity.entities": "1.4.5",
     "com.unity.feature.2d": "2.0.2",
