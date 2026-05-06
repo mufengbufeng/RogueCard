@@ -34,6 +34,14 @@ public partial class Tables
     /// 战斗波次刷怪批次表
     /// </summary>
     public battle.TbBattleWaveSpawnBatch TbBattleWaveSpawnBatch {get; }
+    /// <summary>
+    /// 角色等级配置表
+    /// </summary>
+    public player.TbPlayerLevel TbPlayerLevel {get; }
+    /// <summary>
+    /// 基础卡牌配置表
+    /// </summary>
+    public card.TbCard TbCard {get; }
 
     public Tables(System.Func<string, ByteBuf> loader)
     {
@@ -43,6 +51,8 @@ public partial class Tables
         TbMonster = new monster.TbMonster(loader("monster_tbmonster"));
         TbBattleWaveSpawn = new battle.TbBattleWaveSpawn(loader("battle_tbbattlewavespawn"));
         TbBattleWaveSpawnBatch = new battle.TbBattleWaveSpawnBatch(loader("battle_tbbattlewavespawnbatch"));
+        TbPlayerLevel = new player.TbPlayerLevel(loader("player_tbplayerlevel"));
+        TbCard = new card.TbCard(loader("card_tbcard"));
         ResolveRef();
     }
     
@@ -54,6 +64,8 @@ public partial class Tables
         TbMonster.ResolveRef(this);
         TbBattleWaveSpawn.ResolveRef(this);
         TbBattleWaveSpawnBatch.ResolveRef(this);
+        TbPlayerLevel.ResolveRef(this);
+        TbCard.ResolveRef(this);
     }
 }
 
