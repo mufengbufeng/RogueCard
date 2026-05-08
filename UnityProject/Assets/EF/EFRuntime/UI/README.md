@@ -1,815 +1,382 @@
 # EF UI 系统
 
-一个基于 MVC 架构的 Unity UI 管理系统，与 ModelManager 框架集成，提供完整的 UI 生命周期管理、数据绑定、资源管理和层级控制。
+基于 **UI Toolkit (UITK)** 的 MVVM 风格 UI 框架。`Shell` 把 `UIDocument.rootVisualElement`
+拆成三层命名容器，`Navigator` 在层之间替换 `Screen` / 推弹窗，`Screen<TViewModel>` 通过
+`ReactiveProperty<T>` 与 `ViewModelBase` 完成数据绑定。整套框架不依赖 UGUI、
+不依赖 MonoBehaviour（除 `UIDocument` 自身）、不依赖反射资产配置。
 
 ## 目录
 
-- [特性](#特性)
-- [系统架构](#系统架构)
+- [架构总览](#架构总览)
 - [核心组件](#核心组件)
-- [数据绑定与自动刷新](#数据绑定与自动刷新)
-- [快速开始](#快速开始)
 - [生命周期](#生命周期)
-- [最佳实践](#最佳实践)
-- [API 参考](#api-参考)
+- [数据绑定模式](#数据绑定模式)
+- [Procedure ↔ Screen 协作](#procedure--screen-协作)
+- [Root.uxml 约定](#rootuxml-约定)
+- [快速开始](#快速开始)
+- [测试入口](#测试入口)
+- [遗留与占位](#遗留与占位)
 
 ---
 
-## 特性
-
-- **MVC 架构**：清晰的 Model、View、Controller 分离
-- **ModelManager 集成**：UI 数据层复用 ModelManager 框架，避免重复
-- **层级访问控制**：View 只能读取 Model，Controller 可完整访问 Model 和 View
-- **完整生命周期**：从加载、初始化、打开、刷新到关闭、销毁的完整流程控制
-- **响应式数据绑定**：基于表达式树的属性绑定，自动 UI 更新
-- **异步支持**：完整的 async/await 模式，支持取消令牌
-- **资源管理**：集成资源加载系统，支持缓存和对象池
-- **分层系统**：Background、Normal、Popup、Overlay 四层 UI 管理
-
----
-
-## 系统架构
-
-### MVC 分层设计
-
-| 层级 | 组件 | 职责 | 可访问 |
-|------|------|------|--------|
-| **Model** | `ModelBase<TData>` | 数据存储和业务逻辑 | 无 UI 层引用 |
-| **View** | `UIView` | UI 展示和用户交互 | ModelManager 只读数据接口 |
-| **Controller** | `UIController` | 协调 Model 和 View | ModelManager 完整 Model + View |
-
-### 数据流
+## 架构总览
 
 ```
-用户操作
-    ↓
-View (调用 Controller 或触发事件)
-    ↓
-Controller (调用 Model 方法)
-    ↓
-Model (更新数据，通过 ModelManager 管理)
-    ↓
-View (通过 ModelManager 只读视图获取数据)
-    ↓
-UI 更新
+┌──────────────────────────────────────────────┐
+│ UIDocument (Scene)                           │
+│   rootVisualElement                          │
+│     └── Root.uxml                            │
+│           ├── screen-layer  ← 单 Screen      │
+│           ├── popup-layer   ← Popup 栈       │
+│           └── system-layer  ← Toast/Loading  │
+└──────────────────────────────────────────────┘
+        │ Shell 解析三个命名层
+        ▼
+┌──────────────┐  Navigator  ┌──────────────────────┐
+│  Procedure   │────────────▶│  Screen<TViewModel>  │
+│ (业务流程)   │             │  (VisualElement)     │
+└──────────────┘             └──────────────────────┘
+        │ 创建 + 持有                   │ OnSetup
+        ▼                                ▼
+┌──────────────────┐  Changed   ┌──────────────────┐
+│  ViewModelBase   │───────────▶│ ReactiveProperty │
+│  (Prop 工厂追踪) │            │ <T>              │
+└──────────────────┘            └──────────────────┘
 ```
 
-### 与 ModelManager 集成
-
-```
-ModelManager (全局数据管理)
-    │
-    ├── ModelBase<TData> (数据层)
-    │       └── TData (只读数据接口)
-    │
-UIManager (UI 管理)
-    │
-    ├── UIView (通过 ModelManager.Get<TData>() 获取只读数据)
-    │
-    └── UIController (通过 ModelManager.GetModel<T>() 获取完整 Model)
-```
+- **Shell**：从 `rootVisualElement` 解析 `screen-layer` / `popup-layer` / `system-layer`。
+- **Navigator**：`NavigateToAsync` 替换 ScreenLayer，`PushPopupAsync` 入栈到 PopupLayer。
+- **Screen / Screen&lt;TViewModel&gt;**：继承 `VisualElement`，UXML 内容作为子节点 `CloneTree` 挂入。
+- **ViewModelBase**：通过 `Prop<T>` 创建并追踪 `ReactiveProperty`，`Dispose` 时一次性 `ClearListeners`。
+- **Procedure** 拥有 ViewModel + 订阅命令意图事件，View 仅做 UQuery + 绑定。
 
 ---
 
 ## 核心组件
 
-### UIController
+| 类型                     | 职责                                                | 关键 API                                                                          | 约束 / 注意                                                                       |
+| ------------------------ | --------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `Shell`                  | 持有三个命名层 `VisualElement` 引用                 | `ScreenLayer` / `PopupLayer` / `SystemLayer`                                      | `root` 为 null 抛 `ArgumentNullException`；缺层抛 `InvalidOperationException`     |
+| `INavigator`             | 导航服务接口                                        | `NavigateToAsync` / `PushPopupAsync` / `PopPopup` / `Shutdown`                    | 由 `Navigator` 实现；构造依赖 `Shell` + `ScreenRegistry` + `IResourceManager`     |
+| `Navigator`              | Screen 替换 + Popup 栈 + 异常路径回滚               | 同上                                                                              | Popup 失败时通过 `RemoveFromHierarchy` 回滚 overlay / popup，避免悬挂             |
+| `ScreenRegistry`         | Screen 名称 → 描述符映射                            | `Register<TScreen, TViewModel>(name, uxmlLocation, isPopup=false)`                | 名称大小写不敏感；重复注册抛 `InvalidOperationException`                          |
+| `ScreenDescriptor`       | 单个 Screen 的注册数据                              | `Name` / `Location` / `ScreenType` / `ViewModelType` / `IsPopup`                  | 不可变；由 `ScreenRegistry.Register` 内部构造                                     |
+| `Screen` (非泛型)        | 让 `Navigator` 通过基类引用 Screen，规避泛型协变    | `LoadContent(vta)` / `Setup(viewModel)` / `OnShow` / `OnHide` / `OnDispose`       | `Activator.CreateInstance` + 非泛型基类是 Navigator 真实路径，避免 `InvalidCastException` |
+| `Screen<TViewModel>`     | 强类型 Screen 基类                                  | `OnSetup` (子类重写)                                                              | `Setup` 类型不匹配抛 `ArgumentException`；`OnDispose` 自动 Dispose ViewModel + 自脱树 |
+| `ViewModelBase`          | 创建并追踪 `ReactiveProperty`，统一清理监听者       | `Prop<T>(initialValue)` / `Dispose()`                                             | `Dispose` 幂等；只清监听者，不清属性值                                            |
+| `ReactiveProperty<T>`    | 值变化触发 `Changed` 事件                           | `Value` / `Changed` / `ClearListeners()`                                          | 仅在新旧值不等时触发；`Value` setter 用 `EqualityComparer<T>.Default`             |
+| `Region`                 | Screen 内可切换内容插槽                             | `ShowAsync(uxmlLocation)` / `Show(VisualElement)` / `Clear()` / `CurrentContent`  | 构造时传入 UXML 中的空容器 + `IResourceManager`；加载失败仅记 `Log.Warning`       |
+| `LocalEventBus`          | 窗口内 System 间事件总线，独立于全局 `EventHub`     | `GetChannel<T>() where T : struct`                                                | 实现 `EF.Event.IEventPublisher`；`Dispose` 释放所有 Channel                       |
 
-UI 控制器基类，负责协调 Model 和 View。
+### 三处非显而易见的行为
 
-```csharp
-public abstract class UIController : IDisposable
-{
-    // 访问 View
-    protected UIView View { get; }
-    protected TView GetView<TView>() where TView : UIView;
-    
-    // 通过 ModelManager 获取数据 Model
-    protected TModel GetModel<TModel>() where TModel : ModelBase;
-    protected bool TryGetModel<TModel>(out TModel model) where TModel : ModelBase;
-    
-    // 访问运行时上下文
-    protected UIRuntimeContext Context { get; }
-    
-    // 生命周期
-    protected virtual void OnInitialize();
-    protected virtual UniTask OnPrepareAsync(object userData, CancellationToken token);
-    protected virtual void OnEnter(object userData);
-    protected virtual void OnRefresh(object userData);
-    protected virtual void OnExit();
-    protected virtual void OnRelease();
-    protected virtual void OnUpdate(float elapseSeconds, float realElapseSeconds);
-}
-```
+**1. `Screen` 用非泛型基类规避协变**
 
-### UIView
+`Navigator` 通过 `Activator.CreateInstance(descriptor.ScreenType)` 构造实例，
+然后以非泛型 `Screen` 引用调用 `LoadContent` / `Setup(ViewModelBase)` / `OnShow` / `OnDispose`。
+泛型 `Screen<TViewModel>` 把 `Setup` 标记为 `sealed override`，在内部检查并强转类型，
+错误类型抛 `ArgumentException` 立即失败，而不是等到使用 `ViewModel` 时才崩。
 
-所有 UI 视图的基类（MonoBehaviour），只能通过 ModelManager 获取只读数据接口。
+**2. `Navigator.PushPopupAsync` 异常路径回滚**
 
-```csharp
-public abstract class UIView : MonoBehaviour
-{
-    // 通过 ModelManager 获取只读数据接口
-    protected TData GetModelData<TData>() where TData : class;
-    protected bool TryGetModelData<TData>(out TData data) where TData : class;
-    
-    // 访问运行时上下文
-    protected UIRuntimeContext Context { get; }
-    
-    // 数据绑定
-    protected UIBindingCollection Bindings { get; }
-    protected void BindProperty<TSource, TValue>(
-        TSource source,
-        Expression<Func<TSource, TValue>> expression,
-        Action<TValue> setter) where TSource : class, INotifyPropertyChanged;
-    
-    // 生命周期
-    protected virtual void OnInitialize();
-    protected virtual void OnBindings();  // 注册数据绑定
-    protected virtual UniTask OnPrepareAsync(object userData, CancellationToken token);
-    protected virtual void OnOpen(object userData);
-    protected virtual void OnRefresh(object userData);
-    protected virtual void OnClose();
-    protected virtual void OnRelease();
-    protected virtual void OnUpdate(float elapseSeconds, float realElapseSeconds);
-}
-```
+打开 Popup 期间任何阶段抛异常（资源加载失败、`Activator.CreateInstance` 失败、`Setup` 类型错误等），
+`Navigator` 都会 `RemoveFromHierarchy` 已添加到 `PopupLayer` 的 overlay 和 popup，
+确保 PopupLayer 不会留下半透明遮罩或空白节点。Overlay 是 `VisualElement`
+背景色 `(0, 0, 0, 0.6)` 的全屏 `Position.Absolute`。
 
-### UIWindowDescriptor
-
-描述 UI 窗口元数据的配置类。
+**3. `ViewModelBase.Prop<T>` 自动追踪 + Dispose 清理**
 
 ```csharp
-public sealed class UIWindowDescriptor
-{
-    public string Name { get; }                        // 唯一窗口标识符
-    public string Location { get; }                    // Prefab 资源路径
-    public Type ViewType { get; }                      // UIView 派生类型
-    public Func<UIController> ControllerFactory { get; }  // Controller 工厂
-    public UILayer Layer { get; }                      // UI 显示层级
-    public bool CacheOnClose { get; }                  // 关闭时是否缓存
-    public bool AllowMultiple { get; }                 // 是否允许多实例
-    
-    // 泛型创建方法
-    public static UIWindowDescriptor Create<TView, TController>(
-        string name,
-        string location,
-        UILayer layer = UILayer.Normal,
-        bool cacheOnClose = true,
-        bool allowMultiple = false)
-        where TView : UIView
-        where TController : UIController, new();
-}
+// ViewModel 构造时只用 Prop，不要 new ReactiveProperty<T>()
+StatusText = Prop<string>("初始文本");
+CanStart   = Prop(true);
 ```
 
-### UIRuntimeContext
-
-UI 实例运行时上下文。
-
-```csharp
-public sealed class UIRuntimeContext
-{
-    public IUIManager Manager { get; }           // UI 管理器
-    public ModelManager ModelManager { get; }    // 全局 Model 管理器
-    public UIWindowDescriptor Descriptor { get; }// 窗口描述符
-    public Transform LayerRoot { get; }          // 层级根节点
-}
-```
-
-### IUIManager
-
-UI 管理器公共接口。
-
-```csharp
-public interface IUIManager
-{
-    // 注册与查询
-    void RegisterWindow(UIWindowDescriptor descriptor);
-    bool UnregisterWindow(string name);
-    bool Contains(string name);
-
-    // 窗口生命周期
-    UniTask<UIWindowHandle> OpenWindowAsync(string name, object userData = null, CancellationToken token = default);
-    UniTask CloseWindowAsync(string name);
-    UniTask CloseAllAsync();
-
-    // 数据访问
-    bool TryGetController<TController>(string name, out TController controller) where TController : UIController;
-    bool TryGetView<TView>(string name, out TView view) where TView : UIView;
-
-    // 层级管理
-    void RegisterLayerRoot(UILayer layer, Transform parent);
-    void SetFallbackRoot(Transform fallback);
-}
-```
-
----
-
-## 数据绑定与自动刷新
-
-### 原理
-
-ModelBase 实现了 `INotifyPropertyChanged` 接口，当调用 `SetValue` 修改数据时会自动触发 `PropertyChanged` 事件。View 通过 `BindProperty` 订阅属性变更，实现 UI 自动刷新。
-
-```
-Model.SetValue()
-    ↓
-触发 PropertyChanged 事件
-    ↓
-UIBindingCollection 收到通知
-    ↓
-调用 setter 更新 UI
-```
-
-### 使用示例
-
-#### 1. Model 定义（自动触发通知）
-
-```csharp
-public interface IPlayerData
-{
-    int Gold { get; }
-    int Level { get; }
-}
-
-public class PlayerModel : ModelBase<IPlayerData>, IPlayerData
-{
-    private readonly ModelValue<int> _gold;
-    private readonly ModelValue<int> _level;
-
-    public int Gold => GetValue(_gold);
-    public int Level => GetValue(_level);
-
-    public PlayerModel()
-    {
-        _gold = CreateValue(100);
-        _level = CreateValue(1);
-    }
-
-    protected override IPlayerData CreateData() => this;
-
-    // SetValue 会自动触发 PropertyChanged("Gold")
-    public void AddGold(int amount) => SetValue(_gold, Gold + amount);
-    
-    // SetValue 会自动触发 PropertyChanged("Level")
-    public void LevelUp() => SetValue(_level, Level + 1);
-}
-```
-
-#### 2. View 绑定属性
-
-```csharp
-public class PlayerInfoView : UIView
-{
-    [SerializeField] private TMP_Text goldText;
-    [SerializeField] private TMP_Text levelText;
-
-    protected override void OnBindings()
-    {
-        // 获取 Model（Model 实现了 INotifyPropertyChanged）
-        var playerModel = Context.ModelManager.GetModel<PlayerModel>();
-        
-        // 绑定属性 - 数据变更时自动刷新 UI
-        BindProperty(playerModel, x => x.Gold, value => goldText.text = $"金币: {value}");
-        BindProperty(playerModel, x => x.Level, value => levelText.text = $"等级: {value}");
-    }
-}
-```
-
-#### 3. Controller 修改数据
-
-```csharp
-public class PlayerInfoController : UIController
-{
-    public void OnAddGoldClicked()
-    {
-        var model = GetModel<PlayerModel>();
-        model.AddGold(50);  // 自动触发 UI 刷新，无需手动调用
-    }
-    
-    public void OnLevelUpClicked()
-    {
-        var model = GetModel<PlayerModel>();
-        model.LevelUp();  // 自动触发 UI 刷新
-    }
-}
-```
-
-### 手动触发通知
-
-如果需要手动触发属性变更通知（例如计算属性），可以使用 `RaisePropertyChanged`：
-
-```csharp
-public class PlayerModel : ModelBase<IPlayerData>, IPlayerData
-{
-    public int TotalPower => Attack + Defense;  // 计算属性
-
-    public void UpdateStats()
-    {
-        // 手动触发计算属性的变更通知
-        RaisePropertyChanged(nameof(TotalPower));
-    }
-}
-```
-
-### 刷新方式对比
-
-| 方式 | 说明 | 适用场景 |
-|------|------|----------|
-| **自动绑定** | `BindProperty` + `SetValue` 自动触发 | 单个属性变更 |
-| **手动刷新** | `View.OnRefresh()` 或 `View.RefreshXxx()` | 批量数据变更、复杂 UI 更新 |
-| **事件通知** | `RaisePropertyChanged()` | 计算属性、联动属性 |
-
----
-
-## 快速开始
-
-### 1. 创建数据 Model（使用 ModelManager）
-
-```csharp
-using EF.Model;
-
-// 定义只读数据接口
-public interface IPlayerData
-{
-    string Name { get; }
-    int Level { get; }
-    int Gold { get; }
-}
-
-// 实现 Model
-public class PlayerModel : ModelBase<IPlayerData>, IPlayerData
-{
-    private readonly ModelValue<string> _name;
-    private readonly ModelValue<int> _level;
-    private readonly ModelValue<int> _gold;
-    
-    public string Name => GetValue(_name);
-    public int Level => GetValue(_level);
-    public int Gold => GetValue(_gold);
-    
-    public PlayerModel()
-    {
-        _name = CreateValue("Player");
-        _level = CreateValue(1);
-        _gold = CreateValue(0);
-    }
-    
-    protected override IPlayerData CreateData() => this;
-    
-    // 修改数据的方法（只有 Controller 可以调用）
-    public void SetName(string name) => SetValue(_name, name);
-    public void AddGold(int amount) => SetValue(_gold, Gold + amount);
-    public void LevelUp() => SetValue(_level, Level + 1);
-}
-```
-
-### 2. 创建 Controller
-
-```csharp
-using EF.UI;
-using EF.Model;
-
-public class MainMenuController : UIController
-{
-    private PlayerModel _playerModel;
-    
-    protected override void OnInitialize()
-    {
-        // 获取 Model
-        _playerModel = GetModel<PlayerModel>();
-    }
-    
-    protected override void OnEnter(object userData)
-    {
-        // 初始化逻辑
-    }
-    
-    public void OnStartButtonClicked()
-    {
-        // 响应用户操作，修改 Model
-        _playerModel.AddGold(100);
-    }
-    
-    public void OnLevelUpClicked()
-    {
-        _playerModel.LevelUp();
-    }
-}
-```
-
-### 3. 创建 View
-
-```csharp
-using EF.UI;
-using UnityEngine.UI;
-
-public class MainMenuView : UIView
-{
-    public Text playerNameText;
-    public Text levelText;
-    public Text goldText;
-    public Button startButton;
-    public Button levelUpButton;
-    
-    private MainMenuController _controller;
-    
-    protected override void OnInitialize()
-    {
-        // 获取 Controller（通过反射或其他方式，这里简化处理）
-        startButton.onClick.AddListener(OnStartClicked);
-        levelUpButton.onClick.AddListener(OnLevelUpClicked);
-    }
-    
-    protected override void OnBindings()
-    {
-        // 获取只读数据接口并绑定
-        var playerData = GetModelData<IPlayerData>();
-
-        // 如果 Model 实现了 INotifyPropertyChanged，可以使用数据绑定
-        // 否则在 OnRefresh 中手动更新
-    }
-
-    protected override void OnRefresh(object userData)
-    {
-        // 刷新 UI 显示
-        if (TryGetModelData<IPlayerData>(out var player))
-        {
-            playerNameText.text = player.Name;
-            levelText.text = $"Lv.{player.Level}";
-            goldText.text = $"Gold: {player.Gold}";
-        }
-    }
-    
-    private void OnStartClicked()
-    {
-        // 通过某种方式调用 Controller
-        // 可以使用事件系统或直接引用
-    }
-    
-    private void OnLevelUpClicked()
-    {
-        // 调用 Controller 方法
-    }
-    
-    protected override void OnRelease()
-    {
-        startButton.onClick.RemoveListener(OnStartClicked);
-        levelUpButton.onClick.RemoveListener(OnLevelUpClicked);
-    }
-}
-```
-
-### 4. 使用 - 三级 API 复杂度
-
-UI 框架提供了三级复杂度的 API，从简单到完整控制：
-
-#### 级别1：最简单用法
-```csharp
-public class GameInitializer : MonoBehaviour
-{
-    private IUIManager _uiManager;
-    private ModelManager _modelManager;
-    
-    void Start()
-    {
-        // 注册 Model
-        _modelManager.Register<PlayerModel>();
-    }
-    
-    async void OpenMainMenu()
-    {
-        // 最简单：只需要指定资源路径，使用默认配置
-        // 默认：UILayer.Normal, cacheOnClose=true, allowMultiple=false
-        var handle = await _uiManager.OpenWindowAsync<MainMenuView, MainMenuController>(
-            "UI/MainMenuPrefab");
-        
-        // 获取 Controller
-        var controller = handle.Controller as MainMenuController;
-        
-        // 关闭
-        await handle.CloseAsync();
-    }
-}
-```
-
-#### 级别2：基本配置
-```csharp
-async void OpenPopupDialog()
-{
-    // 指定层级和是否缓存
-    var handle = await _uiManager.OpenWindowAsync<DialogView, DialogController>(
-        "UI/DialogPrefab", 
-        UILayer.Popup,           // 弹窗层
-        cacheOnClose: false);    // 关闭时销毁，不缓存
-        
-    // 传递用户数据
-    await handle.RefreshAsync("确定要删除吗？");
-}
-```
-
-#### 级别3：完整控制（向后兼容）
-```csharp
-async void OpenComplexWindow()
-{
-    // 完整参数控制，适用于复杂场景
-    var handle = await _uiManager.OpenWindowAsync<InventoryView, InventoryController>(
-        "UI/InventoryPrefab",
-        UILayer.Normal,
-        cacheOnClose: true,      // 缓存以提高性能
-        allowMultiple: true);    // 允许同时打开多个实例
-}
-```
-
-#### 传统方式（仍然支持）
-```csharp
-void RegisterAndOpenTraditionalWay()
-{
-    // 如果需要预注册或更复杂的配置
-    var descriptor = UIWindowDescriptor.Create<SettingsView, SettingsController>(
-        name: "Settings",
-        location: "UI/SettingsPrefab", 
-        layer: UILayer.Overlay,
-        cacheOnClose: true,
-        allowMultiple: false
-    );
-    _uiManager.RegisterWindow(descriptor);
-    
-    // 然后使用窗口名称打开
-    await _uiManager.OpenWindowAsync("Settings");
-}
-```
+`ViewModelBase` 内部用 `List<ReactivePropertyBase>` 记录所有 `Prop` 出来的属性，
+`Dispose` 时遍历调用 `ClearListeners()`。`Dispose` 幂等，多次调用安全，
+且**不会清空属性值** —— `Dispose` 后 `vm.StatusText.Value = "x"` 仍可读写，只是没人收到通知。
 
 ---
 
 ## 生命周期
 
-### 窗口完整生命周期
+### `NavigateToAsync(name, viewModel, ct)`
 
 ```
-OpenWindowAsync("WindowName", userData)
-│
-├─ [加载阶段]
-│  ├─ 检查是否已注册
-│  ├─ 如果已打开（AllowMultiple = false）→ 刷新并返回
-│  └─ 尝试从缓存复用或创建新实例
-│
-├─ [初始化阶段]
-│  ├─ View.OnInitialize()
-│  ├─ View.OnBindings()      ← 注册数据绑定
-│  └─ Controller.OnInitialize()
-│
-├─ [准备阶段 - 异步]
-│  ├─ Controller.OnPrepareAsync()
-│  └─ View.OnPrepareAsync()
-│
-├─ [激活阶段]
-│  ├─ Controller.OnEnter()
-│  ├─ View.OnOpen()
-│  ├─ Controller.OnRefresh()
-│  └─ View.OnRefresh()
-│
-├─ [运行时]
-│  ├─ Controller.OnUpdate()  ← 每帧调用
-│  └─ View.OnUpdate()
-│
-└─ CloseWindowAsync()
-   ├─ Controller.OnExit()
-   ├─ View.OnClose()
-   │
-   ├─ [如果缓存] → 隐藏 GameObject
-   │
-   └─ [如果销毁]
-      ├─ Controller.OnRelease()
-      ├─ View.OnRelease()
-      └─ 销毁 GameObject
+NavigateToAsync(name, viewModel)
+  │
+  ├── _currentScreen != null ?
+  │     ├── _currentScreen.OnHide()
+  │     └── _currentScreen.OnDispose()      ← 自动 Dispose ViewModel + 自脱树
+  │
+  ├── ResourceManager.LoadAssetAsync<VisualTreeAsset>(descriptor.Location)
+  │     ↑ 任意阶段 cancellationToken.ThrowIfCancellationRequested()
+  │
+  ├── Activator.CreateInstance(descriptor.ScreenType)  ← 通过非泛型基类引用
+  ├── screen.LoadContent(vta)                          ← CloneTree + flexGrow=1
+  ├── _shell.ScreenLayer.Add(screen)
+  ├── screen.Setup(viewModel)                          ← 触发 OnSetup
+  └── screen.OnShow()
 ```
+
+### `PushPopupAsync(name, viewModel, ct)`
+
+```
+PushPopupAsync(name, viewModel)
+  │
+  ├── try
+  │     ├── 加载 VisualTreeAsset
+  │     ├── popup = Activator.CreateInstance(descriptor.ScreenType)
+  │     ├── popup.LoadContent(vta)
+  │     ├── overlay = CreateOverlay()           ← rgba(0,0,0,0.6) 绝对全屏
+  │     ├── _shell.PopupLayer.Add(overlay)
+  │     ├── _shell.PopupLayer.Add(popup)
+  │     ├── popup.Setup(viewModel) + popup.OnShow()
+  │     └── _popupStack.Push(PopupEntry(popup, overlay, viewModel))
+  │
+  └── catch                                     ← 异常路径回滚
+        ├── overlay?.RemoveFromHierarchy()
+        └── popup?.RemoveFromHierarchy()
+```
+
+### `PopPopup()` / `Shutdown()`
+
+```
+PopPopup()
+  ├── stack 空 → 直接返回
+  └── pop → entry.Popup.OnHide() → entry.Popup.OnDispose() → entry.Overlay.RemoveFromHierarchy()
+
+Shutdown()
+  ├── 弹窗栈逐个：try { OnHide() } catch { } / try { OnDispose() } catch { } / overlay 脱树
+  ├── _currentScreen：try { OnHide() } catch { } / try { OnDispose() } catch { }
+  └── ScreenLayer.Clear() / PopupLayer.Clear() / SystemLayer.Clear()
+```
+
+`Shutdown` 用 `try { } catch { }` 兜底，保证单个 ViewModel `Dispose` 抛异常**不会阻断**后续清理。
 
 ---
 
-## 最佳实践
+## 数据绑定模式
 
-### 1. Controller 设计
+标准模式：在 `Screen.OnSetup` 中（1）UQuery 抓元素 → （2）订阅 `ReactiveProperty.Changed` →
+（3）注册命令意图回调 → （4）用 `vm.Xxx.Value` 同步初始值。
+
+来自 `MainMenuScreen.OnSetup`（路径：`Assets/GameScripts/HotFix/GameLogic/UI/Main/MainMenuScreen.cs`）：
 
 ```csharp
-public class ShopController : UIController
+protected override void OnSetup()
 {
-    private PlayerModel _playerModel;
-    private ShopModel _shopModel;
-    
-    protected override void OnInitialize()
+    _statusLabel    = this.Q<Label>("status-text");
+    _levelNameLabel = this.Q<Label>("level-name");
+    _levelDescLabel = this.Q<Label>("level-desc");
+    _feedbackLabel  = this.Q<Label>("feedback-text");
+    _startBtn       = this.Q<Button>("start-btn");
+
+    // 数据绑定：ViewModel → VisualElement
+    ViewModel.StatusText.Changed += v => SetText(_statusLabel, v);
+    ViewModel.LevelName.Changed  += v => SetText(_levelNameLabel, v);
+    ViewModel.LevelDesc.Changed  += v => SetText(_levelDescLabel, v);
+    ViewModel.CanStart.Changed   += v =>
     {
-        // 获取需要的 Model
-        _playerModel = GetModel<PlayerModel>();
-        _shopModel = GetModel<ShopModel>();
+        if (_startBtn != null) _startBtn.SetEnabled(v);
+    };
+
+    // 命令绑定：VisualElement → ViewModel
+    if (_startBtn != null)
+    {
+        _startBtn.RegisterCallback<ClickEvent>(_ => ViewModel.RequestStart());
     }
-    
-    // 处理用户操作
-    public void BuyItem(int itemId)
+
+    // 初始值同步（订阅写在赋值前，所以这里需要主动刷一次 UI）
+    SetText(_statusLabel,    ViewModel.StatusText.Value);
+    SetText(_levelNameLabel, ViewModel.LevelName.Value);
+    SetText(_levelDescLabel, ViewModel.LevelDesc.Value);
+}
+```
+
+对应的 `MainViewModel`（`Assets/GameScripts/HotFix/GameLogic/UI/Main/MainViewModel.cs`）：
+
+```csharp
+public class MainViewModel : ViewModelBase
+{
+    public ReactiveProperty<string> StatusText { get; private set; }
+    public ReactiveProperty<string> LevelName  { get; private set; }
+    public ReactiveProperty<string> LevelDesc  { get; private set; }
+    public ReactiveProperty<bool>   CanStart   { get; private set; }
+
+    public event Action StartRequested;            // 命令意图事件
+    public void RequestStart() => StartRequested?.Invoke();
+
+    public MainViewModel()
     {
-        var item = _shopModel.GetItem(itemId);
-        if (_playerModel.Gold >= item.Price)
-        {
-            _playerModel.AddGold(-item.Price);
-            _playerModel.AddItem(item);
-            
-            // 刷新 View
-            GetView<ShopView>().RefreshGoldDisplay();
-        }
-    }
-    
-    protected override void OnExit()
-    {
-        // 清理订阅
+        StatusText = Prop<string>();               // 自动追踪
+        LevelName  = Prop<string>();
+        LevelDesc  = Prop<string>();
+        CanStart   = Prop(true);                   // 初始值
     }
 }
 ```
 
-### 2. View 设计
-
-```csharp
-public class ShopView : UIView
-{
-    [SerializeField] private Text goldText;
-    [SerializeField] private Button closeButton;
-    
-    protected override void OnInitialize()
-    {
-        closeButton.onClick.AddListener(OnCloseClicked);
-    }
-    
-    protected override void OnRefresh(object userData)
-    {
-        RefreshGoldDisplay();
-    }
-    
-    public void RefreshGoldDisplay()
-    {
-        if (TryGetModelData<IPlayerData>(out var player))
-        {
-            goldText.text = $"Gold: {player.Gold}";
-        }
-    }
-    
-    private void OnCloseClicked()
-    {
-        Context.Manager.CloseWindowAsync(Context.Descriptor.Name);
-    }
-    
-    protected override void OnRelease()
-    {
-        closeButton.onClick.RemoveListener(OnCloseClicked);
-    }
-}
-```
-
-### 3. 层级访问控制
-
-```csharp
-// ✗ 错误：View 不应该直接修改 Model
-public class BadView : UIView
-{
-    protected override void OnRefresh(object userData)
-    {
-        var model = Context.ModelManager.GetModel<PlayerModel>();  // ✗ 编译错误：View 无法获取完整 Model
-        model.AddGold(100);  // ✗ 不应该直接修改
-    }
-}
-
-// ✓ 正确：View 只读取数据
-public class GoodView : UIView
-{
-    protected override void OnRefresh(object userData)
-    {
-        var playerData = GetModelData<IPlayerData>();  // ✓ 只获取只读数据接口
-        goldText.text = $"Gold: {playerData.Gold}";   // ✓ 只读取数据
-    }
-}
-
-// ✓ 正确：Controller 可以完整访问 Model
-public class GoodController : UIController
-{
-    public void AddGold()
-    {
-        var model = GetModel<PlayerModel>();  // ✓ Controller 可以获取完整 Model
-        model.AddGold(100);                   // ✓ 可以修改数据
-    }
-}
-```
+**清理路径**：`Screen<TViewModel>.OnDispose` 默认调用 `ViewModel.Dispose()`（清理所有
+`Prop` 出来的监听者）+ 把 `Screen` 从树中 `RemoveFromHierarchy`。Procedure 自己持有的
+`StartRequested` 订阅需要在 `OnLeave` 里手动 `-=` 解开（见下一节）。
 
 ---
 
-## API 参考
+## Procedure ↔ Screen 协作
 
-### UIController
+Procedure 是 ViewModel 的**唯一所有者**：在 `OnEnter` 创建 ViewModel、填充数据、订阅命令意图事件、
+调用 `_navigator.NavigateToAsync(name, vm)`；在 `OnLeave` 解订阅。Screen 只通过
+`ReactiveProperty` 读 / `RegisterCallback` 写，**不直接持有 Procedure 引用**。
 
-| 方法/属性 | 说明 |
-|-----------|------|
-| `protected UIView View` | 当前绑定的 View |
-| `protected UIRuntimeContext Context` | 运行时上下文 |
-| `protected TModel GetModel<TModel>()` | 获取 ModelManager 中的 Model |
-| `protected bool TryGetModel<TModel>(out TModel)` | 尝试获取 Model |
-| `protected TView GetView<TView>()` | 获取强类型 View |
-| `protected virtual void OnInitialize()` | 初始化 |
-| `protected virtual UniTask OnPrepareAsync(...)` | 异步准备 |
-| `protected virtual void OnEnter(object)` | 进入 |
-| `protected virtual void OnRefresh(object)` | 刷新 |
-| `protected virtual void OnExit()` | 退出 |
-| `protected virtual void OnRelease()` | 释放 |
-| `protected virtual void OnUpdate(float, float)` | 更新 |
+来自 `MainMenuProcedure`（`Assets/GameScripts/HotFix/GameLogic/Procedure/Main/MainMenuProcedure.cs`）：
 
-### UIView
+```csharp
+public class MainMenuProcedure : ProcedureBase
+{
+    private INavigator _navigator;
+    private MainViewModel _viewModel;
 
-| 方法/属性 | 说明 |
-|-----------|------|
-| `protected UIRuntimeContext Context` | 运行时上下文 |
-| `protected UIBindingCollection Bindings` | 绑定集合 |
-| `protected TData GetModelData<TData>()` | 获取 ModelManager 只读数据接口 |
-| `protected bool TryGetModelData<TData>(out TData)` | 尝试获取只读数据接口 |
-| `protected void BindProperty<TSource, TValue>(...)` | 绑定属性 |
-| `protected virtual void OnInitialize()` | 初始化 |
-| `protected virtual void OnBindings()` | 注册绑定 |
-| `protected virtual UniTask OnPrepareAsync(...)` | 异步准备 |
-| `protected virtual void OnOpen(object)` | 打开 |
-| `protected virtual void OnRefresh(object)` | 刷新 |
-| `protected virtual void OnClose()` | 关闭 |
-| `protected virtual void OnRelease()` | 释放 |
-| `protected virtual void OnUpdate(float, float)` | 更新 |
+    protected internal override void OnEnter(ProcedureOwner procedureOwner)
+    {
+        base.OnEnter(procedureOwner);
+        _navigator = GameLogicEntry.Navigator;        // 延后到 OnEnter 取，确保已初始化
+        EnterAsync().Forget();
+    }
 
-### IUIManager - 渐进式 API
+    private async UniTaskVoid EnterAsync()
+    {
+        _viewModel = new MainViewModel();
+        PopulateFromConfig(_viewModel);               // 从配置表填 ReactiveProperty.Value
+        _viewModel.StartRequested += OnStartRequested;
 
-UI管理器提供三级复杂度的 OpenWindow API：
+        await _navigator.NavigateToAsync("MainMenu", _viewModel);
+    }
 
-#### 级别1：最简单（推荐用于大多数场景）
-| 方法 | 说明 |
-|------|------|
-| `OpenWindowAsync<TView, TController>(location)` | 使用默认配置（Normal层，缓存，单实例） |
+    private void OnStartRequested()
+    {
+        // 处理命令意图：切流程
+        GameProcedure.PendingLevelId = _viewModel.DefaultLevelId;
+        ChangeState<GameProcedure>(_procedureOwner);
+    }
 
-#### 级别2：基本配置
-| 方法 | 说明 |
-|------|------|
-| `OpenWindowAsync<TView, TController>(location, layer, cacheOnClose)` | 指定层级和缓存策略 |
+    protected internal override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
+    {
+        base.OnLeave(procedureOwner, isShutdown);
+        if (_viewModel != null)
+        {
+            _viewModel.StartRequested -= OnStartRequested;
+            _viewModel = null;
+        }
+    }
+}
+```
 
-#### 级别3：完整控制
-| 方法 | 说明 |
-|------|------|
-| `OpenWindowAsync<TView, TController>(location, layer, cacheOnClose, allowMultiple)` | 完整参数控制 |
+**协作要点**：
 
-**参数说明：**
-- `location`：Prefab资源路径
-- `layer`：UI层级（Background/Normal/Popup/Overlay）
-- `cacheOnClose`：关闭时是否缓存（默认true）
-- `allowMultiple`：是否允许多实例（默认false）
+- ViewModel 暴露 `event Action StartRequested` 之类的"命令意图"，View 通过 `vm.RequestStart()` 触发。
+- Procedure 订阅 `StartRequested` 处理业务逻辑（切流程、写 Model、上报埋点）。
+- `Navigator` 切到下一个 Screen 时会调旧 Screen 的 `OnDispose`，自动清理 ViewModel 的 `ReactiveProperty` 监听者；但 Procedure 自己加上的 `+= OnStartRequested` 必须自己 `-=`。
 
-**自动特性：**
-- 窗口名称：自动使用 `typeof(TView).FullName` 作为唯一标识
-- 动态注册：首次打开时自动注册到UIManager
-- 资源复用：相同路径的Prefab自动共享
+---
 
-#### 传统API（完全向后兼容）
-| 方法 | 说明 |
-|------|------|
-| `RegisterWindow(descriptor)` | 预注册窗口描述符 |
-| `OpenWindowAsync(windowName, userData, token)` | 按名称打开已注册窗口 |
-| `CloseWindowAsync(windowName, userData, token)` | 按名称关闭窗口 |
+## Root.uxml 约定
 
-### UIWindowHandle
+`Assets/AssetRaw/UI/Root.uxml`：
 
-| 属性/方法 | 说明 |
-|-----------|------|
-| `uint InstanceId` | 实例唯一 ID |
-| `UIWindowState State` | 当前状态 |
-| `UIView View` | View 实例 |
-| `UIController Controller` | Controller 实例 |
-| `UniTask CloseAsync()` | 关闭窗口 |
+```xml
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <ui:VisualElement name="root" style="flex-grow: 1; width: 100%; height: 100%;">
+        <ui:VisualElement name="screen-layer" picking-mode="Ignore"
+                          style="position: absolute; left: 0; top: 0; right: 0; bottom: 0;" />
+        <ui:VisualElement name="popup-layer"  picking-mode="Ignore"
+                          style="position: absolute; left: 0; top: 0; right: 0; bottom: 0;" />
+        <ui:VisualElement name="system-layer" picking-mode="Ignore"
+                          style="position: absolute; left: 0; top: 0; right: 0; bottom: 0;" />
+    </ui:VisualElement>
+</ui:UXML>
+```
+
+- 三层 `picking-mode="Ignore"`：空层不拦截点击事件，避免 popup-layer 在没弹窗时挡住主界面。
+- **`PanelSettings.ScaleMode`** 直接驱动 `rootVisualElement` 尺寸，框架不再额外撑满。
+- **推荐**：把 `UIDocument.SourceAsset` 设为 `Root.uxml`。
+- **回退**：如果 `UIDocument` 没配 `SourceAsset`，`GameLogicEntry.InitializeNavigator` 会
+  在运行时 `LoadAssetSync<VisualTreeAsset>("Root")` 并 `CloneTree(root)`（仅用于兜底）。
+
+---
+
+## 快速开始
+
+**第 1 步：在启动入口注册 Screen** —— 来自 `GameLogicEntry.InitializeNavigator`：
+
+```csharp
+var uiDocument = Object.FindFirstObjectByType<UIDocument>();
+var shell = new Shell(uiDocument.rootVisualElement);
+
+var registry = new ScreenRegistry();
+registry.Register<MainMenuScreen, MainViewModel>("MainMenu", "MainView");
+registry.Register<GameScreen,     GameViewModel>("Game",     "GameView");
+
+_navigator = new Navigator(shell, registry, _resourceManager);
+```
+
+第 2 个参数 `"MainView"` 是 UXML 资源 location，由 `IResourceManager.LoadAssetAsync<VisualTreeAsset>`
+解析（YooAsset 路径或 location 别名）。
+
+**第 2 步：在 Procedure 中创建 ViewModel + 订阅命令意图**：
+
+```csharp
+var vm = new MainViewModel();
+vm.StatusText.Value = "准备就绪";
+vm.CanStart.Value   = true;
+vm.StartRequested  += OnStartRequested;
+```
+
+**第 3 步：通过 Navigator 打开 Screen**：
+
+```csharp
+await _navigator.NavigateToAsync("MainMenu", vm);
+```
+
+`Navigator` 会自动卸载当前 Screen、加载 UXML、构造 `MainMenuScreen` 实例、触发 `OnSetup` 完成绑定。
+
+### `LocalEventBus` vs 全局 `EventHub`
+
+- **全局 `EventHub`**：跨窗口 / 跨流程 / 跨系统的广播事件（如战斗结算 → UI 多处刷新）。
+  通过 `ModuleSystem.Get<IEventManager>()` 或 `GameLogicEntry.Event` 访问。
+- **`LocalEventBus`**：单个 Screen / 复合窗口内部的"系统间通信"。生命周期跟随 Screen，
+  `Dispose` 时自动释放所有 Channel，避免向已关闭窗口推送。两者都实现 `IEventPublisher`，
+  共用 `EventChannel<T> where T : struct` 类型契约。
+
+---
+
+## 测试入口
+
+EditMode 测试在程序集 `GameLogic.Tests.EditMode`，目录 `Assets/GameScripts/HotFix/GameLogic/Tests/EditMode/Framework/`：
+
+| 文件                       | 一句话目的                                                              |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `ShellAndRegistryTests`    | 验证 `Shell` 解析三层 / 缺层抛异常，`ScreenRegistry` 注册查询与名称大小写不敏感 |
+| `ScreenLifecycleTests`     | 验证 `Activator.CreateInstance` + 非泛型 `Screen` 引用 + `Setup(ViewModelBase)` 完整路径，错误类型快速失败，`OnDispose` 销毁 ViewModel + 自脱树 |
+| `ReactivePropertyTests`    | 验证 `Value` 仅在变化时触发 `Changed`、`ClearListeners` 后不再回调，`ViewModelBase.Prop` 追踪 + `Dispose` 清理 + 幂等性 |
+
+修改 `Shell` / `Navigator` / `Screen` / `ReactiveProperty` / `ViewModelBase` 时，先把这三个测试跑过。
+
+---
+
+## 遗留与占位
+
+- **`UILayer` 枚举**（`UILayer.cs`）：旧 UI 工具链的遗留类型，仅供
+  `ReferenceCollectorScriptGenerator` 模板字符串引用，**新框架不消费**。新代码不要引用 `UILayer.*`。
+- **`UHub/` 目录**：当前为空，**预留给后续按窗口聚合的 UI Hub 抽象**（计划中：把窗口内的
+  `Region` / `LocalEventBus` / 子系统统一打包），本框架版本不依赖它。
 
 ---
 
 ## 依赖项
 
-- **Unity 2021.3+**
-- **Cysharp.Threading.Tasks (UniTask)**：异步操作支持
-- **EF.Model.ModelManager**：数据 Model 管理
-- **EF.Resource.IResourceManager**：资源加载接口
-
----
-
-## 更新日志
-
-### v2.1.0
-- 🎉 **新增渐进式 API**：提供三级复杂度的 OpenWindow API
-  - 级别1：`OpenWindowAsync<TView, TController>(location)` - 最简单用法
-  - 级别2：`OpenWindowAsync<TView, TController>(location, layer, cache)` - 基本配置
-  - 级别3：`OpenWindowAsync<TView, TController>(location, layer, cache, multiple)` - 完整控制
-- 🔄 **自动注册机制**：首次打开窗口时自动注册，无需手动调用 RegisterWindow
-- 🏷️ **智能命名**：使用 `typeof(TView).FullName` 自动生成窗口唯一标识
-- 📦 **默认参数优化**：提供合理的默认值（Normal层、缓存开启、单实例）
-- ⚡ **向后兼容**：完全保持传统 API 兼容性
-
-### v2.0.0
-- 从 MVVM 重构为 MVC 架构
-- 集成 ModelManager 框架管理数据层
-- View 通过 ModelManager 获取只读视图
-- Controller 通过 ModelManager 获取完整 Model
-- 移除独立的 UIModel 和 UIViewModel
-- 简化 UIWindowDescriptor（移除 ModelFactory）
+- **Unity 6000.3+**（UI Toolkit Runtime）
+- **Cysharp.Threading.Tasks (UniTask)** —— 异步导航
+- **EF.Resource.IResourceManager** —— UXML 资源加载（YooAsset）
+- **EF.Event.IEventPublisher / EventChannel&lt;T&gt;** —— `LocalEventBus` 复用
+- **EF.Debugger.Log** —— 失败路径日志
