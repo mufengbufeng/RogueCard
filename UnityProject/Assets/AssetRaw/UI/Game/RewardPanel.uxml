@@ -1,0 +1,11 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <Style src="../Shared/SharedStyles.uss" />
+    <Style src="GameViewStyles.uss" />
+
+    <ui:VisualElement name="RewardPanel" class="reward-panel" style="flex-grow: 1; align-items: center; justify-content: center;">
+        <ui:Label name="reward-title" text="关卡完成" class="reward-title" />
+        <ui:Label name="reward-desc" text="选择你的奖励" class="reward-desc" />
+        <ui:VisualElement name="reward-options" class="reward-options" />
+        <ui:Button name="reward-confirm-btn" text="继续" class="reward-confirm-btn" />
+    </ui:VisualElement>
+</ui:UXML>

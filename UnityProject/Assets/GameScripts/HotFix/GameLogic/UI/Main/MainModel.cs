@@ -1,5 +1,6 @@
 using System;
 using EF.Model;
+using GameConfig;
 
 namespace GameLogic
 {
@@ -21,7 +22,7 @@ namespace GameLogic
         /// <summary>
         /// 默认关卡标识。
         /// </summary>
-        string DefaultLevelId { get; }
+        int DefaultLevelId { get; }
 
         /// <summary>
         /// 默认关卡展示名称。
@@ -40,19 +41,19 @@ namespace GameLogic
     public class MainModel : ModelBase<IMainModelData>
     {
         /// <summary>
-        /// 默认关卡稳定标识。
+        /// 未找到默认关卡时的占位标识。
         /// </summary>
-        public const string DefaultLevelIdentifier = "level_default_001";
+        public const int FallbackLevelId = 0;
 
         /// <summary>
-        /// 默认关卡展示名称。
+        /// 未找到默认关卡时的占位名称。
         /// </summary>
-        public const string DefaultLevelDisplayName = "第一关：试炼";
+        public const string FallbackLevelName = "未找到关卡";
 
         /// <summary>
-        /// 默认关卡简短说明。
+        /// 未找到默认关卡时的占位说明。
         /// </summary>
-        public const string DefaultLevelSummary = "包含战斗、宝箱和商店节点的默认测试关卡。";
+        public const string FallbackLevelDescription = "配置表中未找到默认关卡数据。";
 
         /// <summary>
         /// 主界面默认就绪状态文本。
@@ -61,7 +62,7 @@ namespace GameLogic
 
         private readonly ModelValue<bool> _isInteractable;
         private readonly ModelValue<string> _statusText;
-        private readonly ModelValue<string> _defaultLevelId;
+        private readonly ModelValue<int> _defaultLevelId;
         private readonly ModelValue<string> _defaultLevelName;
         private readonly ModelValue<string> _defaultLevelDescription;
 
@@ -78,7 +79,7 @@ namespace GameLogic
         /// <summary>
         /// 默认关卡标识。
         /// </summary>
-        public string DefaultLevelId => GetValue(_defaultLevelId);
+        public int DefaultLevelId => GetValue(_defaultLevelId);
 
         /// <summary>
         /// 默认关卡展示名称。
@@ -97,9 +98,9 @@ namespace GameLogic
         {
             _isInteractable = CreateValue(true);
             _statusText = CreateValue(string.Empty);
-            _defaultLevelId = CreateValue(DefaultLevelIdentifier);
-            _defaultLevelName = CreateValue(DefaultLevelDisplayName);
-            _defaultLevelDescription = CreateValue(DefaultLevelSummary);
+            _defaultLevelId = CreateValue(FallbackLevelId);
+            _defaultLevelName = CreateValue(FallbackLevelName);
+            _defaultLevelDescription = CreateValue(FallbackLevelDescription);
         }
 
         /// <summary>
@@ -111,14 +112,49 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 模型初始化。
+        /// 模型初始化，从配置表读取默认关卡信息。
         /// </summary>
         protected override void OnModelInitialized()
         {
             base.OnModelInitialized();
             SetValue(_isInteractable, true, nameof(IsInteractable));
             SetValue(_statusText, ReadyStatusText, nameof(StatusText));
-            SetDefaultLevelInfo(DefaultLevelIdentifier, DefaultLevelDisplayName, DefaultLevelSummary);
+            LoadDefaultLevelFromConfig();
+        }
+
+        /// <summary>
+        /// 从 TbLevel 配置表加载 IsDefault=true 的关卡信息。
+        /// </summary>
+        public void LoadDefaultLevelFromConfig()
+        {
+            var tables = GameLogicEntry.Config?.Tables;
+            if (tables == null)
+            {
+                EF.Debugger.Log.Warning("[MainModel] ConfigSystem 未就绪，使用占位关卡信息");
+                SetDefaultLevelInfo(FallbackLevelId, FallbackLevelName, FallbackLevelDescription);
+                return;
+            }
+
+            GameConfig.level.Level defaultLevel = null;
+            foreach (var lvl in tables.TbLevel.DataList)
+            {
+                if (lvl.IsDefault)
+                {
+                    defaultLevel = lvl;
+                    break;
+                }
+            }
+
+            if (defaultLevel != null)
+            {
+                SetDefaultLevelInfo(defaultLevel.Id, defaultLevel.Name, defaultLevel.Desc);
+                EF.Debugger.Log.Info($"[MainModel] 从配置表加载默认关卡：{defaultLevel.Id} - {defaultLevel.Name}");
+            }
+            else
+            {
+                EF.Debugger.Log.Warning("[MainModel] TbLevel 中未找到 IsDefault=true 的关卡，使用占位信息");
+                SetDefaultLevelInfo(FallbackLevelId, FallbackLevelName, FallbackLevelDescription);
+            }
         }
 
         /// <summary>
@@ -140,10 +176,10 @@ namespace GameLogic
         /// <summary>
         /// 设置默认关卡入口信息。
         /// </summary>
-        public void SetDefaultLevelInfo(string levelId, string levelName, string levelDescription)
+        public void SetDefaultLevelInfo(int levelId, string levelName, string levelDescription)
         {
-            SetValue(_defaultLevelId, string.IsNullOrWhiteSpace(levelId) ? DefaultLevelIdentifier : levelId, nameof(DefaultLevelId));
-            SetValue(_defaultLevelName, string.IsNullOrWhiteSpace(levelName) ? DefaultLevelDisplayName : levelName, nameof(DefaultLevelName));
+            SetValue(_defaultLevelId, levelId, nameof(DefaultLevelId));
+            SetValue(_defaultLevelName, string.IsNullOrWhiteSpace(levelName) ? FallbackLevelName : levelName, nameof(DefaultLevelName));
             SetValue(_defaultLevelDescription, levelDescription ?? string.Empty, nameof(DefaultLevelDescription));
         }
 
@@ -154,7 +190,7 @@ namespace GameLogic
         {
             SetValue(_isInteractable, true, nameof(IsInteractable));
             SetValue(_statusText, string.Empty, nameof(StatusText));
-            SetDefaultLevelInfo(DefaultLevelIdentifier, DefaultLevelDisplayName, DefaultLevelSummary);
+            SetDefaultLevelInfo(FallbackLevelId, FallbackLevelName, FallbackLevelDescription);
             base.OnModelReleased();
         }
 
@@ -174,7 +210,7 @@ namespace GameLogic
 
             public string StatusText => _model.StatusText;
 
-            public string DefaultLevelId => _model.DefaultLevelId;
+            public int DefaultLevelId => _model.DefaultLevelId;
 
             public string DefaultLevelName => _model.DefaultLevelName;
 

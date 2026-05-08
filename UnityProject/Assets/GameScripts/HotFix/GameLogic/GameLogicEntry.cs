@@ -1,6 +1,7 @@
 using EF.Common;
 using EF.Debugger;
 using EF.Entity;
+using EF.Event;
 using EF.Fsm;
 using EF.Model;
 using EF.ObjectPool;
@@ -11,6 +12,8 @@ using EF.Sound;
 using EF.Timer;
 using EF.UI;
 using UnityEngine;
+using UnityEngine.UIElements;
+using GameConfig;
 
 namespace GameLogic
 {
@@ -21,7 +24,7 @@ namespace GameLogic
     {
         private static IResourceManager _resourceManager;
         private static EventHub _eventHub;
-        private static IUIManager _uiManager;
+        private static INavigator _navigator;
         private static ISoundManager _soundManager;
         private static ITimerManager _timerManager;
         private static IObjectPoolManager _objectPoolManager;
@@ -31,6 +34,7 @@ namespace GameLogic
         private static ModelManager _modelManager;
         private static IEntityManager _entityManager;
         private static Camera _uiCamera;
+        private static ConfigSystem _configSystem;
 
         /// <summary>
         /// 资源管理器。
@@ -43,9 +47,9 @@ namespace GameLogic
         public static EventHub Event => _eventHub;
 
         /// <summary>
-        /// UI 管理器。
+        /// 导航服务。
         /// </summary>
-        public static IUIManager UI => _uiManager;
+        public static INavigator Navigator => _navigator;
 
         /// <summary>
         /// 音频管理器。
@@ -93,6 +97,11 @@ namespace GameLogic
         public static Camera UICamera => _uiCamera;
 
         /// <summary>
+        /// 配置系统。
+        /// </summary>
+        public static ConfigSystem Config => _configSystem;
+
+        /// <summary>
         /// 热更新代码入口点。
         /// </summary>
         public static void Init()
@@ -100,9 +109,9 @@ namespace GameLogic
             Log.Info("[GameLogicEntry] 开始初始化热更新逻辑...");
 
             _resourceManager = ModuleSystem.Get<IResourceManager>();
+            _configSystem = new ConfigSystem(_resourceManager);
             _eventHub = new EventHub();
             ModuleSystem.Register(_eventHub, replace: true);
-            _uiManager = ModuleSystem.Get<IUIManager>();
             _soundManager = ModuleSystem.Get<ISoundManager>();
             _timerManager = ModuleSystem.Get<ITimerManager>();
             _objectPoolManager = ModuleSystem.Get<IObjectPoolManager>();
@@ -112,55 +121,85 @@ namespace GameLogic
             _entityManager = ModuleSystem.Get<IEntityManager>();
             _modelManager = ModuleSystem.Get<ModelManager>();
 
-            InitializeManagerLogic();
+            InitializeNavigator();
+            InitializeModels();
             InitializeProcedures();
 
             Log.Info("[GameLogicEntry] 游戏逻辑初始化完成。");
         }
 
-        private static void InitializeManagerLogic()
+        /// <summary>
+        /// 初始化导航服务：找到场景中的 UIDocument、构造 Shell（从 rootVisualElement 解析层级）、
+        /// 注册所有 Screen、创建 Navigator。
+        ///
+        /// UIDocument 必须配置 SourceAsset = Root.uxml（推荐），或场景外部已经把 Root.uxml 内容
+        /// 添加到了 rootVisualElement 下。Root.uxml 必须包含 screen-layer / popup-layer / system-layer
+        /// 三个命名 VisualElement。
+        /// </summary>
+        private static void InitializeNavigator()
         {
-            var entryGo = GameObject.Find("Entry");
-            if (entryGo == null)
+            var uiDocument = Object.FindFirstObjectByType<UIDocument>();
+            if (uiDocument == null)
             {
-                Log.Error("[GameLogicEntry] 未找到 Entry 游戏对象，无法初始化管理器逻辑。");
+                Log.Error("[GameLogicEntry] 场景中未找到 UIDocument 组件，无法初始化导航服务。"
+                          + "请在启动场景中放置一个带 UIDocument 的 GameObject。");
                 return;
             }
 
-            var rc = entryGo.GetComponent<ReferenceCollector>();
-            if (rc == null)
+            var root = uiDocument.rootVisualElement;
+            if (root == null)
             {
-                Log.Error("[GameLogicEntry] Entry 游戏对象缺少 ReferenceCollector 组件，无法初始化管理器逻辑。");
+                Log.Error("[GameLogicEntry] UIDocument.rootVisualElement 为 null，无法初始化导航服务。");
                 return;
             }
 
-            var background = rc.Get<GameObject>("Background");
-            var normal = rc.Get<GameObject>("Normal");
-            var popup = rc.Get<GameObject>("Popup");
-            var overlay = rc.Get<GameObject>("Overlay");
-            var uiCamera = rc.Get<GameObject>("UICamera");
-
-            if (uiCamera != null)
+            // 如果 UIDocument 没配 SourceAsset，rootVisualElement 是空的——回退到运行时加载 Root.uxml
+            if (root.childCount == 0)
             {
-                _uiCamera = uiCamera.GetComponent<Camera>();
-                if (_uiCamera == null)
+                Log.Warning("[GameLogicEntry] UIDocument 未配置 SourceAsset，回退到运行时加载 Root.uxml。"
+                            + "建议在 UIDocument 上配置 SourceAsset = Assets/AssetRaw/UI/Root.uxml 以获得最佳尺寸适配。");
+                var rootHandle = _resourceManager.LoadAssetSync<VisualTreeAsset>("Root");
+                var rootVta = rootHandle?.AssetObject as VisualTreeAsset;
+                if (rootVta == null)
                 {
-                    Log.Warning("[GameLogicEntry] UICamera 游戏对象上未找到 Camera 组件。");
+                    Log.Error("[GameLogicEntry] 加载 Root.uxml 失败，导航服务初始化中止。");
+                    return;
+                }
+                rootVta.CloneTree(root);
+            }
+
+            Shell shell;
+            try
+            {
+                shell = new Shell(root);
+            }
+            catch (System.Exception e)
+            {
+                Log.Error($"[GameLogicEntry] 构造 Shell 失败：{e.Message}");
+                return;
+            }
+
+            // 可选：UI 摄像机仍然通过 Entry/UICamera 引用（向下兼容）
+            var entryGo = GameObject.Find("Entry");
+            if (entryGo != null)
+            {
+                var rc = entryGo.GetComponent<ReferenceCollector>();
+                var uiCamera = rc != null ? rc.Get<GameObject>("UICamera") : null;
+                if (uiCamera != null)
+                {
+                    _uiCamera = uiCamera.GetComponent<Camera>();
                 }
             }
-            else
-            {
-                Log.Warning("[GameLogicEntry] ReferenceCollector 中未找到 UICamera 引用。");
-            }
 
-            _uiManager.RegisterLayerRoot(UILayer.Background, background.transform);
-            _uiManager.RegisterLayerRoot(UILayer.Normal, normal.transform);
-            _uiManager.RegisterLayerRoot(UILayer.Popup, popup.transform);
-            _uiManager.RegisterLayerRoot(UILayer.Overlay, overlay.transform);
+            // 注册所有 Screen
+            var registry = new ScreenRegistry();
+            registry.Register<MainMenuScreen, MainViewModel>("MainMenu", "MainView");
+            registry.Register<GameScreen, GameViewModel>("Game", "GameView");
 
-            InitializeModels();
+            // 创建 Navigator
+            _navigator = new Navigator(shell, registry, _resourceManager);
 
-            Log.Info("[GameLogicEntry] 管理器逻辑初始化完成。");
+            Log.Info($"[GameLogicEntry] 导航服务初始化完成，UIDocument={uiDocument.gameObject.name}");
         }
 
         /// <summary>
@@ -171,6 +210,7 @@ namespace GameLogic
             try
             {
                 _modelManager.Register<MainModel>();
+                _modelManager.Register<GameModel>();
                 Log.Info("[GameLogicEntry] 游戏数据模型初始化完成");
             }
             catch (System.Exception ex)

@@ -1,0 +1,51 @@
+/* 共享样式 - 公共变量和基础样式 */
+
+:root {
+    --color-primary: #ffffff;
+    --color-secondary: #dbdbdb;
+    --color-accent: #4fc3f7;
+    --color-danger: #ff5252;
+    --color-bg: rgba(0, 0, 0, 0.85);
+    --font-size-title: 38px;
+    --font-size-subtitle: 28px;
+    --font-size-body: 24px;
+    --font-size-small: 20px;
+    --font-size-tips: 18px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+}
+
+.label-title {
+    font-size: var(--font-size-title);
+    color: var(--color-primary);
+    -unity-text-align: middle-center;
+}
+
+.label-subtitle {
+    font-size: var(--font-size-subtitle);
+    color: var(--color-primary);
+    -unity-text-align: middle-center;
+}
+
+.label-body {
+    font-size: var(--font-size-body);
+    color: var(--color-primary);
+    -unity-text-align: middle-center;
+}
+
+.label-small {
+    font-size: var(--font-size-small);
+    color: var(--color-primary);
+    -unity-text-align: middle-center;
+}
+
+.label-tips {
+    font-size: var(--font-size-tips);
+    -unity-text-align: middle-center;
+}
+
+.btn-primary {
+    font-size: var(--font-size-body);
+    color: var(--color-primary);
+}

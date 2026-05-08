@@ -42,14 +42,16 @@ namespace GameLogic.Tests.EditMode.Framework
         }
 
         [Test]
-        public void Subscribe_WhenDuplicateHandler_ShouldNotDuplicate()
+        public void Subscribe_WhenDuplicateHandler_ShouldRegisterTwice()
         {
+            // 设计契约：Subscribe 不做去重检查（保持热路径无 O(n) 扫描，零 GC）。
+            // 重复订阅会被记录两次，调用方有责任避免重复注册。
             Action<TestEvent> handler = e => { };
 
             _channel.Subscribe(handler);
             _channel.Subscribe(handler);
 
-            Assert.That(_channel.HandlerCount, Is.EqualTo(1));
+            Assert.That(_channel.HandlerCount, Is.EqualTo(2));
         }
 
         [Test]
@@ -135,8 +137,11 @@ namespace GameLogic.Tests.EditMode.Framework
         }
 
         [Test]
-        public void Publish_WhenHandlerSubscribesDuringDispatch_ShouldNotFireInCurrentRound()
+        public void Publish_WhenHandlerSubscribesDuringDispatch_ShouldFireInCurrentRound()
         {
+            // 设计契约（参见 EventChannel README "迭代安全" 一节）：
+            // 派发期间 Subscribe 会通过 _version 触发"重新对齐迭代边界"，
+            // 新订阅的 handler 会在当前 Publish 轮内被立即触发。
             var calls = new List<int>();
             Action<TestEvent> handlerD = e => calls.Add(4);
 
@@ -149,12 +154,13 @@ namespace GameLogic.Tests.EditMode.Framework
 
             _channel.Publish(new TestEvent());
 
-            // handlerD 不应在本轮触发
-            Assert.That(calls, Is.EqualTo(new[] { 1, 2 }));
+            // 第一轮：h1 → Subscribe(hD) → 边界对齐 → h2 → hD
+            Assert.That(calls, Is.EqualTo(new[] { 1, 2, 4 }));
 
-            // 下一轮应触发 handlerD
+            // 第二轮：h1 又会 Subscribe 一次 hD（Subscribe 不去重），
+            // 因此本轮会触发 h1、h2、原 hD、新增的 hD（共两次 4）。
             _channel.Publish(new TestEvent());
-            Assert.That(calls, Is.EqualTo(new[] { 1, 2, 1, 2, 4 }));
+            Assert.That(calls, Is.EqualTo(new[] { 1, 2, 4, 1, 2, 4, 4 }));
         }
 
         [Test]

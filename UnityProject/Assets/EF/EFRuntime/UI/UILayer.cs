@@ -1,7 +1,8 @@
 namespace EF.UI
 {
     /// <summary>
-    /// UI 层级枚举，数值越大越靠前显示。
+    /// 旧 UI 工具链遗留枚举，仅供 ReferenceCollectorScriptGenerator 模板字符串引用。
+    /// 新 MVVM UI 框架使用 Shell 内部的 ScreenLayer / PopupLayer / SystemLayer，无需此枚举。
     /// </summary>
     public enum UILayer
     {

@@ -1,0 +1,342 @@
+/* 局内界面样式 — 竖屏 1200x2670 */
+
+/* === 整体容器 === */
+.game-container {
+    flex-grow: 1;
+    background-color: #1a1a2e;
+}
+
+/* === 怪物区域 === */
+.monster-area {
+    flex-grow: 1;
+    justify-content: center;
+    align-items: center;
+    padding-top: 60px;
+}
+
+.monster-container {
+    flex-direction: row;
+    justify-content: center;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+/* === 信息栏 === */
+.info-bar {
+    height: 60px;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0.6);
+    border-top-width: 1px;
+    border-top-color: rgba(255, 255, 255, 0.1);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.info-label {
+    font-size: 28px;
+    color: #e0e0e0;
+    -unity-text-align: middle-center;
+}
+
+/* === 拖放区域 === */
+.drop-zone {
+    display: none;
+    height: 200px;
+    justify-content: center;
+    align-items: center;
+    margin: 10px 30px;
+    border-width: 3px;
+    border-color: rgba(255, 215, 0, 0.4);
+    border-radius: 16px;
+    background-color: rgba(255, 215, 0, 0.05);
+}
+
+.drop-zone-label {
+    font-size: 26px;
+    color: rgba(255, 215, 0, 0.6);
+    -unity-text-align: middle-center;
+}
+
+/* 拖拽激活时闪烁动画 */
+@keyframes drop-zone-flash {
+    0% {
+        border-color: rgba(255, 215, 0, 0.2);
+        background-color: rgba(255, 215, 0, 0.03);
+    }
+    50% {
+        border-color: rgba(255, 215, 0, 0.9);
+        background-color: rgba(255, 215, 0, 0.12);
+    }
+    100% {
+        border-color: rgba(255, 215, 0, 0.2);
+        background-color: rgba(255, 215, 0, 0.03);
+    }
+}
+
+.drop-zone.active {
+    display: flex;
+    animation: drop-zone-flash 0.8s infinite;
+}
+
+/* === 手牌区域 === */
+.card-area {
+    flex-direction: row;
+    height: 280px;
+    padding-left: 16px;
+    padding-right: 8px;
+}
+
+/* 扇形手牌容器：相对定位，作为子卡牌 absolute 的参照 */
+.hand-fan {
+    position: relative;
+    flex-grow: 1;
+}
+
+/* 预览层：覆盖 BattlePanel 整个区域，承载放大克隆卡，不抢点击 */
+.preview-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.end-turn-wrapper {
+    width: 160px;
+    justify-content: center;
+    align-items: center;
+    padding-right: 16px;
+}
+
+.end-turn-btn {
+    width: 150px;
+    height: 70px;
+    font-size: 26px;
+    color: #ffffff;
+    background-color: #c0392b;
+    border-color: #e74c3c;
+    border-width: 2px;
+    border-radius: 12px;
+}
+
+.end-turn-btn:hover {
+    background-color: #e74c3c;
+}
+
+.end-turn-btn:disabled {
+    background-color: #555555;
+    border-color: #444444;
+    color: #888888;
+}
+
+/* === 玩家状态条 === */
+.player-status {
+    padding: 16px 30px 30px;
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+.status-row {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.status-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    margin-right: 12px;
+}
+
+.hp-icon {
+    background-color: #e74c3c;
+}
+
+.armor-icon {
+    background-color: #3498db;
+}
+
+.energy-icon {
+    background-color: #f39c12;
+}
+
+/* 进度条 */
+.progress-bar-bg {
+    flex-grow: 1;
+    height: 32px;
+    background-color: #333333;
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    border-radius: 16px;
+    transition-property: width;
+    transition-duration: 0.3s;
+}
+
+.hp-fill {
+    background-color: #e74c3c;
+}
+
+.energy-fill {
+    background-color: #f39c12;
+}
+
+.progress-label {
+    width: 120px;
+    font-size: 22px;
+    color: #ffffff;
+    -unity-text-align: middle-center;
+    margin-left: 12px;
+}
+
+.armor-label {
+    font-size: 24px;
+    color: #3498db;
+    -unity-text-align: middle-left;
+}
+
+/* === 怪物子项 === */
+.monster-item {
+    width: 200px;
+    margin: 16px;
+    align-items: center;
+}
+
+.monster-intent {
+    font-size: 18px;
+    color: #ffffff;
+    padding: 4px 16px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    -unity-text-align: middle-center;
+}
+
+.monster-intent-attack {
+    background-color: rgba(231, 76, 60, 0.8);
+}
+
+.monster-intent-defend {
+    background-color: rgba(52, 152, 219, 0.8);
+}
+
+.monster-portrait {
+    width: 140px;
+    height: 140px;
+    border-radius: 12px;
+    margin-bottom: 8px;
+    background-color: #4a5568;
+}
+
+.monster-name {
+    font-size: 22px;
+    color: #ffffff;
+    -unity-text-align: middle-center;
+    margin-bottom: 4px;
+}
+
+.monster-hp-bar-bg {
+    width: 140px;
+    height: 14px;
+    background-color: #333333;
+    border-radius: 7px;
+    overflow: hidden;
+}
+
+.monster-hp-bar {
+    height: 100%;
+    background-color: #e74c3c;
+    border-radius: 7px;
+}
+
+.monster-hp-text {
+    font-size: 17px;
+    color: #cccccc;
+    -unity-text-align: middle-center;
+    margin-top: 4px;
+}
+
+/* === 手牌子项 === */
+.card-item {
+    position: absolute;
+    width: 150px;
+    height: 230px;
+    border-width: 3px;
+    border-color: rgba(255, 255, 255, 0.5);
+    border-radius: 12px;
+    background-color: rgba(44, 62, 80, 0.9);
+    align-items: center;
+    transform-origin: 50% 100%;
+    transition-property: translate, rotate, scale, opacity, left, top;
+    transition-duration: 0.15s;
+}
+
+.card-item:hover {
+    border-color: rgba(255, 215, 0, 0.8);
+    background-color: rgba(52, 73, 94, 0.95);
+}
+
+/* 拖拽中的原卡占位（仅降低透明度，保留扇形位置） */
+.card-item--placeholder {
+    opacity: 0.3;
+}
+
+/* 悬停抬升（C# 控制添加/移除，避免与拖拽态冲突） */
+.card-item--hovering {
+    translate: 0 -20px;
+    scale: 1.05;
+}
+
+/* 预览克隆卡：1.6× 显示在原卡正上方 */
+.card-item--preview {
+    scale: 1.6;
+    border-color: rgba(255, 215, 0, 0.9);
+}
+
+.card-cost {
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    width: 36px;
+    height: 36px;
+    background-color: #f39c12;
+    border-radius: 18px;
+    font-size: 22px;
+    color: #ffffff;
+    -unity-text-align: middle-center;
+}
+
+.card-art {
+    width: 110px;
+    height: 90px;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    border-radius: 8px;
+    background-color: #555555;
+}
+
+.card-name {
+    font-size: 20px;
+    color: #ffffff;
+    -unity-text-align: middle-center;
+    margin-top: 6px;
+}
+
+/* === 拖拽中的卡牌幽灵 === */
+.card-ghost {
+    position: absolute;
+    width: 150px;
+    height: 230px;
+    border-width: 3px;
+    border-color: rgba(255, 215, 0, 0.9);
+    border-radius: 12px;
+    background-color: rgba(44, 62, 80, 0.8);
+    opacity: 0.85;
+    align-items: center;
+    /* 用于回弹动画 */
+    transition-property: left, top;
+    transition-duration: 0.15s;
+}

@@ -1,0 +1,14 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <Style src="../Shared/SharedStyles.uss" />
+    <Style src="MainViewStyles.uss" />
+
+    <ui:VisualElement name="MainView" class="main-container">
+        <ui:VisualElement name="content" class="main-content">
+            <ui:Label name="level-name" text="关卡名称" class="label-title" />
+            <ui:Label name="level-desc" text="关卡描述" class="label-subtitle" />
+            <ui:Label name="status-text" text="状态" class="label-body" />
+            <ui:Button name="start-btn" text="开始游戏" class="btn-primary" />
+            <ui:Label name="feedback-text" text="" class="label-small" />
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

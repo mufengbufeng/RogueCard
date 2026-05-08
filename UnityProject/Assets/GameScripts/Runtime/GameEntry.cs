@@ -46,11 +46,11 @@ public class GameEntry : MonoBehaviour
         ModuleSystem.Register<IProcedureManager>(new ProcedureManager());
         ModuleSystem.Register<ISaveManager>(new SaveManager());
         ModuleSystem.Register(new ModelManager());
-        // 3. 注册 ModelManager（UIManager 依赖它）
+        // 3. 注册 ModelManager
         _modelManager = ModuleSystem.Get<ModelManager>();
 
-        // 4. 注册需要 ResourceManager 和 ModelManager 的管理器
-        ModuleSystem.Register<IUIManager>(new UIManager(_resourceManager, _modelManager));
+        // 4. 注册需要 ResourceManager 的管理器
+        // Navigator 由 GameLogicEntry.InitializeNavigator() 在热更层创建
         ModuleSystem.Register<ISoundManager>(new SoundManager(_resourceManager));
 
         // 5. 注册 EntityManager（依赖 ObjectPoolManager 和 ResourceManager）

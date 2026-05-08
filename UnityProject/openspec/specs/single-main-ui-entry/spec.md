@@ -7,11 +7,11 @@
 ## Requirements
 
 ### Requirement: 项目启动后仅显示单一主界面入口
-系统启动并完成热更新初始化后，必须直接进入唯一的主界面入口。该入口必须由现有 HotFix 启动链路打开，且不得再要求用户先经过独立的入口页、登录页或其他中转流程。
+系统启动并完成热更新初始化后，必须直接进入唯一的主界面入口。该入口必须通过 Navigator.NavigateToAsync 打开 MainMenuScreen，且不得再要求用户先经过独立的入口页、登录页或其他中转流程。
 
 #### Scenario: 启动后直接进入主界面
 - **WHEN** 用户启动项目并完成 `GameEntry` 与 `GameLogicEntry` 初始化
-- **THEN** 系统必须直接打开主界面窗口
+- **THEN** 系统必须通过 Navigator.NavigateToAsync("MainMenu", mainViewModel) 打开主界面
 - **AND** 屏幕上不得同时存在独立的 `EntryView` 入口窗口
 
 ### Requirement: 主界面入口不得依赖示例玩法模块
@@ -38,27 +38,25 @@
 - **THEN** 不得再发现指向 `EntryView`、示例玩法流程或其核心模块的活跃默认引用
 
 ### Requirement: 主界面必须展示默认关卡入口信息
-主界面入口 MUST 在默认可交互状态下展示一个可开始的默认关卡信息，至少包含默认关卡标识可对应的展示名称、简短说明和开始按钮可用状态。
+主界面入口 MUST 在默认可交互状态下展示一个可开始的默认关卡信息。默认关卡标识 MUST 从 TbLevel 配置表读取 IsDefault=true 的记录。MainViewModel 的 StatusText、LevelName、LevelDesc 属性 MUST 由 Procedure 在创建 ViewModel 时从配置表填充。
 
-#### Scenario: 打开主界面后显示默认关卡
-- **WHEN** 系统完成热更新初始化并打开主界面
-- **THEN** 主界面 MUST 展示默认关卡的名称或等价标题
-- **AND** 主界面 MUST 展示默认关卡的简短说明或状态文本
-- **AND** 开始按钮 MUST 处于可交互状态
+#### Scenario: 打开主界面后显示配置表中的默认关卡
+- **WHEN** MainMenuProcedure 创建 MainViewModel 并从 TbLevel 读取默认关卡
+- **THEN** MainViewModel.LevelName.Value SHALL 为关卡配置中的 Name
+- **AND** MainViewModel.LevelDesc.Value SHALL 为关卡配置中的 Desc
+- **AND** MainViewModel.CanStart.Value SHALL 为 true
+
+#### Scenario: 配置表中无默认关卡时回退到安全状态
+- **WHEN** TbLevel 中不存在 IsDefault=true 的记录
+- **THEN** 系统 MUST 记录警告日志
+- **AND** MainViewModel MUST 展示占位提示信息
+- **AND** 系统 MUST NOT 因缺少默认关卡配置而阻断主界面显示
 
 ### Requirement: 主界面开始按钮必须发起默认关卡进入请求
-主界面入口 MUST 在用户点击开始按钮时发起默认关卡进入请求，并且该请求 MUST 能够让主菜单流程识别要进入的默认关卡并进入局内 UI。请求被承接后，系统 MUST 不再停留在仅显示“请求已发出”的临时状态。
+主界面 MainMenuScreen MUST 将开始按钮点击转发为 MainViewModel.RequestStart() 命令意图。MainMenuProcedure MUST 订阅此意图事件并执行 Navigator.NavigateToAsync("Game", gameViewModel) 切换到局内界面。
 
-#### Scenario: 点击开始按钮后进入默认关卡局内 UI
+#### Scenario: 点击开始按钮后导航到局内界面
 - **WHEN** 用户在主界面点击开始按钮
-- **THEN** 系统 MUST 发起默认关卡进入请求
-- **AND** 该请求 MUST 携带或能够解析出稳定的默认关卡标识
-- **AND** 主菜单流程 MUST 承接该请求并切换到局内流程
-- **AND** 系统 MUST 打开 `GameView`
-- **AND** 主界面 MUST 不再显示“未接入玩法逻辑”的旧占位反馈
-
-#### Scenario: 关卡运行时上下文尚未实现时仍可进入局内 UI 骨架
-- **WHEN** 用户点击开始按钮但关卡运行时上下文和波次推进尚未实现
-- **THEN** 系统 MUST 进入可打开的局内 UI 骨架
-- **AND** 系统 MUST 保留默认关卡标识用于后续关卡系统识别
-- **AND** 系统 MUST 不得因为缺少完整关卡流程而抛出阻断性错误
+- **THEN** MainMenuScreen SHALL 调用 MainViewModel.RequestStart()
+- **AND** MainMenuProcedure SHALL 收到 StartRequested 事件
+- **AND** Procedure SHALL 调用 Navigator.NavigateToAsync("Game", gameViewModel)

@@ -1,0 +1,14 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="../Shared/SharedStyles.uss" />
+    <Style src="GameViewStyles.uss" />
+
+    <ui:VisualElement name="MonsterItem" class="monster-item">
+        <ui:Label name="intent-text" text="" class="monster-intent" />
+        <ui:VisualElement name="portrait" class="monster-portrait" />
+        <ui:Label name="name-text" text="" class="monster-name" />
+        <ui:VisualElement name="hp-bar-bg" class="monster-hp-bar-bg">
+            <ui:VisualElement name="hp-bar" class="monster-hp-bar" style="width: 100%;" />
+        </ui:VisualElement>
+        <ui:Label name="hp-text" text="" class="monster-hp-text" />
+    </ui:VisualElement>
+</ui:UXML>

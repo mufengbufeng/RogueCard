@@ -8,7 +8,7 @@ namespace GameLogic
         /// <summary>
         /// 关卡标识。
         /// </summary>
-        public readonly string LevelId;
+        public readonly int LevelId;
 
         /// <summary>
         /// 关卡展示名称。
@@ -18,7 +18,7 @@ namespace GameLogic
         /// <summary>
         /// 创建请求进入关卡事件。
         /// </summary>
-        public StartLevelRequestedEvent(string levelId, string levelName)
+        public StartLevelRequestedEvent(int levelId, string levelName)
         {
             LevelId = levelId;
             LevelName = levelName;

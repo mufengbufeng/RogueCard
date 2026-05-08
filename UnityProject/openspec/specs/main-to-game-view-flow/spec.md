@@ -2,45 +2,55 @@
 
 ## Purpose
 
-定义主菜单开始游戏后进入局内 UI 骨架的最小流程，确保主菜单请求由流程状态机承接并打开 `GameView`。
+定义主菜单开始游戏后进入局内 UI 的流程。MainMenuProcedure 承接 MainViewModel.RequestStart 命令意图，通过流程状态机切换到 GameProcedure；GameProcedure 创建 GameViewModel + 各 System，调用 Navigator.NavigateToAsync("Game") 打开 GameScreen，订阅 ViewModel 命令转发到 System。
 
 ## Requirements
 
 ### Requirement: 主菜单必须承接默认关卡进入请求并切换到局内流程
-系统 MUST 在主菜单流程处于激活状态时承接主界面发出的默认关卡进入请求，并通过流程状态机切换到局内流程。流程切换 MUST 使用运行中的流程状态机切换能力，不得通过重新启动流程管理器实现。
+系统 MUST 在 MainMenuProcedure 处于激活状态时承接 MainViewModel.RequestStart() 发出的进入请求（携带 int 类型关卡标识），并通过流程状态机切换到局内流程。
 
 #### Scenario: 点击开始游戏后切换到局内流程
-- **WHEN** 用户在主界面点击开始游戏按钮
-- **THEN** 主菜单流程 MUST 接收到默认关卡进入请求
+- **WHEN** MainMenuProcedure 订阅了 MainViewModel.StartRequested 事件
+- **AND** 用户点击开始按钮触发 MainViewModel.RequestStart()
+- **THEN** MainMenuProcedure MUST 接收到事件
 - **AND** 系统 MUST 从主菜单流程切换到局内流程
 
 #### Scenario: 流程切换不重新启动流程状态机
 - **WHEN** 默认关卡进入请求在流程状态机已经启动后被处理
 - **THEN** 系统 MUST 使用流程状态切换进入局内流程
-- **AND** 系统 MUST NOT 调用只能用于首次启动的流程启动接口来进入局内流程
+- **AND** 系统 MUST NOT 调用只能用于首次启动的流程启动接口
 
 ### Requirement: 进入局内流程时必须关闭主界面并打开局内界面
-系统 MUST 在离开主菜单流程时关闭 `MainView`，并在进入局内流程时打开 `GameView`。`MainView` 与 `GameView` MUST NOT 在正常进入局内路径中同时作为活动主窗口显示。
+GameProcedure MUST 创建 GameViewModel 并调用 Navigator.NavigateToAsync("Game", gameViewModel) 打开 GameScreen。Navigator 自动关闭当前 MainMenuScreen。GameProcedure MUST 将 int 类型关卡标识传递给 GameViewModel。
 
-#### Scenario: 主菜单流程离开时关闭 MainView
-- **WHEN** 系统从主菜单流程切换到局内流程
-- **THEN** 主菜单流程 MUST 请求关闭 `MainView`
-- **AND** 主界面 MUST 不再作为正常活动主窗口显示
-
-#### Scenario: 局内流程进入时打开 GameView
+#### Scenario: 局内流程进入时打开 GameScreen 并传递关卡标识
 - **WHEN** 系统进入局内流程
-- **THEN** 系统 MUST 使用 EF MVC UI 打开 `GameView`
-- **AND** `GameView` MUST 使用 `Assets/AssetRaw/UI/Game/GameView.prefab` 对应的资源地址加载
+- **THEN** GameProcedure MUST 创建 GameViewModel 并设置 LevelId
+- **AND** GameProcedure MUST 调用 Navigator.NavigateToAsync("Game", gameViewModel)
+- **AND** Navigator MUST 自动关闭 MainMenuScreen
 
-### Requirement: GameView 必须满足最小 EF MVC UI 契约
-局内界面 MUST 提供可被 EF UI 系统实例化和初始化的 `GameView` 与 `GameController` 类型。该最小契约只要求局内窗口能够成功打开，不要求接入战斗数据、卡牌输入或波次推进。
+#### Scenario: GameScreen 作为 MVVM Screen 打开
+- **WHEN** Navigator 处理 NavigateToAsync("Game", ...)
+- **THEN** MUST 加载 GameScreen 的 UXML
+- **AND** MUST 创建 GameScreen 实例并添加到 Shell.ScreenLayer
+- **AND** MUST 调用 Setup(gameViewModel) 和 OnShow()
 
-#### Scenario: GameView 作为 EF 窗口打开
-- **WHEN** 局内流程请求打开 `GameView`
-- **THEN** EF UI 系统 MUST 能解析或动态添加 `GameView` 组件
-- **AND** EF UI 系统 MUST 能创建并初始化 `GameController`
+### Requirement: GameProcedure 必须承接 Controller 职责创建 System 并订阅 ViewModel 命令
+GameProcedure SHALL 在进入时创建 GameViewModel、CardSystem、MonsterSystem、BattleSystem、WaveSystem。GameProcedure SHALL 订阅 GameViewModel 的命令意图事件（CardUsed、EndTurnRequested）并转发到对应 System 方法。
 
-#### Scenario: 缺少战斗数据时仍可打开局内 UI
-- **WHEN** 战斗规则、波次推进和卡牌数据同步尚未实现
-- **THEN** `GameView` MUST 仍可作为最小局内窗口打开
-- **AND** 系统 MUST NOT 因缺少完整战斗运行时上下文而阻断窗口打开
+#### Scenario: GameProcedure 创建 System 并初始化
+- **WHEN** GameProcedure.OnEnter 被调用
+- **THEN** GameProcedure SHALL 创建 CardSystem、MonsterSystem、BattleSystem、WaveSystem
+- **AND** GameProcedure SHALL 调用各 System 的 Init 方法
+- **AND** GameProcedure SHALL 调用 WaveSystem.StartLevel(levelId)
+
+#### Scenario: GameProcedure 订阅 ViewModel 命令转发到 System
+- **WHEN** GameViewModel.CardUsed 事件触发
+- **THEN** GameProcedure SHALL 调用 CardSystem.Play(handIndex)
+- **WHEN** GameViewModel.EndTurnRequested 事件触发
+- **THEN** GameProcedure SHALL 调用 BattleSystem.EndTurn()
+
+#### Scenario: GameProcedure 退出时清理
+- **WHEN** GameProcedure.OnLeave 被调用
+- **THEN** GameProcedure SHALL 取消订阅 ViewModel 的所有命令事件
+- **AND** GameProcedure SHALL Dispose 所有 System

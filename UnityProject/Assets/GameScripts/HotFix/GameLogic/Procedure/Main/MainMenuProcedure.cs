@@ -1,103 +1,150 @@
+using System;
 using Cysharp.Threading.Tasks;
 using EF.Debugger;
+using EF.Event;
 using EF.Procedure;
+using EF.UI;
 using ProcedureOwner = EF.Fsm.IFsm<EF.Procedure.IProcedureManager>;
 
 namespace GameLogic
 {
     /// <summary>
-    /// 主菜单流程。
+    /// 主菜单流程。创建 MainViewModel，从配置表填充数据，
+    /// 通过 Navigator 打开 MainMenuScreen，订阅 ViewModel 命令意图。
     /// </summary>
     public class MainMenuProcedure : ProcedureBase
     {
-        private EF.UI.IUIManager _uiManager;
+        private INavigator _navigator;
         private ProcedureOwner _procedureOwner;
+        private MainViewModel _viewModel;
 
-        /// <summary>
-        /// 初始化主菜单流程。
-        /// </summary>
-        protected override void OnInit(ProcedureOwner procedureOwner)
+        /// <inheritdoc />
+        protected internal override void OnInit(ProcedureOwner procedureOwner)
         {
             base.OnInit(procedureOwner);
-            _uiManager = GameLogicEntry.UI;
             Log.Info("[MainMenuProcedure] OnInit");
         }
 
-        /// <summary>
-        /// 进入主菜单流程。
-        /// </summary>
-        protected override async void OnEnter(ProcedureOwner procedureOwner)
+        /// <inheritdoc />
+        protected internal override void OnEnter(ProcedureOwner procedureOwner)
         {
             base.OnEnter(procedureOwner);
             _procedureOwner = procedureOwner;
-            GameLogicEntry.Event?.StartLevelRequestedEvent.Subscribe(HandleStartLevelRequested);
-            Log.Info("[MainMenuProcedure] OnEnter - 打开主界面");
+            // 延迟到 OnEnter 才读 Navigator，确保此时 InitializeNavigator 已完成
+            _navigator = GameLogicEntry.Navigator;
+            EnterAsync().Forget();
+        }
 
+        private async UniTaskVoid EnterAsync()
+        {
             try
             {
-                await _uiManager.OpenWindowAsync<MainView, MainController>(
-                    location: "MainView",
-                    layer: EF.UI.UILayer.Normal,
-                    cacheOnClose: false,
-                    allowMultiple: false);
+                if (_navigator == null)
+                {
+                    Log.Error("[MainMenuProcedure] Navigator 未初始化（GameLogicEntry.Navigator 为 null）。"
+                              + "请检查 Console 中 [GameLogicEntry] 开头的早期日志，"
+                              + "查找 InitializeNavigator 失败原因（可能是缺少 Entry 节点 / ReferenceCollector / Normal/UIDocument）。");
+                    return;
+                }
+
+                _viewModel = new MainViewModel();
+                PopulateFromConfig(_viewModel);
+                _viewModel.StartRequested += OnStartRequested;
+
+                await _navigator.NavigateToAsync("MainMenu", _viewModel);
                 Log.Info("[MainMenuProcedure] 主界面已打开");
             }
-            catch (System.Exception e)
+            catch (Exception e)
             {
-                Log.Error($"[MainMenuProcedure] 打开主界面失败：{e.Message}");
+                Log.Error($"[MainMenuProcedure] 进入主界面失败：{e}\n{e.StackTrace}");
             }
         }
 
-        /// <summary>
-        /// 离开主菜单流程。
-        /// </summary>
-        protected override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
+        /// <inheritdoc />
+        protected internal override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
         {
             base.OnLeave(procedureOwner, isShutdown);
-            UnsubscribeStartLevelRequestedEvent();
-            Log.Info("[MainMenuProcedure] OnLeave - 关闭主界面");
-
-            try
-            {
-                _uiManager.CloseWindowAsync("MainView").Forget();
-            }
-            catch (System.Exception e)
-            {
-                Log.Warning($"[MainMenuProcedure] 关闭主界面时出错：{e.Message}");
-            }
+            Cleanup();
+            Log.Info("[MainMenuProcedure] OnLeave");
         }
 
-        /// <summary>
-        /// 销毁主菜单流程。
-        /// </summary>
-        protected override void OnDestroy(ProcedureOwner procedureOwner)
+        /// <inheritdoc />
+        protected internal override void OnDestroy(ProcedureOwner procedureOwner)
         {
-            UnsubscribeStartLevelRequestedEvent();
+            Cleanup();
             base.OnDestroy(procedureOwner);
-            Log.Info("[MainMenuProcedure] OnDestroy");
         }
 
         /// <summary>
-        /// 处理默认关卡进入请求。
+        /// 从配置表填充 MainViewModel 数据。
         /// </summary>
-        private void HandleStartLevelRequested(StartLevelRequestedEvent requestEvent)
+        private void PopulateFromConfig(MainViewModel vm)
         {
-            if (_procedureOwner == null)
+            vm.StatusText.Value = MainModel.ReadyStatusText;
+            vm.CanStart.Value = true;
+
+            var tables = GameLogicEntry.Config?.Tables;
+            if (tables == null)
             {
-                Log.Warning("[MainMenuProcedure] 流程状态机未就绪，无法进入局内流程");
+                vm.LevelName.Value = MainModel.FallbackLevelName;
+                vm.LevelDesc.Value = MainModel.FallbackLevelDescription;
                 return;
             }
 
-            Log.Info($"[MainMenuProcedure] 收到默认关卡进入请求：{requestEvent.LevelId}，切换到局内流程");
+            GameConfig.level.Level defaultLevel = null;
+            foreach (var lvl in tables.TbLevel.DataList)
+            {
+                if (lvl.IsDefault)
+                {
+                    defaultLevel = lvl;
+                    break;
+                }
+            }
+
+            if (defaultLevel != null)
+            {
+                vm.DefaultLevelId = defaultLevel.Id;
+                vm.LevelName.Value = defaultLevel.Name;
+                vm.LevelDesc.Value = defaultLevel.Desc;
+                Log.Info($"[MainMenuProcedure] 从配置表加载默认关卡：{defaultLevel.Id} - {defaultLevel.Name}");
+            }
+            else
+            {
+                Log.Warning("[MainMenuProcedure] TbLevel 中未找到默认关卡，使用占位信息");
+                vm.DefaultLevelId = MainModel.FallbackLevelId;
+                vm.LevelName.Value = MainModel.FallbackLevelName;
+                vm.LevelDesc.Value = MainModel.FallbackLevelDescription;
+            }
+        }
+
+        /// <summary>
+        /// 处理开始游戏意图。
+        /// </summary>
+        private void OnStartRequested()
+        {
+            if (_procedureOwner == null)
+            {
+                Log.Warning("[MainMenuProcedure] 流程状态机未就绪");
+                return;
+            }
+
+            int levelId = _viewModel?.DefaultLevelId ?? MainModel.FallbackLevelId;
+            Log.Info($"[MainMenuProcedure] 请求进入关卡：{levelId}，切换到局内流程");
+            GameProcedure.PendingLevelId = levelId;
             ChangeState<GameProcedure>(_procedureOwner);
         }
 
         /// <summary>
-        /// 取消订阅默认关卡进入请求。
+        /// 清理 ViewModel 订阅。
         /// </summary>
-        private void UnsubscribeStartLevelRequestedEvent()
+        private void Cleanup()
         {
-            GameLogicEntry.Event?.StartLevelRequestedEvent.Unsubscribe(HandleStartLevelRequested);
+            if (_viewModel != null)
+            {
+                _viewModel.StartRequested -= OnStartRequested;
+                _viewModel = null;
+            }
+
             _procedureOwner = null;
         }
     }

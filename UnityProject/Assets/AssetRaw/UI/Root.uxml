@@ -1,0 +1,19 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <!--
+        UI 框架根模板。直接挂在 UIDocument 的 Source Asset 槽位上，
+        让 PanelSettings 的 ScaleMode 自动驱动整个 UI 树的尺寸。
+
+        三个层级容器并列，picking-mode=Ignore 避免空层拦截点击：
+        - screen-layer：主界面层（同时只显示一个 Screen）
+        - popup-layer：弹窗层（栈式）
+        - system-layer：系统层（Toast、Loading 等）
+    -->
+    <ui:VisualElement name="root" style="flex-grow: 1; width: 100%; height: 100%;">
+        <ui:VisualElement name="screen-layer" picking-mode="Ignore"
+                          style="position: absolute; left: 0; top: 0; right: 0; bottom: 0;" />
+        <ui:VisualElement name="popup-layer" picking-mode="Ignore"
+                          style="position: absolute; left: 0; top: 0; right: 0; bottom: 0;" />
+        <ui:VisualElement name="system-layer" picking-mode="Ignore"
+                          style="position: absolute; left: 0; top: 0; right: 0; bottom: 0;" />
+    </ui:VisualElement>
+</ui:UXML>

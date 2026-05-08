@@ -1,0 +1,10 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements">
+    <Style src="../Shared/SharedStyles.uss" />
+    <Style src="GameViewStyles.uss" />
+
+    <ui:VisualElement name="CardItem" class="card-item">
+        <ui:Label name="card-cost" text="" class="card-cost" />
+        <ui:VisualElement name="card-art" class="card-art" />
+        <ui:Label name="card-name" text="" class="card-name" />
+    </ui:VisualElement>
+</ui:UXML>

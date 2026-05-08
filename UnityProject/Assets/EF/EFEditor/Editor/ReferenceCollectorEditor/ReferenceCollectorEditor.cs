@@ -106,6 +106,7 @@ public class ReferenceCollectorEditor : Editor
             serializedObject.Update();
             RefreshReferenceList();
         }));
+        // UHub 自动绑定已移除（UI 框架重设计为 MVVM 模式）
         root.Add(row);
     }
 

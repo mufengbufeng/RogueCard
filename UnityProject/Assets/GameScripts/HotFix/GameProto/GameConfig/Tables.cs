@@ -42,6 +42,10 @@ public partial class Tables
     /// 基础卡牌配置表
     /// </summary>
     public card.TbCard TbCard {get; }
+    /// <summary>
+    /// 怪物意图配置表
+    /// </summary>
+    public monster.TbMonsterIntent TbMonsterIntent {get; }
 
     public Tables(System.Func<string, ByteBuf> loader)
     {
@@ -53,6 +57,7 @@ public partial class Tables
         TbBattleWaveSpawnBatch = new battle.TbBattleWaveSpawnBatch(loader("battle_tbbattlewavespawnbatch"));
         TbPlayerLevel = new player.TbPlayerLevel(loader("player_tbplayerlevel"));
         TbCard = new card.TbCard(loader("card_tbcard"));
+        TbMonsterIntent = new monster.TbMonsterIntent(loader("monster_tbmonsterintent"));
         ResolveRef();
     }
     
@@ -66,6 +71,7 @@ public partial class Tables
         TbBattleWaveSpawnBatch.ResolveRef(this);
         TbPlayerLevel.ResolveRef(this);
         TbCard.ResolveRef(this);
+        TbMonsterIntent.ResolveRef(this);
     }
 }
 

@@ -1,0 +1,28 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <Style src="../Shared/SharedStyles.uss" />
+    <Style src="GameViewStyles.uss" />
+
+    <ui:VisualElement name="BattlePanel" class="battle-panel" style="flex-grow: 1;">
+        <!-- 顶部：怪物展示区 -->
+        <ui:VisualElement name="monster-area" class="monster-area">
+            <ui:VisualElement name="monster-container" class="monster-container" />
+        </ui:VisualElement>
+
+        <!-- 拖放区域（默认隐藏，拖拽卡牌时显示） -->
+        <ui:VisualElement name="drop-zone" class="drop-zone">
+            <ui:Label name="drop-zone-label" text="拖放卡牌到此处" class="drop-zone-label" />
+        </ui:VisualElement>
+
+        <!-- 下部：手牌区 + 结束回合按钮 -->
+        <ui:VisualElement name="card-area" class="card-area">
+            <!-- 扇形手牌容器（绝对定位的卡牌挂在此处） -->
+            <ui:VisualElement name="hand-fan" class="hand-fan" />
+            <ui:VisualElement name="end-turn-wrapper" class="end-turn-wrapper">
+                <ui:Button name="end-turn-btn" text="结束回合" class="end-turn-btn" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- 预览层（克隆放大卡显示在此层，不抢点击） -->
+        <ui:VisualElement name="preview-layer" class="preview-layer" picking-mode="Ignore" />
+    </ui:VisualElement>
+</ui:UXML>

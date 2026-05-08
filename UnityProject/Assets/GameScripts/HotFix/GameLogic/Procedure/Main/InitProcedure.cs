@@ -12,7 +12,7 @@ namespace GameLogic
         /// <summary>
         /// 初始化流程实例。
         /// </summary>
-        protected override void OnInit(ProcedureOwner procedureOwner)
+        protected internal override void OnInit(ProcedureOwner procedureOwner)
         {
             base.OnInit(procedureOwner);
             Log.Info("[InitProcedure] OnInit");
@@ -21,7 +21,7 @@ namespace GameLogic
         /// <summary>
         /// 进入初始化流程。
         /// </summary>
-        protected override void OnEnter(ProcedureOwner procedureOwner)
+        protected internal override void OnEnter(ProcedureOwner procedureOwner)
         {
             base.OnEnter(procedureOwner);
             Log.Info("[InitProcedure] 初始化完成，切换到主界面流程");
@@ -31,7 +31,7 @@ namespace GameLogic
         /// <summary>
         /// 离开初始化流程。
         /// </summary>
-        protected override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
+        protected internal override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
         {
             base.OnLeave(procedureOwner, isShutdown);
             Log.Info("[InitProcedure] OnLeave");
@@ -40,7 +40,7 @@ namespace GameLogic
         /// <summary>
         /// 销毁初始化流程。
         /// </summary>
-        protected override void OnDestroy(ProcedureOwner procedureOwner)
+        protected internal override void OnDestroy(ProcedureOwner procedureOwner)
         {
             base.OnDestroy(procedureOwner);
             Log.Info("[InitProcedure] OnDestroy");
