@@ -69,6 +69,6 @@
 
 ## 9. 归档准备
 
-- [ ] 9.1 提交所有修改并撰写中文 commit message（描述变更内容和原因）
-- [ ] 9.2 通过 `/opsx:verify fix-game-view-card-interactions` 校验实现与 spec 一致
-- [ ] 9.3 通过 `/opsx:archive fix-game-view-card-interactions` 归档变更
+- [x] 9.1 提交所有修改并撰写中文 commit message（描述变更内容和原因）
+- [x] 9.2 通过 `/opsx:verify fix-game-view-card-interactions` 校验实现与 spec 一致
+- [x] 9.3 通过 `/opsx:archive fix-game-view-card-interactions` 归档变更
