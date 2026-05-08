@@ -39,13 +39,18 @@
     -unity-text-align: middle-center;
 }
 
-/* === 拖放区域 === */
+/* === 拖放区域 ===
+   注意：必须使用 absolute 定位浮在 BattlePanel 上层，否则切换 display
+   会让它参与 flex column 布局，把 monster-area 挤压上移。 */
 .drop-zone {
     display: none;
+    position: absolute;
+    left: 30px;
+    right: 30px;
+    bottom: 300px;
     height: 200px;
     justify-content: center;
     align-items: center;
-    margin: 10px 30px;
     border-width: 3px;
     border-color: rgba(255, 215, 0, 0.4);
     border-radius: 16px;
@@ -336,7 +341,10 @@
     background-color: rgba(44, 62, 80, 0.8);
     opacity: 0.85;
     align-items: center;
-    /* 用于回弹动画 */
+}
+
+/* 仅回弹时启用 transition，避免初次显示时从 (0,0) 飞到鼠标位置的过渡动画 */
+.card-ghost--rebounding {
     transition-property: left, top;
     transition-duration: 0.15s;
 }
