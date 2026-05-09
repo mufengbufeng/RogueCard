@@ -19,6 +19,9 @@ public sealed partial class Monster : Luban.BeanBase
         Id = _buf.ReadInt();
         Name = _buf.ReadString();
         Desc = _buf.ReadString();
+        MaxHp = _buf.ReadInt();
+        MaxEnergy = _buf.ReadInt();
+        HandLimit = _buf.ReadInt();
         AssetId = _buf.ReadString();
     }
 
@@ -40,6 +43,18 @@ public sealed partial class Monster : Luban.BeanBase
     /// </summary>
     public readonly string Desc;
     /// <summary>
+    /// 最大血量
+    /// </summary>
+    public readonly int MaxHp;
+    /// <summary>
+    /// 最大能量
+    /// </summary>
+    public readonly int MaxEnergy;
+    /// <summary>
+    /// 手牌上限
+    /// </summary>
+    public readonly int HandLimit;
+    /// <summary>
     /// 资源标识
     /// </summary>
     public readonly string AssetId;
@@ -57,6 +72,9 @@ public sealed partial class Monster : Luban.BeanBase
         + "id:" + Id + ","
         + "name:" + Name + ","
         + "desc:" + Desc + ","
+        + "maxHp:" + MaxHp + ","
+        + "maxEnergy:" + MaxEnergy + ","
+        + "handLimit:" + HandLimit + ","
         + "assetId:" + AssetId + ","
         + "}";
     }

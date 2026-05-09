@@ -1,19 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using EF.Event;
-using GameConfig.monster;
 
 namespace GameLogic
 {
     /// <summary>
-    /// 怪物系统，管理怪物意图刷新和回合行为执行。
+    /// 怪物系统：Prepare 阶段为每只存活怪物准备 PendingCards；MonsterTurn 阶段执行 PendingCards。
+    /// 实际行动通过 <see cref="CardEffectExecutor"/> 与 <see cref="MonsterCardSystem"/> 完成，自身不实现具体效果。
     /// </summary>
-    public class MonsterSystem : IDisposable
+    public class MonsterSystem : IDisposable, IBattleEventSink
     {
-        private readonly Random _random = new();
         private GameModel _model;
         private IEventPublisher _events;
+        private MonsterCardSystem _cardSystem;
         private bool _isDisposed;
 
         /// <summary>
@@ -26,122 +25,136 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 刷新所有存活怪物的意图。
+        /// 注入怪物卡牌系统依赖。
         /// </summary>
-        public void RefreshIntents()
+        public void Initialize(MonsterCardSystem cardSystem)
         {
-            var tables = GameLogicEntry.Config?.Tables;
-            if (tables == null) return;
+            _cardSystem = cardSystem ?? throw new ArgumentNullException(nameof(cardSystem));
+        }
+
+        /// <summary>
+        /// Prepare 阶段：恢复每只存活怪物能量、按剧本/抽牌生成 PendingCards。
+        /// </summary>
+        public void BeginMonsterPrepare()
+        {
+            if (_cardSystem == null)
+            {
+                throw new InvalidOperationException("MonsterSystem.BeginMonsterPrepare 调用前必须 Initialize 注入 MonsterCardSystem");
+            }
 
             foreach (var monster in _model.Monsters)
             {
-                if (monster.Hp <= 0) continue;
+                if (monster == null || monster.IsDead) continue;
 
-                var allIntents = new List<GameConfig.monster.MonsterIntent>();
-                foreach (var intent in tables.TbMonsterIntent.DataList)
+                // 恢复能量到上限（与玩家 Prepare 阶段对称）
+                monster.CurrentEnergy = monster.MaxEnergy;
+
+                int turnNumber = monster.TurnsAlive + 1;
+                bool isScripted = monster.ScriptedCards != null
+                    && monster.ScriptedCards.ContainsKey(turnNumber);
+
+                if (!isScripted)
                 {
-                    if (intent.MonsterId == monster.Config.Id)
-                        allIntents.Add(intent);
+                    _cardSystem.Draw(monster, monster.HandLimit);
                 }
 
-                if (allIntents.Count == 0) continue;
-
-                var sequence = allIntents
-                    .Where(i => i.Order > 0 && i.Weight == 0)
-                    .OrderBy(i => i.Order)
-                    .ToList();
-                var weighted = allIntents
-                    .Where(i => i.Weight > 0 && i.Order == 0)
-                    .ToList();
-
-                if (sequence.Count > 0)
+                var pending = MonsterAiBrain.SelectIntent(monster, turnNumber);
+                monster.PendingCards.Clear();
+                foreach (var card in pending)
                 {
-                    monster.CurrentIntent = sequence[monster.IntentSequenceIndex % sequence.Count];
-                    monster.IntentSequenceIndex++;
-                }
-                else if (weighted.Count > 0)
-                {
-                    int totalWeight = weighted.Sum(i => i.Weight);
-                    int roll = _random.Next(totalWeight);
-                    int cumulative = 0;
-                    foreach (var intent in weighted)
-                    {
-                        cumulative += intent.Weight;
-                        if (roll < cumulative)
-                        {
-                            monster.CurrentIntent = intent;
-                            break;
-                        }
-                    }
+                    if (card != null) monster.PendingCards.Add(card);
                 }
             }
         }
 
         /// <summary>
-        /// 执行所有存活怪物的回合行动。
+        /// MonsterTurn 阶段：对每只存活怪物按 PendingCards 依次调用 Executor，
+        /// 之后弃光手牌、清空 PendingCards、TurnsAlive++。
         /// </summary>
-        public bool ExecuteTurn()
+        public void ExecuteTurn()
         {
-            bool anyDeath = false;
+            if (_cardSystem == null) return;
+
+            var playerActor = new PlayerActor(_model);
 
             for (int i = 0; i < _model.Monsters.Count; i++)
             {
                 var monster = _model.Monsters[i];
-                if (monster.Hp <= 0 || monster.CurrentIntent == null) continue;
+                if (monster == null || monster.IsDead) continue;
 
-                switch (monster.CurrentIntent.IntentType)
+                var targets = new List<IBattleActor> { playerActor };
+                foreach (var card in monster.PendingCards)
                 {
-                    case MonsterIntentType.Attack:
-                        int damage = monster.CurrentIntent.Value;
-                        if (_model.PlayerArmor > 0)
-                        {
-                            int absorbed = Math.Min(_model.PlayerArmor, damage);
-                            _model.ModifyPlayerArmor(-absorbed);
-                            damage -= absorbed;
-                        }
-
-                        if (damage > 0)
-                        {
-                            _model.ModifyPlayerHp(-damage);
-                        }
-
-                        break;
-
-                    case MonsterIntentType.Defend:
-                        monster.Armor += monster.CurrentIntent.Value;
-                        break;
+                    if (card == null) continue;
+                    if (playerActor.IsDead) break; // 玩家已死，停止后续行动
+                    CardEffectExecutor.Execute(card, monster, targets, this);
                 }
-            }
 
-            return anyDeath;
+                _cardSystem.DiscardAllHand(monster);
+                monster.PendingCards.Clear();
+                monster.TurnsAlive++;
+            }
         }
 
         /// <summary>
-        /// 生成指定批次的怪物运行时实例。
+        /// 生成指定批次的怪物运行时实例：读取 TbMonster 字段、初始化牌堆、设置初始能量。
         /// </summary>
         public void SpawnBatch(GameConfig.battle.BattleWaveSpawnBatch batch)
         {
-            var tables = GameLogicEntry.Config.Tables;
-            var monsters = new List<MonsterRuntime>();
+            if (_cardSystem == null)
+            {
+                throw new InvalidOperationException("MonsterSystem.SpawnBatch 调用前必须 Initialize 注入 MonsterCardSystem");
+            }
 
+            var tables = GameLogicEntry.Config?.Tables;
+            if (tables == null) return;
+
+            var monsters = new List<MonsterRuntime>();
             for (int i = 0; i < batch.Count; i++)
             {
                 var monsterConfig = tables.TbMonster.GetOrDefault(batch.MonsterId);
-                if (monsterConfig != null)
+                if (monsterConfig == null) continue;
+
+                var monster = new MonsterRuntime
                 {
-                    monsters.Add(new MonsterRuntime
-                    {
-                        Config = monsterConfig,
-                        Hp = GameModel.DefaultMonsterHp,
-                        MaxHp = GameModel.DefaultMonsterHp,
-                        Armor = 0,
-                        CurrentIntent = null,
-                        IntentSequenceIndex = 0
-                    });
-                }
+                    Config = monsterConfig,
+                    MaxHp = monsterConfig.MaxHp,
+                    Hp = monsterConfig.MaxHp,
+                    Armor = 0,
+                    MaxEnergy = monsterConfig.MaxEnergy,
+                    CurrentEnergy = monsterConfig.MaxEnergy,
+                    HandLimit = monsterConfig.HandLimit,
+                    TurnsAlive = 0,
+                };
+
+                _cardSystem.InitDeck(monster);
+                monsters.Add(monster);
             }
 
             _model.SetMonsters(monsters);
+        }
+
+        /// <inheritdoc />
+        public void OnActorDied(IBattleActor actor)
+        {
+            if (actor is MonsterRuntime monster)
+            {
+                int index = -1;
+                var list = _model.Monsters;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (ReferenceEquals(list[i], monster))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+                if (index >= 0)
+                {
+                    _events.GetChannel<MonsterDeathEvent>().Publish(new MonsterDeathEvent(index));
+                }
+            }
+            // 玩家死亡由 BattleSystem.Check 阶段处理，此处不发布
         }
 
         /// <summary>
@@ -153,6 +166,7 @@ namespace GameLogic
             _isDisposed = true;
             _model = null;
             _events = null;
+            _cardSystem = null;
         }
     }
 }

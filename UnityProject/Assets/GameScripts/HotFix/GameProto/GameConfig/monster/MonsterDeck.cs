@@ -12,58 +12,59 @@ using Luban;
 
 namespace GameConfig.monster
 {
-public sealed partial class MonsterIntent : Luban.BeanBase
+public sealed partial class MonsterDeck : Luban.BeanBase
 {
-    public MonsterIntent(ByteBuf _buf) 
+    public MonsterDeck(ByteBuf _buf) 
     {
         Id = _buf.ReadInt();
         MonsterId = _buf.ReadInt();
+        MonsterId_Ref = null;
         Order = _buf.ReadInt();
-        IntentType = (monster.MonsterIntentType)_buf.ReadInt();
-        Value = _buf.ReadInt();
-        Weight = _buf.ReadInt();
+        CardId = _buf.ReadInt();
+        CardId_Ref = null;
+        Count = _buf.ReadInt();
         Comment = _buf.ReadString();
     }
 
-    public static MonsterIntent DeserializeMonsterIntent(ByteBuf _buf)
+    public static MonsterDeck DeserializeMonsterDeck(ByteBuf _buf)
     {
-        return new monster.MonsterIntent(_buf);
+        return new monster.MonsterDeck(_buf);
     }
 
     /// <summary>
-    /// 意图标识
+    /// 记录标识
     /// </summary>
     public readonly int Id;
     /// <summary>
     /// 怪物标识
     /// </summary>
     public readonly int MonsterId;
+    public monster.Monster MonsterId_Ref;
     /// <summary>
-    /// 序列顺序（&gt;0时使用序列循环）
+    /// 剧本顺序
     /// </summary>
     public readonly int Order;
     /// <summary>
-    /// 意图类型
+    /// 卡牌标识
     /// </summary>
-    public readonly monster.MonsterIntentType IntentType;
+    public readonly int CardId;
+    public card.Card CardId_Ref;
     /// <summary>
-    /// 意图数值
+    /// 份数
     /// </summary>
-    public readonly int Value;
-    /// <summary>
-    /// 权重（&gt;0时使用权重随机）
-    /// </summary>
-    public readonly int Weight;
+    public readonly int Count;
     /// <summary>
     /// 备注
     /// </summary>
     public readonly string Comment;
    
-    public const int __ID__ = -1526232094;
+    public const int __ID__ = -171578513;
     public override int GetTypeId() => __ID__;
 
     public  void ResolveRef(Tables tables)
     {
+        MonsterId_Ref = tables.TbMonster.GetOrDefault(MonsterId);
+        CardId_Ref = tables.TbCard.GetOrDefault(CardId);
     }
 
     public override string ToString()
@@ -72,9 +73,8 @@ public sealed partial class MonsterIntent : Luban.BeanBase
         + "id:" + Id + ","
         + "monsterId:" + MonsterId + ","
         + "order:" + Order + ","
-        + "intentType:" + IntentType + ","
-        + "value:" + Value + ","
-        + "weight:" + Weight + ","
+        + "cardId:" + CardId + ","
+        + "count:" + Count + ","
         + "comment:" + Comment + ","
         + "}";
     }
