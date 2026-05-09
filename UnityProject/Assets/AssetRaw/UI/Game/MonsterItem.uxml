@@ -4,11 +4,15 @@
 
     <ui:VisualElement name="MonsterItem" class="monster-item">
         <ui:Label name="intent-text" text="" class="monster-intent" />
+        <!-- 多 effect 意图区：每张 PendingCard 渲染为一个 .intent-card，挂多个 .intent-icon -->
+        <ui:VisualElement name="intent-container" class="intent-container" picking-mode="Ignore" />
         <ui:VisualElement name="portrait" class="monster-portrait" />
         <ui:Label name="name-text" text="" class="monster-name" />
         <ui:VisualElement name="hp-bar-bg" class="monster-hp-bar-bg">
             <ui:VisualElement name="hp-bar" class="monster-hp-bar" style="width: 100%;" />
         </ui:VisualElement>
         <ui:Label name="hp-text" text="" class="monster-hp-text" />
+        <!-- Buff 状态条：DoT、增益、减益等 -->
+        <ui:VisualElement name="buff-bar" class="buff-bar" picking-mode="Ignore" />
     </ui:VisualElement>
 </ui:UXML>

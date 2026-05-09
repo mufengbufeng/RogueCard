@@ -24,5 +24,8 @@
 
         <!-- 预览层（克隆放大卡显示在此层，不抢点击） -->
         <ui:VisualElement name="preview-layer" class="preview-layer" picking-mode="Ignore" />
+
+        <!-- 出牌失败 toast（默认隐藏，CardPlayFailedEvent 触发时短暂显示，1.2s 后淡出） -->
+        <ui:Label name="fail-toast" class="fail-toast" picking-mode="Ignore" />
     </ui:VisualElement>
 </ui:UXML>

@@ -69,6 +69,11 @@ namespace GameLogic
         public ReactiveProperty<bool> IsPlayerDead { get; private set; }
 
         /// <summary>
+        /// 玩家身上的 Buff 列表（DoT 等持续效果），供 UI 渲染 buff 状态条。
+        /// </summary>
+        public ReactiveProperty<IReadOnlyList<BuffRuntime>> PlayerBuffs { get; private set; }
+
+        /// <summary>
         /// 创建局内 ViewModel。
         /// </summary>
         public GameViewModel()
@@ -83,14 +88,16 @@ namespace GameLogic
             PlayerArmor = Prop(0);
             IsLevelComplete = Prop(false);
             IsPlayerDead = Prop(false);
+            PlayerBuffs = Prop<IReadOnlyList<BuffRuntime>>(Array.Empty<BuffRuntime>());
         }
 
         // ── 命令意图事件 ──
 
         /// <summary>
-        /// 使用卡牌（参数为手牌索引）。
+        /// 使用卡牌（参数为手牌索引、目标怪物索引）。
+        /// targetIndex = -1 表示由后端按 TargetMode 自动决策；&gt;= 0 表示玩家手选的具体怪物索引（仅 SingleManual 用）。
         /// </summary>
-        public event Action<int> CardUsed;
+        public event Action<int, int> CardUsed;
 
         /// <summary>
         /// 结束回合。
@@ -101,6 +108,11 @@ namespace GameLogic
         /// 选择奖励。
         /// </summary>
         public event Action RewardSelected;
+
+        /// <summary>
+        /// 出牌失败事件，参数为失败原因字符串。
+        /// </summary>
+        public event Action<string> CardPlayFailed;
 
         /// <summary>
         /// 绑定 GameModel，订阅其 PropertyChanged 并镜像到 ReactiveProperty。
@@ -124,14 +136,20 @@ namespace GameLogic
             CardUsed = null;
             EndTurnRequested = null;
             RewardSelected = null;
+            CardPlayFailed = null;
 
             base.Dispose();
         }
 
         /// <summary>
-        /// 触发使用卡牌意图。
+        /// 触发使用卡牌意图。targetIndex = -1 表示由后端按 TargetMode 自动决策。
         /// </summary>
-        public void UseCard(int handIndex) => CardUsed?.Invoke(handIndex);
+        public void UseCard(int handIndex, int targetIndex = -1) => CardUsed?.Invoke(handIndex, targetIndex);
+
+        /// <summary>
+        /// 通知 UI 出牌失败（由 GameProcedure 在收到 CardPlayFailedEvent 时调用）。
+        /// </summary>
+        public void NotifyCardPlayFailed(string reason) => CardPlayFailed?.Invoke(reason);
 
         /// <summary>
         /// 触发结束回合意图。
@@ -177,7 +195,23 @@ namespace GameLogic
                 case "Hand":
                     Hand.Value = _model.Hand;
                     break;
+                case nameof(GameModel.PlayerBuffs):
+                    PlayerBuffs.Value = SnapshotPlayerBuffs();
+                    break;
             }
+        }
+
+        /// <summary>
+        /// 把 GameModel.PlayerBuffs（List）拷贝为只读快照供 UI 订阅。
+        /// 拷贝避免列表后续 mutation 与 UI 渲染并发。
+        /// </summary>
+        private IReadOnlyList<BuffRuntime> SnapshotPlayerBuffs()
+        {
+            var src = _model.PlayerBuffs;
+            if (src == null || src.Count == 0) return Array.Empty<BuffRuntime>();
+            var copy = new BuffRuntime[src.Count];
+            for (int i = 0; i < src.Count; i++) copy[i] = src[i];
+            return copy;
         }
 
         private void SyncAll()
@@ -192,6 +226,7 @@ namespace GameLogic
             IsPlayerDead.Value = _model.IsPlayerDead;
             Monsters.Value = _model.Monsters;
             Hand.Value = _model.Hand;
+            PlayerBuffs.Value = SnapshotPlayerBuffs();
         }
     }
 }

@@ -1,6 +1,26 @@
 namespace GameLogic
 {
     /// <summary>
+    /// 卡牌出牌失败事件，在 CardSystem.Play 因任意原因拒绝出牌时发布。
+    /// Reason 取值：NotPlayerTurn / InvalidHandIndex / InsufficientEnergy / InvalidTarget。
+    /// </summary>
+    public readonly struct CardPlayFailedEvent
+    {
+        /// <summary>
+        /// 失败原因（约定为预定义字符串，以避免引入额外枚举）。
+        /// </summary>
+        public readonly string Reason;
+
+        /// <summary>
+        /// 创建出牌失败事件。
+        /// </summary>
+        public CardPlayFailedEvent(string reason)
+        {
+            Reason = reason;
+        }
+    }
+
+    /// <summary>
     /// 卡牌打出事件，在 CardSystem.Play 成功执行后发布。
     /// </summary>
     public readonly struct CardPlayedEvent

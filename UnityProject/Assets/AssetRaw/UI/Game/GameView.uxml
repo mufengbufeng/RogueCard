@@ -25,6 +25,8 @@
                 </ui:VisualElement>
                 <ui:Label name="energy-text" text="3/3" class="progress-label"/>
             </ui:VisualElement>
+            <!-- 玩家 Buff 状态条：DoT 等持续效果 -->
+            <ui:VisualElement name="player-buff-bar" class="buff-bar" picking-mode="Ignore"/>
         </ui:VisualElement>
     </ui:VisualElement>
 </ui:UXML>

@@ -284,9 +284,27 @@
     background-color: rgba(52, 73, 94, 0.95);
 }
 
-/* 拖拽中的原卡占位（仅降低透明度，保留扇形位置） */
+/* 拖拽中的原卡占位（旧版 placeholder 行为，已废弃，待验证下线后删除） */
 .card-item--placeholder {
     opacity: 0.3;
+}
+
+/* 拖拽中临时禁用 transition：让其他卡按 RecomputeHandLayout 写入的目标位置即时生效（避免跟手延迟） */
+.card-item--no-transition {
+    transition-duration: 0s;
+}
+
+/* 松手回弹时启用与默认一致的 transition（标记类，便于按用途清理） */
+.card-item--rebounding {
+    transition-property: translate, rotate, left, top;
+    transition-duration: 0.15s;
+}
+
+/* 区域内拖拽时显示的半透明插槽占位卡（视觉替代被拖卡的目标位置） */
+.card-item--insert-slot {
+    opacity: 0.3;
+    border-color: rgba(255, 215, 0, 0.6);
+    background-color: rgba(44, 62, 80, 0.5);
 }
 
 /* 悬停抬升（C# 控制添加/移除，避免与拖拽态冲突） */
@@ -347,4 +365,102 @@
 .card-ghost--rebounding {
     transition-property: left, top;
     transition-duration: 0.15s;
+}
+
+/* === 出牌失败 Toast === */
+.fail-toast {
+    position: absolute;
+    left: 50%;
+    top: 35%;
+    translate: -50% 0;
+    padding: 10px 24px;
+    background-color: rgba(180, 30, 30, 0.85);
+    color: #ffffff;
+    font-size: 30px;
+    -unity-font-style: bold;
+    border-radius: 8px;
+    border-width: 2px;
+    border-color: rgba(255, 100, 100, 0.7);
+    opacity: 0;
+    display: none;
+    transition-property: opacity;
+    transition-duration: 0.4s;
+}
+
+.fail-toast--visible {
+    opacity: 1;
+    display: flex;
+}
+
+/* === 选目标态：怪物高亮 === */
+.target-selectable.active {
+    border-width: 3px;
+    border-color: rgba(255, 215, 0, 0.9);
+    background-color: rgba(255, 215, 0, 0.15);
+}
+
+/* === 怪物意图区 === */
+.intent-container {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: 4px;
+}
+
+.intent-card {
+    flex-direction: row;
+    align-items: center;
+    margin-right: 6px;
+    padding: 2px 6px;
+    background-color: rgba(0, 0, 0, 0.4);
+    border-radius: 4px;
+}
+
+.intent-icon {
+    font-size: 22px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    margin-right: 4px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    color: #ffffff;
+}
+
+.intent-icon-damage {
+    background-color: rgba(180, 30, 30, 0.9);
+}
+
+.intent-icon-shield {
+    background-color: rgba(50, 100, 200, 0.9);
+}
+
+.intent-icon-dot {
+    background-color: rgba(140, 60, 180, 0.9);
+}
+
+.intent-icon-energy {
+    background-color: rgba(220, 180, 30, 0.95);
+    color: #2a1a00;
+}
+
+/* === Buff 状态条 === */
+.buff-bar {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 2px;
+    align-items: center;
+}
+
+.buff-icon {
+    font-size: 18px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    padding: 1px 5px;
+    margin-right: 3px;
+    border-radius: 3px;
+    color: #ffffff;
+}
+
+.buff-icon-dot {
+    background-color: rgba(140, 60, 180, 0.9);
 }
