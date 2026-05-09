@@ -1,13 +1,13 @@
 ﻿<Solution>
-  <Project Path="GameProto.csproj" />
   <Project Path="SingularityGroup.HotReload.Editor.csproj" />
+  <Project Path="GameLogic.Tests.EditMode.csproj" />
+  <Project Path="GameProto.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="SingularityGroup.HotReload.Runtime.csproj" />
+  <Project Path="GameLogic.csproj" />
+  <Project Path="EF.Runtime.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="Assembly-CSharp-firstpass.csproj" />
-  <Project Path="EF.Runtime.csproj" />
-  <Project Path="Assembly-CSharp-Editor.csproj" />
-  <Project Path="GameLogic.Tests.PlayMode.csproj" />
-  <Project Path="GameLogic.Tests.EditMode.csproj" />
-  <Project Path="GameLogic.csproj" />
   <Project Path="SingularityGroup.HotReload.Runtime.Public.csproj" />
+  <Project Path="GameLogic.Tests.PlayMode.csproj" />
 </Solution>
