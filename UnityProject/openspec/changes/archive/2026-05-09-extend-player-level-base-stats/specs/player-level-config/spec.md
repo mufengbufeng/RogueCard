@@ -1,9 +1,5 @@
-# player-level-config Specification
+## MODIFIED Requirements
 
-## Purpose
-
-定义 MVP 角色等级配置表的最小结构和测试数据要求，支撑后续玩家经验、升级、基础能量和手牌上限逻辑接入。
-## Requirements
 ### Requirement: 角色等级配置表必须定义 MVP 成长字段
 
 系统 MUST 在配置数据目录中提供角色等级配置表结构，用于描述玩家等级、达到该等级所需经验、**基础生命**、基础能量和手牌上限，并且等级标识 MUST 使用 `int`。
@@ -28,13 +24,3 @@
 - **AND** 5 级的 `BaseHp` MUST 等于 140
 - **AND** 每条记录的 `BaseEnergy` MUST 等于 3
 - **AND** 每条记录的 `HandLimit` MUST 等于 10
-
-### Requirement: 角色等级配置表必须注册到 Luban 表清单
-系统 MUST 在 Luban 表清单中注册角色等级配置表，使配置生成流程能够识别该表。
-
-#### Scenario: 注册角色等级配置表
-- **WHEN** 检查 `__tables__.xlsx` 的表注册数据
-- **THEN** 系统 MUST 存在 `player.TbPlayerLevel` 注册记录
-- **AND** 该注册记录 MUST 使用 `PlayerLevel` 作为记录类名
-- **AND** 该注册记录 MUST 从 `player_level.xlsx` 读取结构和数据
-

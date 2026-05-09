@@ -18,6 +18,7 @@ public sealed partial class PlayerLevel : Luban.BeanBase
     {
         Id = _buf.ReadInt();
         RequiredExp = _buf.ReadInt();
+        BaseHp = _buf.ReadInt();
         BaseEnergy = _buf.ReadInt();
         HandLimit = _buf.ReadInt();
     }
@@ -35,6 +36,10 @@ public sealed partial class PlayerLevel : Luban.BeanBase
     /// 升级所需累计经验
     /// </summary>
     public readonly int RequiredExp;
+    /// <summary>
+    /// 基础生命
+    /// </summary>
+    public readonly int BaseHp;
     /// <summary>
     /// 基础能量
     /// </summary>
@@ -56,6 +61,7 @@ public sealed partial class PlayerLevel : Luban.BeanBase
         return "{ "
         + "id:" + Id + ","
         + "requiredExp:" + RequiredExp + ","
+        + "baseHp:" + BaseHp + ","
         + "baseEnergy:" + BaseEnergy + ","
         + "handLimit:" + HandLimit + ","
         + "}";
