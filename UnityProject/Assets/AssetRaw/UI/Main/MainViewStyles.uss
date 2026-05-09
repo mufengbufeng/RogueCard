@@ -1,26 +1,330 @@
-/* 主菜单样式 */
+/* 主菜单样式：顶部资源栏 + 关卡预览 + 开始按钮 + 底部导航栏 */
 
+/* ============ 根容器 ============ */
 .main-container {
     flex-grow: 1;
-    justify-content: center;
-    align-items: center;
-    background-color: var(--color-bg);
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: stretch;
+    background-color: rgba(160, 200, 150, 0.15);
+    padding-top: 24px;
+    padding-bottom: 24px;
+    padding-left: 32px;
+    padding-right: 32px;
 }
 
+/* ============ 顶部资源栏 ============ */
+.top-bar {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    height: 80px;
+    flex-shrink: 0;
+}
+
+.resource-panel {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgba(60, 40, 20, 0.85);
+    border-top-left-radius: 36px;
+    border-bottom-left-radius: 36px;
+    border-top-right-radius: 36px;
+    border-bottom-right-radius: 36px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-color: rgba(120, 80, 40, 1);
+    padding-top: 6px;
+    padding-bottom: 6px;
+    padding-left: 8px;
+    padding-right: 16px;
+    min-width: 220px;
+    height: 64px;
+}
+
+.resource-icon {
+    width: 56px;
+    height: 56px;
+    border-top-left-radius: 28px;
+    border-bottom-left-radius: 28px;
+    border-top-right-radius: 28px;
+    border-bottom-right-radius: 28px;
+    background-color: rgba(255, 255, 255, 0.2);
+    margin-right: 12px;
+}
+
+.resource-icon-stamina {
+    background-color: rgba(180, 130, 60, 1);
+}
+
+.resource-icon-gold {
+    background-color: rgba(220, 180, 80, 1);
+}
+
+.resource-content {
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    flex-grow: 1;
+}
+
+.resource-title {
+    font-size: 18px;
+    color: rgba(240, 220, 180, 1);
+    -unity-text-align: middle-left;
+    margin-bottom: 0;
+    padding: 0;
+}
+
+.resource-value {
+    font-size: 24px;
+    color: rgba(255, 240, 200, 1);
+    -unity-text-align: middle-left;
+    -unity-font-style: bold;
+    margin-bottom: 0;
+    padding: 0;
+}
+
+.resource-add-btn {
+    width: 36px;
+    height: 36px;
+    margin-left: 12px;
+    font-size: 24px;
+    color: rgba(255, 240, 200, 1);
+    background-color: rgba(120, 80, 40, 1);
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    border-left-width: 1px;
+    border-right-width: 1px;
+    border-color: rgba(180, 130, 60, 1);
+    -unity-font-style: bold;
+}
+
+/* ============ 中部主内容 ============ */
 .main-content {
+    flex-grow: 1;
+    flex-shrink: 1;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    width: 800px;
-    height: 600px;
+    width: 100%;
+    overflow: hidden;
 }
 
-.main-content > Label {
-    margin-bottom: var(--spacing-md);
+/* 关卡预览面板 */
+.preview-panel {
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 640px;
+    margin-bottom: 24px;
 }
 
-.main-content > Button {
-    margin-top: var(--spacing-lg);
-    margin-bottom: var(--spacing-md);
-    width: 200px;
-    height: 50px;
+.preview-title {
+    font-size: 26px;
+    color: rgba(80, 50, 20, 1);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    margin-bottom: 12px;
+}
+
+.preview-frame {
+    width: 100%;
+    height: auto;
+    min-height: 120px;
+    max-height: 320px;
+    flex-shrink: 1;
+    background-color: rgba(60, 40, 20, 0.85);
+    border-top-left-radius: 16px;
+    border-bottom-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border-bottom-right-radius: 16px;
+    border-top-width: 6px;
+    border-bottom-width: 6px;
+    border-left-width: 6px;
+    border-right-width: 6px;
+    border-color: rgba(140, 90, 50, 1);
+    padding-top: 8px;
+    padding-bottom: 8px;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+.preview-image {
+    flex-grow: 1;
+    background-color: rgba(40, 60, 90, 1);
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+/* 关卡信息 */
+.level-info {
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.level-name {
+    font-size: 30px;
+    color: rgba(60, 40, 20, 1);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
+    margin-bottom: 4px;
+}
+
+.level-desc {
+    font-size: 22px;
+    color: rgba(80, 60, 30, 0.85);
+    -unity-text-align: middle-center;
+    margin-bottom: 0;
+}
+
+.status-text {
+    font-size: 18px;
+    color: rgba(80, 60, 30, 0.6);
+    -unity-text-align: middle-center;
+    margin-top: 4px;
+}
+
+/* 开始游戏区域 */
+.start-section {
+    flex-direction: column;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.btn-start {
+    width: 320px;
+    height: 80px;
+    font-size: 32px;
+    -unity-font-style: bold;
+    color: rgba(255, 245, 215, 1);
+    background-color: rgba(60, 90, 130, 1);
+    border-top-left-radius: 24px;
+    border-bottom-left-radius: 24px;
+    border-top-right-radius: 24px;
+    border-bottom-right-radius: 24px;
+    border-top-width: 4px;
+    border-bottom-width: 4px;
+    border-left-width: 4px;
+    border-right-width: 4px;
+    border-color: rgba(140, 90, 50, 1);
+}
+
+.btn-start:hover {
+    background-color: rgba(80, 110, 150, 1);
+}
+
+.btn-start:disabled {
+    background-color: rgba(120, 120, 120, 0.6);
+    color: rgba(220, 220, 220, 0.6);
+}
+
+.feedback-text {
+    font-size: 18px;
+    color: rgba(180, 70, 70, 1);
+    -unity-text-align: middle-center;
+    margin-top: 8px;
+    min-height: 22px;
+}
+
+/* ============ 底部导航栏 ============ */
+.nav-bar {
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    width: 100%;
+    height: 110px;
+    flex-shrink: 0;
+    background-color: rgba(60, 40, 20, 0.85);
+    border-top-left-radius: 16px;
+    border-top-right-radius: 16px;
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+    border-top-width: 3px;
+    border-bottom-width: 3px;
+    border-left-width: 3px;
+    border-right-width: 3px;
+    border-color: rgba(140, 90, 50, 1);
+    padding-top: 8px;
+    padding-bottom: 8px;
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+.nav-btn {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(0, 0, 0, 0);
+    border-top-width: 0;
+    border-bottom-width: 0;
+    border-left-width: 0;
+    border-right-width: 0;
+    width: 96px;
+    height: 96px;
+    padding: 4px;
+    margin: 0;
+}
+
+.nav-btn:hover {
+    background-color: rgba(255, 240, 200, 0.15);
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.nav-btn-active {
+    background-color: rgba(255, 240, 200, 0.2);
+    border-top-left-radius: 12px;
+    border-bottom-left-radius: 12px;
+    border-top-right-radius: 12px;
+    border-bottom-right-radius: 12px;
+}
+
+.nav-icon {
+    width: 56px;
+    height: 56px;
+    background-color: rgba(255, 240, 200, 0.6);
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    margin-bottom: 6px;
+}
+
+.nav-icon-shop {
+    background-color: rgba(220, 180, 100, 1);
+}
+
+.nav-icon-character {
+    background-color: rgba(180, 120, 80, 1);
+}
+
+.nav-icon-home {
+    background-color: rgba(120, 150, 110, 1);
+}
+
+.nav-icon-challenge {
+    background-color: rgba(150, 100, 80, 1);
+}
+
+.nav-icon-rank {
+    background-color: rgba(230, 200, 80, 1);
+}
+
+.nav-label {
+    font-size: 18px;
+    color: rgba(255, 240, 200, 1);
+    -unity-text-align: middle-center;
+    -unity-font-style: bold;
 }
