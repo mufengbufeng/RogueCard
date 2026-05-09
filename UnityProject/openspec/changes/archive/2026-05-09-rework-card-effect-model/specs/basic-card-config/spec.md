@@ -1,17 +1,24 @@
-# basic-card-config Specification
+## REMOVED Requirements
 
-## Purpose
+### Requirement: 基础卡牌配置表必须定义 MVP 卡牌字段
 
-定义 MVP 基础卡牌配置表的最小结构和测试数据要求，支撑后续卡牌牌堆、出牌效果和奖励配置引用。
-## Requirements
-### Requirement: 基础卡牌配置表必须注册到 Luban 表清单
-系统 MUST 在 Luban 表清单中注册基础卡牌配置表，使配置生成流程能够识别该表。
+**Reason:** 字段集变更——`EffectType` / `Value` 被结构化的 `TbCardEffect` 表替代，新增 `OwnerKind` / `TargetMode` 字段。原 requirement 描述的字段集已不再准确。
 
-#### Scenario: 注册基础卡牌配置表
-- **WHEN** 检查 `__tables__.xlsx` 的表注册数据
-- **THEN** 系统 MUST 存在 `card.TbCard` 注册记录
-- **AND** 该注册记录 MUST 使用 `Card` 作为记录类名
-- **AND** 该注册记录 MUST 从 `card.xlsx` 读取结构和数据
+**Migration:** 请见 ADDED Requirement「基础卡牌配置表必须支持卡牌+效果分离结构」。
+
+### Requirement: MVP 卡牌效果类型必须限制为基础效果集合
+
+**Reason:** 原 requirement 把 `EffectType` 限制为 `Attack` / `Defense` / `EnergyRecover` 三个字符串值，而新模型用 `EffectKind` 枚举（Damage / Shield / DamageDot / EnergyGain）+ 多效果组合表达更丰富的卡牌语义。
+
+**Migration:** 请见 ADDED Requirement「MVP 基础卡牌必须覆盖 5 类玩法」。
+
+### Requirement: 基础卡牌配置必须提供三张 MVP 基础卡牌
+
+**Reason:** MVP 卡牌从 3 张升级为 5 张（近战 / 投射 / 法术 / 能量 / 护盾），原"攻击 + 防御 + 能量回复"三张已无法覆盖战斗系统需要。
+
+**Migration:** 请见 ADDED Requirement「MVP 基础卡牌必须覆盖 5 类玩法」。
+
+## ADDED Requirements
 
 ### Requirement: 基础卡牌配置表必须支持卡牌+效果分离结构
 
@@ -81,4 +88,3 @@
 - **WHEN** 检查 `card.xlsx` 与 `card_effect.xlsx`
 - **THEN** 系统 MUST 存在一张护盾卡，`Cost = 1`，`TargetMode = Self`
 - **AND** 该卡 MUST 至少挂一条 `TbCardEffect`，`Kind = Shield`，`Value = 5`，`Duration = 0`
-

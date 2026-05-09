@@ -75,11 +75,6 @@ namespace GameLogic
         /// </summary>
         public const int DefaultMonsterHp = 30;
 
-        /// <summary>
-        /// 默认玩家血量（配置表中暂无血量字段）。
-        /// </summary>
-        public const int DefaultPlayerHp = 50;
-
         private readonly ModelValue<BattlePhase> _phase;
         private readonly ModelValue<int> _currentEnergy;
         private readonly ModelValue<int> _maxEnergy;
@@ -98,6 +93,8 @@ namespace GameLogic
         private List<MonsterRuntime> _monsters;
         private List<CardRuntime> _hand;
         private List<CardRuntime> _discardPile;
+        private readonly List<BuffRuntime> _playerBuffs = new();
+        private int _playerLevelId = 1;
 
         /// <summary>
         /// 当前战斗阶段。
@@ -185,6 +182,43 @@ namespace GameLogic
         public IReadOnlyList<CardRuntime> DiscardPile => _discardPile;
 
         /// <summary>
+        /// 玩家身上的 Buff 列表（读写共享同一实例，由 PlayerActor 维护）。
+        /// </summary>
+        public List<BuffRuntime> PlayerBuffs => _playerBuffs;
+
+        /// <summary>
+        /// 添加一条玩家 Buff 并发布 PlayerBuffs 属性变更通知。
+        /// </summary>
+        public void AddPlayerBuff(BuffRuntime buff)
+        {
+            if (buff == null) return;
+            _playerBuffs.Add(buff);
+            RaisePropertyChanged(nameof(PlayerBuffs));
+        }
+
+        /// <summary>
+        /// 通知 ViewModel 玩家 Buff 列表已变化（DoT tick / 移除等场景调用）。
+        /// </summary>
+        public void NotifyPlayerBuffsChanged()
+        {
+            RaisePropertyChanged(nameof(PlayerBuffs));
+        }
+
+        /// <summary>
+        /// 玩家当前等级（用作 TbPlayerLevel 索引），默认 1。BattleSystem 进入战斗时按此等级初始化战斗属性。
+        /// 注意：与上面表达 LevelConfig 的 CurrentLevel 区别——这是玩家成长等级（int），那是当前关卡（Level 配置）。
+        /// </summary>
+        public int PlayerLevelId => _playerLevelId;
+
+        /// <summary>
+        /// 设置玩家当前等级。
+        /// </summary>
+        public void SetPlayerLevelId(int level)
+        {
+            _playerLevelId = Math.Max(1, level);
+        }
+
+        /// <summary>
         /// 当前波次配置。
         /// </summary>
         public GameConfig.level.LevelWave CurrentWave =>
@@ -201,8 +235,8 @@ namespace GameLogic
             _currentEnergy = CreateValue(0);
             _maxEnergy = CreateValue(0);
             _handLimit = CreateValue(5);
-            _playerHp = CreateValue(DefaultPlayerHp);
-            _playerMaxHp = CreateValue(DefaultPlayerHp);
+            _playerHp = CreateValue(0);
+            _playerMaxHp = CreateValue(0);
             _playerArmor = CreateValue(0);
             _isLevelComplete = CreateValue(false);
             _isPlayerDead = CreateValue(false);
@@ -266,15 +300,16 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 初始化战斗属性。
+        /// 初始化战斗属性。MaxHp / 当前 HP 同时设置为传入的 maxHp，玩家护甲清零，玩家 Buff 列表清空。
         /// </summary>
-        public void InitBattleAttributes(int maxEnergy, int handLimit, int playerHp)
+        public void InitBattleAttributes(int maxEnergy, int handLimit, int maxHp)
         {
             SetValue(_maxEnergy, maxEnergy, nameof(MaxEnergy));
             SetValue(_handLimit, handLimit, nameof(HandLimit));
-            SetValue(_playerMaxHp, playerHp, nameof(PlayerMaxHp));
-            SetValue(_playerHp, playerHp, nameof(PlayerHp));
+            SetValue(_playerMaxHp, maxHp, nameof(PlayerMaxHp));
+            SetValue(_playerHp, maxHp, nameof(PlayerHp));
             SetValue(_playerArmor, 0, nameof(PlayerArmor));
+            _playerBuffs.Clear();
         }
 
         /// <summary>
@@ -286,11 +321,21 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 修改能量值。
+        /// 修改能量值（不超过下限 0，不强制上限）。
         /// </summary>
         public void ModifyEnergy(int delta)
         {
             SetValue(_currentEnergy, Math.Max(0, CurrentEnergy + delta), nameof(CurrentEnergy));
+        }
+
+        /// <summary>
+        /// 玩家获取能量。允许 CurrentEnergy 临时超过 MaxEnergy；下回合 Prepare 阶段会被重置回 MaxEnergy。
+        /// 设计语义："能量就是出牌次数"，能量牌让玩家本回合多打几张。
+        /// </summary>
+        public void GainEnergy(int amount)
+        {
+            if (amount == 0) return;
+            SetValue(_currentEnergy, Math.Max(0, CurrentEnergy + amount), nameof(CurrentEnergy));
         }
 
         /// <summary>
@@ -389,6 +434,7 @@ namespace GameLogic
             _monsters.Clear();
             _hand.Clear();
             _discardPile.Clear();
+            _playerBuffs.Clear();
             SetValue(_phase, BattlePhase.Idle, nameof(Phase));
             SetValue(_isLevelComplete, false, nameof(IsLevelComplete));
             SetValue(_isPlayerDead, false, nameof(IsPlayerDead));

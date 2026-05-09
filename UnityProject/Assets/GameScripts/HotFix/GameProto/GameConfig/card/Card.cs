@@ -20,8 +20,8 @@ public sealed partial class Card : Luban.BeanBase
         Name = _buf.ReadString();
         Desc = _buf.ReadString();
         Cost = _buf.ReadInt();
-        EffectType = _buf.ReadString();
-        Value = _buf.ReadInt();
+        OwnerKind = (card.OwnerKind)_buf.ReadInt();
+        TargetMode = (card.TargetMode)_buf.ReadInt();
         IsBasic = _buf.ReadBool();
         AssetId = _buf.ReadString();
     }
@@ -48,13 +48,13 @@ public sealed partial class Card : Luban.BeanBase
     /// </summary>
     public readonly int Cost;
     /// <summary>
-    /// 效果类型
+    /// 卡牌归属
     /// </summary>
-    public readonly string EffectType;
+    public readonly card.OwnerKind OwnerKind;
     /// <summary>
-    /// 效果数值
+    /// 目标模式
     /// </summary>
-    public readonly int Value;
+    public readonly card.TargetMode TargetMode;
     /// <summary>
     /// 基础卡牌标记
     /// </summary>
@@ -78,8 +78,8 @@ public sealed partial class Card : Luban.BeanBase
         + "name:" + Name + ","
         + "desc:" + Desc + ","
         + "cost:" + Cost + ","
-        + "effectType:" + EffectType + ","
-        + "value:" + Value + ","
+        + "ownerKind:" + OwnerKind + ","
+        + "targetMode:" + TargetMode + ","
         + "isBasic:" + IsBasic + ","
         + "assetId:" + AssetId + ","
         + "}";
