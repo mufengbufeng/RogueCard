@@ -74,7 +74,11 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 
 ### 运行测试与编译检查
 
-测试使用 Unity Test Runner（NUnit），EditMode 测试在 `GameLogic.Tests.EditMode` 程序集中。
+测试使用 Unity Test Runner（NUnit），分两层：
+- **EditMode**：`GameLogic.Tests.EditMode` 程序集，覆盖纯逻辑模块（FSM / Model / ObjectPool / EventChannel 等），全 mock，运行极快。
+- **PlayMode**：`GameLogic.Tests.PlayMode` 程序集，覆盖 EF 框架运行时基础设施在真实 PlayerLoop 下的可观察契约（YooAsset EditorSimulate 初始化与异步加载、SceneManager 加载/卸载、EntityManager 真实 prefab 池化、UniTask + TimerManager 帧驱动）。详见 `Assets/GameScripts/HotFix/GameLogic/Tests/README.md`。
+- **PlayMode 测试不在当前 CI 范围**，本地通过 `Window > General > Test Runner > PlayMode` 标签或 Unity Skills 触发。
+
 "D:\DocApp\UnityEditor\6000.3.12f1\Editor\Unity.exe"
 
 优先级约定：
@@ -103,7 +107,12 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
    ```
    仅在当前项目没有被 Unity 编辑器打开时使用；否则 Unity 会因为同一项目多实例而拒绝启动。
 
-Unity 编辑器中手动运行：Window > General > Test Runner > EditMode 标签页。
+4. **PlayMode 测试触发（仅本地）**：
+   - 推荐：`Window > General > Test Runner > PlayMode` 标签 → Run。
+   - Unity Skills：`POST /skill/test_run` 入参 `{"testMode":"PlayMode","filter":"<类名或 fullName>"}`。注意 1.8.2 版本 PlayMode 结果回流不稳定，最终结果以 Test Runner 面板为准。
+   - PlayMode 测试当前不在 CI 跑，留作后续单独变更接入。
+
+Unity 编辑器中手动运行：Window > General > Test Runner > EditMode 标签页（或 PlayMode 标签页）。
 
 ### Unity 编辑器
 
