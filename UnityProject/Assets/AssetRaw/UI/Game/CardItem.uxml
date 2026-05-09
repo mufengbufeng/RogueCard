@@ -1,10 +1,9 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements">
-    <Style src="../Shared/SharedStyles.uss" />
-    <Style src="GameViewStyles.uss" />
-
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="True">
+    <Style src="project://database/Assets/AssetRaw/UI/Shared/SharedStyles.uss?fileID=7433441132597879392&amp;guid=a5638f736612b8b4ca08028996117fcf&amp;type=3#SharedStyles"/>
+    <Style src="project://database/Assets/AssetRaw/UI/Game/GameViewStyles.uss?fileID=7433441132597879392&amp;guid=49e201124c278b34ab659722afa45091&amp;type=3#GameViewStyles"/>
     <ui:VisualElement name="CardItem" class="card-item">
-        <ui:Label name="card-cost" text="" class="card-cost" />
-        <ui:VisualElement name="card-art" class="card-art" />
-        <ui:Label name="card-name" text="" class="card-name" />
+        <ui:VisualElement name="card-art" class="card-art"/>
+        <ui:Label name="card-cost" text="12" class="card-cost"/>
+        <ui:Label name="card-name" text="" class="card-name"/>
     </ui:VisualElement>
 </ui:UXML>
