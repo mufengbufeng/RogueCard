@@ -76,12 +76,24 @@ if _requested_palace_path is None:
     _requested_palace_path = os.path.abspath(_config.palace_path)
 
 _runtime_palace_path = None
-# Only override KG path when --palace is explicitly provided; otherwise use
-# KnowledgeGraph's default (~/.mempalace/knowledge_graph.sqlite3).
+
+
+def _knowledge_graph_path(palace_path):
+    return os.path.join(palace_path, "knowledge_graph.sqlite3")
+
+
+def _wal_dir_path(palace_path):
+    return Path(palace_path) / "wal"
+
+
+# Keep all MCP runtime writes inside the requested palace path. Codex may launch
+# stdio servers under a workspace-write sandbox where ~/.mempalace is read-only.
 if _args.palace:
-    _kg = KnowledgeGraph(db_path=os.path.join(_requested_palace_path, "knowledge_graph.sqlite3"))
+    _kg = KnowledgeGraph(db_path=_knowledge_graph_path(_requested_palace_path))
+    _WAL_DIR = _wal_dir_path(_requested_palace_path)
 else:
     _kg = KnowledgeGraph()
+    _WAL_DIR = Path(os.path.expanduser("~/.mempalace/wal"))
 
 
 _client_cache = None
@@ -95,7 +107,6 @@ _palace_db_mtime = 0.0  # mtime of chroma.sqlite3 at cache time
 # This provides an audit trail for detecting memory poisoning and
 # enables review/rollback of writes from external or untrusted sources.
 
-_WAL_DIR = Path(os.path.expanduser("~/.mempalace/wal"))
 _WAL_DIR.mkdir(parents=True, exist_ok=True)
 try:
     _WAL_DIR.chmod(0o700)
@@ -198,7 +209,7 @@ def _ensure_runtime_palace():
     _metadata_cache_time = 0
 
     if _args.palace:
-        _kg = KnowledgeGraph(db_path=os.path.join(resolved_path, "knowledge_graph.sqlite3"))
+        _kg = KnowledgeGraph(db_path=_knowledge_graph_path(resolved_path))
 
     logger.info("Using palace path: %s", resolved_path)
     return resolved_path

@@ -95,9 +95,17 @@ Archive a completed change in the experimental workflow.
 
    After a successful archive and before the final response, record the archive event in the local MemPalace diary:
 
-   ```bash
-   harness-workspace/mempalace-github-code/.venv/Scripts/python.exe harness-workspace/tools/mempalace_record_event.py openspec-archive --change "<name>" --archive-path "openspec/changes/archive/YYYY-MM-DD-<name>" --schema "<schema-name>" --specs "<synced|skipped|no-delta-specs>" --allow-failure
+   Windows:
+   ```powershell
+   py -3 harness-workspace/tools/mempalace_record_event.py openspec-archive --change "<name>" --archive-path "openspec/changes/archive/YYYY-MM-DD-<name>" --schema "<schema-name>" --specs "<synced|skipped|no-delta-specs>" --allow-failure
    ```
+
+   POSIX shell:
+   ```bash
+   python3 harness-workspace/tools/mempalace_record_event.py openspec-archive --change "<name>" --archive-path "openspec/changes/archive/YYYY-MM-DD-<name>" --schema "<schema-name>" --specs "<synced|skipped|no-delta-specs>" --allow-failure
+   ```
+
+   Use any available Python 3 launcher (`py -3`, `python3`, or the project venv Python). The helper resolves the project-local MemPalace virtualenv via `MEMPALACE_PYTHON` or `harness-workspace/mempalace-github-code/.venv`.
 
    If the command fails, report the warning in the final summary, but do not roll back the archive.
 
