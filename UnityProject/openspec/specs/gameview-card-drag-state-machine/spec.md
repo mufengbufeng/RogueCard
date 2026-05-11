@@ -99,12 +99,28 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 - **THEN** `IDragSurface.ApplyInsertSlotTransform` SHALL 用新 slot 重排占位卡
 - **AND** 其他卡 SHALL 重新分配槽位（跳过新 insertSlot）
 
-#### Scenario: 在 hand-fan 内松手 ReorderCardItem
+#### Scenario: 在 hand-fan 内松手提交视觉换位
 
 - **WHEN** `Dragging.InsertSlot` 态在 `hand-fan` 内松手
 - **THEN** `IDragSurface.ReorderCardItem(activeVisualIdx, insertSlotIdx)` SHALL 被调用
+- **AND** `CardDragController` SHALL 在换位提交后按新的视觉顺序对全部 N 张卡应用最终扇形布局
+- **AND** 每张可见卡 SHALL 占用唯一的最终槽位，SHALL NOT 与相邻卡共享同一 `left/top/translate/rotate` 结果
 - **AND** ghost 与占位卡 SHALL 销毁
+- **AND** 所有卡 SHALL 还原 `opacity` / `pickingMode` / inline transitionDuration
 - **AND** 状态 SHALL 转回 `Idle`
+
+#### Scenario: 在原槽位松手仍然应用最终布局
+
+- **WHEN** `Dragging.InsertSlot` 态在 `hand-fan` 内松手且 `insertSlotIdx == activeVisualIdx`
+- **THEN** `CardDragController` SHALL 仍按 N 张卡应用最终扇形布局
+- **AND** 被拖卡 SHALL 恢复可见且位于自己的最终槽位
+- **AND** 状态 SHALL 转回 `Idle`
+
+#### Scenario: 换位前释放被拖卡 pointer capture
+
+- **WHEN** `Dragging.InsertSlot` 态在 `hand-fan` 内松手
+- **THEN** `CardDragController` SHALL 在改变视觉列表顺序前释放被拖卡的 pointer capture
+- **AND** 释放 pointer capture 的 card index SHALL 指向松手前的 active visual card
 
 ### Requirement: CardDragController 必须区分 ActiveVisualIndex 与 ActiveHandIndex
 
@@ -155,3 +171,4 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 
 - **WHEN** `ExitDragging`（任意路径）
 - **THEN** SHALL 对所有卡调 `IDragSurface.SetCardOpacity(idx, ResetToUssDefault)`（实现层可用 `StyleKeyword.Null`）
+

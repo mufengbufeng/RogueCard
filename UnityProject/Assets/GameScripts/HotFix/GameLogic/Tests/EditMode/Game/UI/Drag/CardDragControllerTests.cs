@@ -138,6 +138,63 @@ namespace GameLogic.Tests
         }
 
         [Test]
+        public void Dragging_InsertSlotRelease_AppliesFinalNCardLayoutAfterReorder()
+        {
+            _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleAuto), NewCard(2, TargetMode.SingleAuto), NewCard(3, TargetMode.SingleAuto) });
+
+            _controller.OnPointerDown(2, 2, 0, new Vector2(400, 500));
+            _controller.OnPointerMove(0, new Vector2(420, 500));
+            _controller.OnPointerMove(0, new Vector2(60, 500));
+            _controller.OnPointerUp(0, new Vector2(60, 500));
+
+            var finalTransforms = _surface.GetApplyFanTransformsAfter("ReorderCardItem:2:0");
+            Assert.AreEqual(3, finalTransforms.Count,
+                "InsertSlot commit SHALL apply final N-card layout after visual reorder.");
+
+            for (int i = 0; i < 3; i++)
+            {
+                Assert.AreEqual(i, finalTransforms[i].cardIdx);
+                AssertSlotEquals(
+                    FanLayoutCalc.ComputeSlot(i, 3, _surface.ConfiguredHandFanWidth, _surface.ConfiguredHandFanHeight, _options),
+                    finalTransforms[i].slot);
+            }
+        }
+
+        [Test]
+        public void Dragging_InsertSlotRelease_SameSlotStillAppliesFinalNCardLayout()
+        {
+            _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleAuto), NewCard(2, TargetMode.SingleAuto), NewCard(3, TargetMode.SingleAuto) });
+
+            _controller.OnPointerDown(1, 1, 0, new Vector2(250, 500));
+            _controller.OnPointerMove(0, new Vector2(270, 500));
+            _controller.OnPointerMove(0, new Vector2(240, 500));
+            _controller.OnPointerUp(0, new Vector2(240, 500));
+
+            var finalTransforms = _surface.GetApplyFanTransformsAfter("ReorderCardItem:1:1");
+            Assert.AreEqual(3, finalTransforms.Count,
+                "Dropping back to the original slot SHALL still restore final N-card layout.");
+            Assert.AreEqual(CardInteractionState.Idle, _controller.State);
+        }
+
+        [Test]
+        public void Dragging_InsertSlotRelease_ReleasesPointerBeforeReorder()
+        {
+            _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleAuto), NewCard(2, TargetMode.SingleAuto), NewCard(3, TargetMode.SingleAuto) });
+
+            _controller.OnPointerDown(2, 2, 0, new Vector2(400, 500));
+            _controller.OnPointerMove(0, new Vector2(420, 500));
+            _controller.OnPointerMove(0, new Vector2(60, 500));
+            _controller.OnPointerUp(0, new Vector2(60, 500));
+
+            int releaseIndex = _surface.IndexOfOperation("ReleasePointer:2:0");
+            int reorderIndex = _surface.IndexOfOperation("ReorderCardItem:2:0");
+            Assert.GreaterOrEqual(releaseIndex, 0, "Dragged pre-reorder visual card SHALL release pointer capture.");
+            Assert.GreaterOrEqual(reorderIndex, 0, "InsertSlot release SHALL reorder the visual list.");
+            Assert.Less(releaseIndex, reorderIndex,
+                "Pointer capture SHALL be released before visual list reorder invalidates the old visual index.");
+        }
+
+        [Test]
         public void Dragging_DetachedRelease_StartsRebound_ScheduledExitAfterReboundDuration()
         {
             _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleAuto), NewCard(2, TargetMode.SingleAuto) });
@@ -249,6 +306,14 @@ namespace GameLogic.Tests
                 BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.NotNull(field, $"未找到字段 {fieldName}");
             field.SetValue(target, value);
+        }
+
+        private static void AssertSlotEquals(FanSlotAssignment expected, FanSlotAssignment actual)
+        {
+            Assert.AreEqual(expected.Left, actual.Left, 0.001f);
+            Assert.AreEqual(expected.Top, actual.Top, 0.001f);
+            Assert.AreEqual(expected.TranslateY, actual.TranslateY, 0.001f);
+            Assert.AreEqual(expected.RotateDegrees, actual.RotateDegrees, 0.001f);
         }
     }
 

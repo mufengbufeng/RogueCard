@@ -48,6 +48,7 @@ namespace GameLogic.Tests
 
         public readonly List<(int cardIdx, int pointerId)> CapturePointerCallLog = new();
         public readonly List<(int cardIdx, int pointerId)> ReleasePointerCallLog = new();
+        public readonly List<string> OperationLog = new();
 
         // 调度任务（测试通过 FlushScheduled 立即执行）
         private readonly List<(Action action, long delayMs)> _scheduledActions = new();
@@ -70,41 +71,49 @@ namespace GameLogic.Tests
         public void ApplyFanTransform(int cardIdx, FanSlotAssignment slot)
         {
             ApplyFanTransformLog.Add((cardIdx, slot));
+            OperationLog.Add($"ApplyFanTransform:{cardIdx}");
         }
 
         public void SetCardOpacity(int cardIdx, float opacity)
         {
             OpacityCallLog.Add((cardIdx, opacity));
+            OperationLog.Add($"SetCardOpacity:{cardIdx}:{opacity}");
         }
 
         public void ResetCardOpacity(int cardIdx)
         {
             ResetOpacityCallLog.Add(cardIdx);
+            OperationLog.Add($"ResetCardOpacity:{cardIdx}");
         }
 
         public void SetCardPickingMode(int cardIdx, bool pickable)
         {
             PickingModeCallLog.Add((cardIdx, pickable));
+            OperationLog.Add($"SetCardPickingMode:{cardIdx}:{pickable}");
         }
 
         public void SetCardTransitionDuration(int cardIdx, float seconds)
         {
             TransitionDurationCallLog.Add((cardIdx, seconds));
+            OperationLog.Add($"SetCardTransitionDuration:{cardIdx}:{seconds}");
         }
 
         public void ClearCardTransitionDuration(int cardIdx)
         {
             ClearTransitionDurationCallLog.Add(cardIdx);
+            OperationLog.Add($"ClearCardTransitionDuration:{cardIdx}");
         }
 
         public void ReorderCardItem(int from, int to)
         {
             ReorderCallLog.Add((from, to));
+            OperationLog.Add($"ReorderCardItem:{from}:{to}");
         }
 
         public void SyncSiblingOrder()
         {
             SyncSiblingOrderCallCount++;
+            OperationLog.Add("SyncSiblingOrder");
         }
 
         public Rect DropZoneWorldBound => ConfiguredDropZoneBound;
@@ -116,55 +125,65 @@ namespace GameLogic.Tests
         public void SetDropZoneActive(bool active)
         {
             DropZoneActiveCallLog.Add(active);
+            OperationLog.Add($"SetDropZoneActive:{active}");
         }
 
         public void CreateGhost(int sourceCardIdx, Vector2 pos)
         {
             CreateGhostCallLog.Add((sourceCardIdx, pos));
+            OperationLog.Add($"CreateGhost:{sourceCardIdx}");
             GhostExists = true;
         }
 
         public void UpdateGhostPosition(Vector2 pos)
         {
             UpdateGhostPositionCallLog.Add(pos);
+            OperationLog.Add("UpdateGhostPosition");
         }
 
         public void DestroyGhost()
         {
             DestroyGhostCallCount++;
+            OperationLog.Add("DestroyGhost");
             GhostExists = false;
         }
 
         public void CreateInsertSlot(int sourceCardIdx)
         {
             CreateInsertSlotCallLog.Add(sourceCardIdx);
+            OperationLog.Add($"CreateInsertSlot:{sourceCardIdx}");
             InsertSlotExists = true;
         }
 
         public void DestroyInsertSlot()
         {
             DestroyInsertSlotCallCount++;
+            OperationLog.Add("DestroyInsertSlot");
             InsertSlotExists = false;
         }
 
         public void ApplyInsertSlotTransform(FanSlotAssignment slot)
         {
             ApplyInsertSlotTransformLog.Add(slot);
+            OperationLog.Add("ApplyInsertSlotTransform");
         }
 
         public void Schedule(Action action, long delayMs)
         {
             _scheduledActions.Add((action, delayMs));
+            OperationLog.Add($"Schedule:{delayMs}");
         }
 
         public void CapturePointer(int cardIdx, int pointerId)
         {
             CapturePointerCallLog.Add((cardIdx, pointerId));
+            OperationLog.Add($"CapturePointer:{cardIdx}:{pointerId}");
         }
 
         public void ReleasePointer(int cardIdx, int pointerId)
         {
             ReleasePointerCallLog.Add((cardIdx, pointerId));
+            OperationLog.Add($"ReleasePointer:{cardIdx}:{pointerId}");
         }
 
         // ── 测试辅助 ──
@@ -178,6 +197,32 @@ namespace GameLogic.Tests
             {
                 entry.action?.Invoke();
             }
+        }
+
+        public int IndexOfOperation(string operation)
+        {
+            return OperationLog.IndexOf(operation);
+        }
+
+        public List<(int cardIdx, FanSlotAssignment slot)> GetApplyFanTransformsAfter(string operation)
+        {
+            int operationIndex = IndexOfOperation(operation);
+            var result = new List<(int cardIdx, FanSlotAssignment slot)>();
+            if (operationIndex < 0) return result;
+
+            int applyIndex = 0;
+            for (int i = 0; i < OperationLog.Count; i++)
+            {
+                if (OperationLog[i].StartsWith("ApplyFanTransform:", StringComparison.Ordinal))
+                {
+                    if (i > operationIndex && applyIndex < ApplyFanTransformLog.Count)
+                    {
+                        result.Add(ApplyFanTransformLog[applyIndex]);
+                    }
+                    applyIndex++;
+                }
+            }
+            return result;
         }
     }
 

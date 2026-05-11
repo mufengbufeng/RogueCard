@@ -93,7 +93,7 @@ namespace GameLogic
         /// 处理 PointerUp。按当前态分发：
         /// - 未进入 Dragging（位移 ≤ DragThreshold） → Callbacks.CardClicked + 转 Idle
         /// - Dragging.OverDropZone → 销毁 ghost（除非 SingleManual）+ Callbacks.CardDroppedOnZone(handIdx, needsManualTarget) + 转 Idle
-        /// - Dragging.InsertSlot → 调 ReorderCardItem + ExitDragging + 转 Idle
+        /// - Dragging.InsertSlot → CommitInsertSlotRelease（释放 capture + reorder + 最终 N 张布局 + 清理）+ 转 Idle
         /// - Dragging.Detached → StartReboundAnimation + Callbacks.CardDragCancelled
         /// </summary>
         public void OnPointerUp(int pointerId, Vector2 pos)
@@ -135,12 +135,7 @@ namespace GameLogic
                     }
                     case DragMode.InsertSlot:
                     {
-                        int from = _activeVisualIndex;
-                        int to = _insertSlotIndex;
-                        _surface.ReorderCardItem(from, to);
-                        ExitDragging();
-                        ReleasePointerCapture(visualIdx, pointerId);
-                        ResetStateAfterDrop();
+                        CommitInsertSlotRelease(pointerId);
                         break;
                     }
                     case DragMode.Detached:
@@ -300,6 +295,25 @@ namespace GameLogic
             _insertSlotIndex = -1;
 
             _surface.SetDropZoneActive(false);
+        }
+
+        private void CommitInsertSlotRelease(int pointerId)
+        {
+            int n = _surface.CardCount;
+            int from = _activeVisualIndex;
+            int to = Mathf.Clamp(_insertSlotIndex, 0, Mathf.Max(0, n - 1));
+
+            ReleasePointerCapture(from, pointerId);
+
+            if (from >= 0 && from < n)
+            {
+                _surface.ReorderCardItem(from, to);
+                _activeVisualIndex = to;
+            }
+
+            RecomputeFanLayout(-1, DragMode.Detached, -1);
+            ExitDragging();
+            ResetStateAfterDrop();
         }
 
         /// <summary>
