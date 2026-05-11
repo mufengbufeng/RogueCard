@@ -17,6 +17,7 @@ namespace GameLogic
         private VisualElement _handFan;
         private VisualElement _dropZone;
         private VisualElement _previewLayer;
+        private VisualElement _previewDismissRoot;
         private IHandContext _context;
         private VisualTreeAsset _cardItemTemplate;
         private HandFanLayoutOptions _options;
@@ -39,6 +40,7 @@ namespace GameLogic
         // 订阅引用（解绑用）
         private Action<IReadOnlyList<CardRuntime>> _onHandChanged;
         private EventCallback<GeometryChangedEvent> _onGeometryChanged;
+        private EventCallback<PointerDownEvent> _onPreviewDismissPointerDown;
 
         // 当前正在按下并接管 Move/Up/CaptureOut 事件的卡（注册在其 Root 上）
         private CardItemView _capturedView;
@@ -64,6 +66,7 @@ namespace GameLogic
             VisualElement handFan,
             VisualElement dropZone,
             VisualElement previewLayer,
+            VisualElement previewDismissRoot,
             IHandContext context,
             VisualTreeAsset cardItemTemplate,
             HandFanLayoutOptions options)
@@ -71,6 +74,7 @@ namespace GameLogic
             _handFan = handFan;
             _dropZone = dropZone;
             _previewLayer = previewLayer;
+            _previewDismissRoot = previewDismissRoot;
             _context = context ?? throw new ArgumentNullException(nameof(context));
             _cardItemTemplate = cardItemTemplate;
             _options = options ?? new HandFanLayoutOptions();
@@ -91,6 +95,12 @@ namespace GameLogic
             {
                 _onGeometryChanged = _ => _dragController?.OnGeometryChanged();
                 _handFan.RegisterCallback(_onGeometryChanged);
+            }
+
+            if (_previewDismissRoot != null)
+            {
+                _onPreviewDismissPointerDown = OnPreviewDismissPointerDown;
+                _previewDismissRoot.RegisterCallback(_onPreviewDismissPointerDown, TrickleDown.TrickleDown);
             }
 
             // 首次同步
@@ -132,6 +142,19 @@ namespace GameLogic
             }
 
             _dragController?.BeginExternalRebound(visualIdx);
+        }
+
+        /// <summary>
+        /// 尝试按 pointer target 关闭当前预览。返回 true 表示调用方应消费该 pointer 事件。
+        /// 卡牌自身及其子节点不在此处关闭，继续交给 TogglePreview 处理同卡关闭 / 别卡切换。
+        /// </summary>
+        private bool TryDismissPreviewFromPointerTarget(VisualElement target)
+        {
+            if (_disposed || _previewController == null || !_previewController.IsPreviewing) return false;
+            if (target != null && IsAnyCardOrDescendant(target)) return false;
+
+            _previewController.ExitPreview();
+            return true;
         }
 
         // ── 内部刷新 ──
@@ -263,6 +286,34 @@ namespace GameLogic
 
         // 用于 CardClicked 回调内访问被点击卡的 source（preview 锚点计算需要）
         private VisualElement _pendingClickSource;
+
+        private void OnPreviewDismissPointerDown(PointerDownEvent evt)
+        {
+            if (!(evt.target is VisualElement target)) return;
+            if (!TryDismissPreviewFromPointerTarget(target)) return;
+            evt.StopPropagation();
+        }
+
+        private bool IsAnyCardOrDescendant(VisualElement target)
+        {
+            foreach (var view in _cardItems)
+            {
+                if (IsSameOrAncestor(view.Root, target)) return true;
+            }
+            return false;
+        }
+
+        private static bool IsSameOrAncestor(VisualElement ancestor, VisualElement target)
+        {
+            if (ancestor == null || target == null) return false;
+            var current = target;
+            while (current != null)
+            {
+                if (current == ancestor) return true;
+                current = current.parent;
+            }
+            return false;
+        }
 
         private void OnCardPointerEnter(CardItemView view)
         {
@@ -398,6 +449,12 @@ namespace GameLogic
             }
             _onGeometryChanged = null;
 
+            if (_previewDismissRoot != null && _onPreviewDismissPointerDown != null)
+            {
+                _previewDismissRoot.UnregisterCallback(_onPreviewDismissPointerDown, TrickleDown.TrickleDown);
+            }
+            _onPreviewDismissPointerDown = null;
+
             if (_capturedView != null) UnregisterCardPointerCallbacks(_capturedView);
             _capturedView = null;
 
@@ -423,6 +480,7 @@ namespace GameLogic
             _handFan = null;
             _dropZone = null;
             _previewLayer = null;
+            _previewDismissRoot = null;
             _cardItemTemplate = null;
         }
 

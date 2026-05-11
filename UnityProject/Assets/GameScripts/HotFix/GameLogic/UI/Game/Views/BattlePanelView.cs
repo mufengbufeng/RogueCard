@@ -74,7 +74,7 @@ namespace GameLogic
 
             // 装配子模块（按设计 §1 顺序：MonsterListView → HandFanView → TurnControlView → TargetSelector）
             _monsterListView = new MonsterListView(_monsterContainer, _context, monsterItemTpl);
-            _handFanView = new HandFanView(_handFan, _dropZone, _previewLayer, _context, cardItemTpl, handFanOptions ?? new HandFanLayoutOptions());
+            _handFanView = new HandFanView(_handFan, _dropZone, _previewLayer, _content, _context, cardItemTpl, handFanOptions ?? new HandFanLayoutOptions());
             _turnControlView = new TurnControlView(_endTurnBtn, _failToast, _context);
             _targetSelector = new TargetSelector(_content, _monsterListView, _handFanView, _context);
 
