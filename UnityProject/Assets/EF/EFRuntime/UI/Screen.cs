@@ -25,6 +25,33 @@ namespace EF.UI
         }
 
         /// <summary>
+        /// UXML 资源 addressable 名。默认按 `{Stem}View → {Stem}Uxml` 命名约定推导，
+        /// 子类可 override 指向自定义资源（如非标准命名或共享模板）。
+        /// </summary>
+        public virtual string UxmlLocation => DeriveAssetName("Uxml");
+
+        /// <summary>
+        /// USS 资源 addressable 名（可选）。默认按 `{Stem}View → {Stem}Uss` 命名约定推导。
+        /// 资源不存在时 Navigator 不抛异常，仅在 DEBUG 构建打印一次警告。
+        /// </summary>
+        public virtual string UssLocation => DeriveAssetName("Uss");
+
+        /// <summary>
+        /// 由具体类型名按命名约定推导 addressable 名。
+        /// `MainView` → `MainUxml` / `MainUss`；
+        /// 未以 `View` 结尾的类型直接附加后缀（罕见情况）。
+        /// </summary>
+        private string DeriveAssetName(string suffix)
+        {
+            var typeName = GetType().Name;
+            if (typeName.EndsWith("View", StringComparison.Ordinal))
+            {
+                typeName = typeName.Substring(0, typeName.Length - 4);
+            }
+            return typeName + suffix;
+        }
+
+        /// <summary>
         /// 框架调用：加载 UXML 模板并挂载为子节点。
         /// </summary>
         public void LoadContent(VisualTreeAsset vta)
@@ -34,6 +61,17 @@ namespace EF.UI
             // TemplateContainer 撑满 Screen，让 UXML 根元素的尺寸正确传播
             clone.style.flexGrow = 1;
             Add(clone);
+        }
+
+        /// <summary>
+        /// 框架调用：挂载额外的 StyleSheet 到本 Screen 根元素。
+        /// 为约定加载的 USS 提供入口；UXML 内嵌的 `&lt;Style src=...&gt;` 仍由引擎自动处理。
+        /// </summary>
+        public void AttachStyleSheet(StyleSheet styleSheet)
+        {
+            if (styleSheet == null) return;
+            // styleSheets 是 IList，重复 attach 同一 StyleSheet 引用是幂等的
+            styleSheets.Add(styleSheet);
         }
 
         /// <summary>

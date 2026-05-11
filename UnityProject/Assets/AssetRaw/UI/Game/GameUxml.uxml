@@ -1,0 +1,32 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
+    <Style src="project://database/Assets/AssetRaw/UI/Shared/SharedStyles.uss?fileID=7433441132597879392&amp;guid=a5638f736612b8b4ca08028996117fcf&amp;type=3#SharedStyles"/>
+    <Style src="project://database/Assets/AssetRaw/UI/Game/GameUss.uss?fileID=7433441132597879392&amp;guid=49e201124c278b34ab659722afa45091&amp;type=3#GameUss"/>
+    <ui:VisualElement name="GameView" class="game-container">
+        <ui:VisualElement name="main-region" class="main-region" style="flex-grow: 1;"/>
+        <ui:VisualElement name="info-bar" class="info-bar">
+            <ui:Label name="info-text" text="" class="info-label"/>
+        </ui:VisualElement>
+        <ui:VisualElement name="player-status" class="player-status">
+            <ui:VisualElement name="hp-row" class="status-row">
+                <ui:VisualElement name="hp-icon" class="status-icon hp-icon"/>
+                <ui:VisualElement name="hp-bar-bg" class="progress-bar-bg">
+                    <ui:VisualElement name="hp-bar-fill" class="progress-bar-fill hp-fill" style="width: 100%;"/>
+                </ui:VisualElement>
+                <ui:Label name="hp-text" text="40/40" class="progress-label"/>
+            </ui:VisualElement>
+            <ui:VisualElement name="armor-row" class="status-row">
+                <ui:VisualElement name="armor-icon" class="status-icon armor-icon"/>
+                <ui:Label name="armor-text" text="0" class="armor-label"/>
+            </ui:VisualElement>
+            <ui:VisualElement name="energy-row" class="status-row">
+                <ui:VisualElement name="energy-icon" class="status-icon energy-icon"/>
+                <ui:VisualElement name="energy-bar-bg" class="progress-bar-bg">
+                    <ui:VisualElement name="energy-bar-fill" class="progress-bar-fill energy-fill" style="width: 100%;"/>
+                </ui:VisualElement>
+                <ui:Label name="energy-text" text="3/3" class="progress-label"/>
+            </ui:VisualElement>
+            <!-- 玩家 Buff 状态条：DoT 等持续效果 -->
+            <ui:VisualElement name="player-buff-bar" class="buff-bar" picking-mode="Ignore"/>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

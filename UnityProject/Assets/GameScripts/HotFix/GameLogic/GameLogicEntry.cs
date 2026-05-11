@@ -122,7 +122,6 @@ namespace GameLogic
             _modelManager = ModuleSystem.Get<ModelManager>();
 
             InitializeNavigator();
-            InitializeModels();
             InitializeProcedures();
 
             Log.Info("[GameLogicEntry] 游戏逻辑初始化完成。");
@@ -191,32 +190,11 @@ namespace GameLogic
                 }
             }
 
-            // 注册所有 Screen
-            var registry = new ScreenRegistry();
-            registry.Register<MainMenuScreen, MainViewModel>("MainMenu", "MainView");
-            registry.Register<GameScreen, GameViewModel>("Game", "GameView");
-
-            // 创建 Navigator
-            _navigator = new Navigator(shell, registry, _resourceManager);
+            // 创建 Navigator——不再需要 ScreenRegistry，新增 Screen 由命名约定 + 反射在打开时解析。
+            // 详见 ui-screen-conventions / ui-navigation 规约。
+            _navigator = new Navigator(shell, _resourceManager);
 
             Log.Info($"[GameLogicEntry] 导航服务初始化完成，UIDocument={uiDocument.gameObject.name}");
-        }
-
-        /// <summary>
-        /// 初始化游戏数据模型。
-        /// </summary>
-        private static void InitializeModels()
-        {
-            try
-            {
-                _modelManager.Register<MainModel>();
-                _modelManager.Register<GameModel>();
-                Log.Info("[GameLogicEntry] 游戏数据模型初始化完成");
-            }
-            catch (System.Exception ex)
-            {
-                Log.Error($"[GameLogicEntry] 游戏数据模型初始化失败：{ex.Message}");
-            }
         }
 
         /// <summary>

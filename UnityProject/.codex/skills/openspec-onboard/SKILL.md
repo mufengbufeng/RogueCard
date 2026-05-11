@@ -355,7 +355,7 @@ Save to `openspec/changes/<name>/design.md`.
 
 Finally, we break the work into implementation tasks—checkboxes that drive the apply phase.
 
-These should be small, clear, and in logical order.
+These should be small, clear, and in logical order. For code behavior changes, tasks follow TDD: write the focused failing test first, then make the production change, then verify.
 ```
 
 **DO:** Generate tasks based on specs and design:
@@ -365,14 +365,17 @@ Here are the implementation tasks:
 
 ---
 
-## 1. [Category or file]
+## 1. Tests
 
-- [ ] 1.1 [Specific task]
-- [ ] 1.2 [Specific task]
+- [ ] 1.1 Add or update focused tests for [observable behavior from the spec]
 
-## 2. Verify
+## 2. Implementation
 
-- [ ] 2.1 [Verification step]
+- [ ] 2.1 Implement the smallest production change needed for those tests
+
+## 3. Verify
+
+- [ ] 3.1 Run [targeted test command or Unity Test Runner mode]
 
 ---
 
@@ -391,16 +394,17 @@ Save to `openspec/changes/<name>/tasks.md`.
 ```
 ## Implementation
 
-Now we implement each task, checking them off as we go. I'll announce each one and occasionally note how the specs/design informed the approach.
+Now we implement each task with TDD, checking them off as we go. I'll announce each one and occasionally note how the specs/design informed the approach.
 ```
 
 **DO:** For each task:
 
 1. Announce: "Working on task N: [description]"
-2. Implement the change in the codebase
+2. For behavior changes, follow the `tdd-development` skill: write or update the focused failing test before production code, run the smallest relevant test target to confirm the expected failure, then implement the minimal production change
 3. Reference specs/design naturally: "The spec says X, so I'm doing Y"
-4. Mark complete in tasks.md: `- [ ]` → `- [x]`
-5. Brief status: "✓ Task N complete"
+4. Re-run the affected tests and refactor only while tests are green
+5. Mark complete in tasks.md: `- [ ]` → `- [x]` only after tests or explicit verification pass
+6. Brief status: "✓ Task N complete"
 
 Keep narration light—don't over-explain every line of code.
 

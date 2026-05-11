@@ -10,7 +10,7 @@ namespace GameLogic
 {
     /// <summary>
     /// 局内游戏流程。创建 GameViewModel、GameSystem，
-    /// 通过 Navigator 打开 GameScreen，订阅 ViewModel 命令意图转发到 System。
+    /// 通过 Navigator 打开 GameView，订阅 ViewModel 命令意图转发到 System。
     /// </summary>
     public class GameProcedure : ProcedureBase
     {
@@ -52,8 +52,8 @@ namespace GameLogic
                 PendingLevelId = 0;
                 Log.Info($"[GameProcedure] OnEnter - 关卡标识：{levelId}");
 
-                // 获取 GameModel（由 GameLogicEntry 在 ModelManager 中注册）
-                var gameModel = GameLogicEntry.Model.GetModel<GameModel>();
+                // 获取 GameModel（按需懒注册——ModelManager.TryGetModel 在首次访问时自动构造）
+                var gameModel = GameLogicEntry.Model.TryGetModel<GameModel>();
 
                 // 创建局部事件总线
                 _localEventBus = new LocalEventBus();
@@ -64,7 +64,7 @@ namespace GameLogic
                 _viewModel.CardUsed += OnCardUsed;
                 _viewModel.EndTurnRequested += OnEndTurnRequested;
 
-                // 订阅卡牌出牌失败事件，转发到 ViewModel 让 GameScreen 显示 toast
+                // 订阅卡牌出牌失败事件，转发到 ViewModel 让 GameView 显示 toast
                 _localEventBus.GetChannel<CardPlayFailedEvent>().Subscribe(OnCardPlayFailed);
 
                 // 创建并初始化 System
@@ -85,7 +85,7 @@ namespace GameLogic
 
                 _waveSystem.StartLevel(levelId);
 
-                await _navigator.NavigateToAsync("Game", _viewModel);
+                await _navigator.OpenAsync<GameView>(_viewModel);
                 Log.Info($"[GameProcedure] 局内界面已打开，关卡标识：{levelId}");
             }
             catch (Exception e)

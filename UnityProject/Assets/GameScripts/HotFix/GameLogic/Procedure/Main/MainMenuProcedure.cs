@@ -10,7 +10,7 @@ namespace GameLogic
 {
     /// <summary>
     /// 主菜单流程。创建 MainViewModel，从配置表填充数据，
-    /// 通过 Navigator 打开 MainMenuScreen，订阅 ViewModel 命令意图。
+    /// 通过 Navigator 打开 MainView，订阅 ViewModel 命令意图。
     /// </summary>
     public class MainMenuProcedure : ProcedureBase
     {
@@ -51,7 +51,7 @@ namespace GameLogic
                 PopulateFromConfig(_viewModel);
                 _viewModel.StartRequested += OnStartRequested;
 
-                await _navigator.NavigateToAsync("MainMenu", _viewModel);
+                await _navigator.OpenAsync<MainView>(_viewModel);
                 Log.Info("[MainMenuProcedure] 主界面已打开");
             }
             catch (Exception e)

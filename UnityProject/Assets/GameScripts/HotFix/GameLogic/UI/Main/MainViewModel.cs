@@ -4,7 +4,7 @@ using EF.UI;
 namespace GameLogic
 {
     /// <summary>
-    /// 主界面 ViewModel。暴露 ReactiveProperty 供 MainMenuScreen 绑定，
+    /// 主界面 ViewModel。暴露 ReactiveProperty 供 MainView 绑定，
     /// 暴露命令意图事件供 Procedure 响应。
     /// </summary>
     public class MainViewModel : ViewModelBase

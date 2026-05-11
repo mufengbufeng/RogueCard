@@ -98,6 +98,10 @@ After completing all artifacts, summarize:
 - The schema defines what each artifact should contain - follow it
 - Read dependency artifacts for context before creating new ones
 - Use `template` as the structure for your output file - fill in its sections
+- When creating implementation tasks, follow the `tdd-development` skill's OpenSpec artifact guidance:
+  - Put focused test-first tasks before production implementation tasks
+  - Tie each test task to observable behavior from requirements or scenarios
+  - Include a final verification task that names the targeted test command or Unity Test Runner mode
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output

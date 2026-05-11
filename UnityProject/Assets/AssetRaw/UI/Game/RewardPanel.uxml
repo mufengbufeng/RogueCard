@@ -1,6 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
     <Style src="../Shared/SharedStyles.uss" />
-    <Style src="GameViewStyles.uss" />
+    <Style src="GameUss.uss" />
 
     <ui:VisualElement name="RewardPanel" class="reward-panel" style="flex-grow: 1; align-items: center; justify-content: center;">
         <ui:Label name="reward-title" text="关卡完成" class="reward-title" />

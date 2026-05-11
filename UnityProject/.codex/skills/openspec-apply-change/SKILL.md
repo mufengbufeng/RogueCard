@@ -1,6 +1,6 @@
 ---
 name: openspec-apply-change
-description: Implement tasks from an OpenSpec change. Use when the user wants to start implementing, continue implementation, or work through tasks.
+description: Implement tasks from an OpenSpec change using TDD. Use when the user wants to start implementing, continue implementation, or work through tasks.
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
@@ -64,13 +64,21 @@ Implement tasks from an OpenSpec change.
    - Remaining tasks overview
    - Dynamic instruction from CLI
 
-6. **Implement tasks (loop until done or blocked)**
+6. **Implement tasks with TDD (loop until done or blocked)**
+
+   Before changing production code for each behavior-sized task, follow the `tdd-development` skill:
+   - Identify the observable behavior from the specs/design/tasks
+   - Write or update the focused failing test first
+   - Run the smallest relevant test target and confirm the expected failure
+   - Make the minimal production change to pass the test
+   - Re-run the focused tests, refactor while green, then re-run affected tests
+   - If test-first is genuinely blocked, explain why before production edits and add the nearest feasible automated or manual verification
 
    For each pending task:
    - Show which task is being worked on
-   - Make the code changes required
+   - Make the code changes required using the TDD loop above
    - Keep changes minimal and focused
-   - Mark task complete in the tasks file: `- [ ]` → `- [x]`
+   - Mark task complete in the tasks file: `- [ ]` → `- [x]` only after the related tests or explicit verification pass
    - Continue to next task
 
    **Pause if:**
@@ -145,6 +153,8 @@ What would you like to do?
 - If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
 - Update task checkbox immediately after completing each task
+- Use the standard TDD loop for new behavior, behavior changes, and bug fixes
+- Do not mark implementation tasks complete before their related tests or verification pass
 - Pause on errors, blockers, or unclear requirements - don't guess
 - Use contextFiles from CLI output, don't assume specific file names
 

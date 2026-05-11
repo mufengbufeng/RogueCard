@@ -1,3 +1,11 @@
+# auto-bind-ui-script Specification
+
+## Purpose
+
+定义旧版 ReferenceCollector 驱动的 UI 脚本自动绑定代码生成能力。
+
+## Requirements
+
 ### Requirement: 自动绑定UI脚本按钮
 ReferenceCollectorEditor 的自动收集操作区 SHALL 包含一个"自动绑定UI脚本"按钮，位于"自动收集"和"清除自动收集"按钮同一行或新行。
 

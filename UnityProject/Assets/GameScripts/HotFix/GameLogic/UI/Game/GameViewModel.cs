@@ -7,9 +7,10 @@ namespace GameLogic
 {
     /// <summary>
     /// 局内 ViewModel。订阅 GameModel 的 PropertyChanged 事件，
-    /// 将变化镜像到 ReactiveProperty 供 GameScreen 绑定。
+    /// 将变化镜像到 ReactiveProperty 供 GameView 绑定。
+    /// 显式实现 IPlayerStatusContext / IMonsterListContext 切片接口，供子模块按需订阅。
     /// </summary>
-    public class GameViewModel : ViewModelBase
+    public class GameViewModel : ViewModelBase, IPlayerStatusContext, IMonsterListContext, IHandContext, ITurnContext, ITargetContext, IBattleContext
     {
         private GameModel _model;
 
@@ -145,6 +146,11 @@ namespace GameLogic
         /// 触发使用卡牌意图。targetIndex = -1 表示由后端按 TargetMode 自动决策。
         /// </summary>
         public void UseCard(int handIndex, int targetIndex = -1) => CardUsed?.Invoke(handIndex, targetIndex);
+
+        /// <summary>
+        /// ITargetContext 实现：使用卡牌并指定怪物目标。语义化转发到 UseCard(handIdx, monsterIdx)。
+        /// </summary>
+        public void UseCardOnMonster(int handIdx, int monsterIdx) => UseCard(handIdx, monsterIdx);
 
         /// <summary>
         /// 通知 UI 出牌失败（由 GameProcedure 在收到 CardPlayFailedEvent 时调用）。

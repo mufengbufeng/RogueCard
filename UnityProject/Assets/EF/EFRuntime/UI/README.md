@@ -1,9 +1,17 @@
 # EF UI 系统
 
 基于 **UI Toolkit (UITK)** 的 MVVM 风格 UI 框架。`Shell` 把 `UIDocument.rootVisualElement`
-拆成三层命名容器，`Navigator` 在层之间替换 `Screen` / 推弹窗，`Screen<TViewModel>` 通过
-`ReactiveProperty<T>` 与 `ViewModelBase` 完成数据绑定。整套框架不依赖 UGUI、
-不依赖 MonoBehaviour（除 `UIDocument` 自身）、不依赖反射资产配置。
+拆成三层命名容器，`Navigator` 按命名约定 + 类型反射在层之间替换 `Screen` / 推弹窗，
+`Screen<TViewModel>` 通过 `ReactiveProperty<T>` 与 `ViewModelBase` 完成数据绑定。
+整套框架不依赖 UGUI、不依赖 MonoBehaviour（除 `UIDocument` 自身）、不依赖反射资产配置。
+
+> **API 更新（convention-based-screen-resolution）**：
+> 本框架已改为基于命名约定的 Screen 解析模式。新增 Screen **不再需要**在
+> `GameLogicEntry` 或任何中心列表注册；Navigator 按 `{Stem}View → {Stem}Uxml/{Stem}Uss`
+> 命名约定加载资源，按 `Popup<T>` vs `Screen<T>` 基类继承关系分流到 PopupLayer / ScreenLayer。
+> 旧 `NavigateToAsync` / `PushPopupAsync` / `PopPopup` API 已合并为
+> `OpenAsync<TScreen>()` / `OpenAsync(string)` / `Close()` / `CloseAll()`；
+> `ScreenRegistry` 已删除。
 
 ## 目录
 
@@ -45,8 +53,8 @@
 ```
 
 - **Shell**：从 `rootVisualElement` 解析 `screen-layer` / `popup-layer` / `system-layer`。
-- **Navigator**：`NavigateToAsync` 替换 ScreenLayer，`PushPopupAsync` 入栈到 PopupLayer。
-- **Screen / Screen&lt;TViewModel&gt;**：继承 `VisualElement`，UXML 内容作为子节点 `CloneTree` 挂入。
+- **Navigator**：`OpenAsync<TScreen>()` 或 `OpenAsync("StemView")` 按类型/字符串打开；目标类型派生自 `Popup<>` 时入栈到 PopupLayer，否则替换 ScreenLayer。
+- **Screen&lt;TViewModel&gt; / Popup&lt;TViewModel&gt;**：继承 `VisualElement`，UXML 内容作为子节点 `CloneTree` 挂入。`UxmlLocation` / `UssLocation` 虚属性默认按 `{Stem}View → {Stem}Uxml / {Stem}Uss` 推导。
 - **ViewModelBase**：通过 `Prop<T>` 创建并追踪 `ReactiveProperty`，`Dispose` 时一次性 `ClearListeners`。
 - **Procedure** 拥有 ViewModel + 订阅命令意图事件，View 仅做 UQuery + 绑定。
 
@@ -57,10 +65,9 @@
 | 类型                     | 职责                                                | 关键 API                                                                          | 约束 / 注意                                                                       |
 | ------------------------ | --------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | `Shell`                  | 持有三个命名层 `VisualElement` 引用                 | `ScreenLayer` / `PopupLayer` / `SystemLayer`                                      | `root` 为 null 抛 `ArgumentNullException`；缺层抛 `InvalidOperationException`     |
-| `INavigator`             | 导航服务接口                                        | `NavigateToAsync` / `PushPopupAsync` / `PopPopup` / `Shutdown`                    | 由 `Navigator` 实现；构造依赖 `Shell` + `ScreenRegistry` + `IResourceManager`     |
-| `Navigator`              | Screen 替换 + Popup 栈 + 异常路径回滚               | 同上                                                                              | Popup 失败时通过 `RemoveFromHierarchy` 回滚 overlay / popup，避免悬挂             |
-| `ScreenRegistry`         | Screen 名称 → 描述符映射                            | `Register<TScreen, TViewModel>(name, uxmlLocation, isPopup=false)`                | 名称大小写不敏感；重复注册抛 `InvalidOperationException`                          |
-| `ScreenDescriptor`       | 单个 Screen 的注册数据                              | `Name` / `Location` / `ScreenType` / `ViewModelType` / `IsPopup`                  | 不可变；由 `ScreenRegistry.Register` 内部构造                                     |
+| `INavigator`             | 导航服务接口                                        | `OpenAsync<TScreen>()` / `OpenAsync(string)` / `Close()` / `CloseAll()` / `Shutdown` | 由 `Navigator` 实现；构造依赖 `Shell` + `IResourceManager`                       |
+| `Navigator`              | Screen 替换 + Popup 栈 + 命名约定解析 + 反射类型缓存 | 同上                                                                              | 按 `Popup<>` 基类继承分流；字符串重载首次调用全程序集扫描 + 字典缓存；同名冲突抛异常 |
+| `Popup<TViewModel>`      | 弹窗类型 marker 基类                                | (无方法，仅类型标记)                                                              | 派生自此类的 Screen 走 PopupLayer 栈；非 Popup 派生类型走 ScreenLayer 替换        |
 | `Screen` (非泛型)        | 让 `Navigator` 通过基类引用 Screen，规避泛型协变    | `LoadContent(vta)` / `Setup(viewModel)` / `OnShow` / `OnHide` / `OnDispose`       | `Activator.CreateInstance` + 非泛型基类是 Navigator 真实路径，避免 `InvalidCastException` |
 | `Screen<TViewModel>`     | 强类型 Screen 基类                                  | `OnSetup` (子类重写)                                                              | `Setup` 类型不匹配抛 `ArgumentException`；`OnDispose` 自动 Dispose ViewModel + 自脱树 |
 | `ViewModelBase`          | 创建并追踪 `ReactiveProperty`，统一清理监听者       | `Prop<T>(initialValue)` / `Dispose()`                                             | `Dispose` 幂等；只清监听者，不清属性值                                            |
@@ -77,9 +84,10 @@
 泛型 `Screen<TViewModel>` 把 `Setup` 标记为 `sealed override`，在内部检查并强转类型，
 错误类型抛 `ArgumentException` 立即失败，而不是等到使用 `ViewModel` 时才崩。
 
-**2. `Navigator.PushPopupAsync` 异常路径回滚**
+**2. `Navigator.OpenAsync` 打开 Popup 时的异常路径回滚**
 
-打开 Popup 期间任何阶段抛异常（资源加载失败、`Activator.CreateInstance` 失败、`Setup` 类型错误等），
+当目标类型派生自 `Popup<>` 时，`OpenAsync` 走 PopupLayer 路径。打开期间任何阶段抛异常
+（资源加载失败、`Activator.CreateInstance` 失败、`Setup` 类型错误等），
 `Navigator` 都会 `RemoveFromHierarchy` 已添加到 `PopupLayer` 的 overlay 和 popup，
 确保 PopupLayer 不会留下半透明遮罩或空白节点。Overlay 是 `VisualElement`
 背景色 `(0, 0, 0, 0.6)` 的全屏 `Position.Absolute`。
@@ -100,51 +108,45 @@ CanStart   = Prop(true);
 
 ## 生命周期
 
-### `NavigateToAsync(name, viewModel, ct)`
+### `OpenAsync<TScreen>(viewModel, ct)` / `OpenAsync(string viewName, viewModel, ct)`
 
 ```
-NavigateToAsync(name, viewModel)
+OpenAsync (按类型 / 按字符串名都进同一内部流程)
   │
-  ├── _currentScreen != null ?
-  │     ├── _currentScreen.OnHide()
-  │     └── _currentScreen.OnDispose()      ← 自动 Dispose ViewModel + 自脱树
+  ├── 字符串重载：先反射查 _typeCache，未命中扫描 AppDomain 程序集填充
+  │     ↑ 同名冲突抛 InvalidOperationException 并提示用类型重载
   │
-  ├── ResourceManager.LoadAssetAsync<VisualTreeAsset>(descriptor.Location)
-  │     ↑ 任意阶段 cancellationToken.ThrowIfCancellationRequested()
+  ├── 实例化 Screen：Activator.CreateInstance(screenType)
+  ├── 判断是否 Popup：IsSubclassOfRawGeneric(screenType, typeof(Popup<>))
   │
-  ├── Activator.CreateInstance(descriptor.ScreenType)  ← 通过非泛型基类引用
-  ├── screen.LoadContent(vta)                          ← CloneTree + flexGrow=1
-  ├── _shell.ScreenLayer.Add(screen)
-  ├── screen.Setup(viewModel)                          ← 触发 OnSetup
-  └── screen.OnShow()
+  ├── 加载 UXML（必需）：ResourceManager.LoadAssetAsync<VisualTreeAsset>(screen.UxmlLocation)
+  │     ↑ 默认按 {Stem}View → {Stem}Uxml 命名约定推导，子类可 override
+  │     ↑ 失败抛 InvalidOperationException
+  │
+  ├── 加载 USS（可选）：ResourceManager.LoadAssetAsync<StyleSheet>(screen.UssLocation)
+  │     ↑ 缺失：DEBUG 警告一次 + Release 静默，Screen 仍正常加载
+  │
+  ├── 解析 ViewModel 类型：沿继承链找 Screen<>/Popup<> 闭合泛型，取第一个泛型参数
+  ├── ViewModel：调用方传入则用，否则 Activator.CreateInstance(viewModelType)
+  │
+  ├── 分流：
+  │   ├── isPopup → MountPopup：CreateOverlay → PopupLayer.Add(overlay) + PopupLayer.Add(popup)
+  │   │              → Setup → OnShow → _popupStack.Push
+  │   │              ↑ 任意阶段抛异常时回滚 overlay/popup
+  │   │
+  │   └── !isPopup → MountScreen：关闭 _currentScreen → ScreenLayer.Add(screen)
+  │                  → Setup → OnShow → _currentScreen = screen
 ```
 
-### `PushPopupAsync(name, viewModel, ct)`
+### `Close()` / `CloseAll()` / `Shutdown()`
 
 ```
-PushPopupAsync(name, viewModel)
-  │
-  ├── try
-  │     ├── 加载 VisualTreeAsset
-  │     ├── popup = Activator.CreateInstance(descriptor.ScreenType)
-  │     ├── popup.LoadContent(vta)
-  │     ├── overlay = CreateOverlay()           ← rgba(0,0,0,0.6) 绝对全屏
-  │     ├── _shell.PopupLayer.Add(overlay)
-  │     ├── _shell.PopupLayer.Add(popup)
-  │     ├── popup.Setup(viewModel) + popup.OnShow()
-  │     └── _popupStack.Push(PopupEntry(popup, overlay, viewModel))
-  │
-  └── catch                                     ← 异常路径回滚
-        ├── overlay?.RemoveFromHierarchy()
-        └── popup?.RemoveFromHierarchy()
-```
-
-### `PopPopup()` / `Shutdown()`
-
-```
-PopPopup()
-  ├── stack 空 → 直接返回
+Close()
+  ├── _popupStack 空 → 直接返回（不影响 ScreenLayer）
   └── pop → entry.Popup.OnHide() → entry.Popup.OnDispose() → entry.Overlay.RemoveFromHierarchy()
+
+CloseAll()
+  └── 循环 Close 所有 Popup（保留 ScreenLayer 当前 Screen）
 
 Shutdown()
   ├── 弹窗栈逐个：try { OnHide() } catch { } / try { OnDispose() } catch { } / overlay 脱树
@@ -161,7 +163,7 @@ Shutdown()
 标准模式：在 `Screen.OnSetup` 中（1）UQuery 抓元素 → （2）订阅 `ReactiveProperty.Changed` →
 （3）注册命令意图回调 → （4）用 `vm.Xxx.Value` 同步初始值。
 
-来自 `MainMenuScreen.OnSetup`（路径：`Assets/GameScripts/HotFix/GameLogic/UI/Main/MainMenuScreen.cs`）：
+来自 `MainView.OnSetup`（路径：`Assets/GameScripts/HotFix/GameLogic/UI/Main/MainView.cs`）：
 
 ```csharp
 protected override void OnSetup()
@@ -226,7 +228,7 @@ public class MainViewModel : ViewModelBase
 ## Procedure ↔ Screen 协作
 
 Procedure 是 ViewModel 的**唯一所有者**：在 `OnEnter` 创建 ViewModel、填充数据、订阅命令意图事件、
-调用 `_navigator.NavigateToAsync(name, vm)`；在 `OnLeave` 解订阅。Screen 只通过
+调用 `_navigator.OpenAsync<TScreen>(vm)`；在 `OnLeave` 解订阅。Screen 只通过
 `ReactiveProperty` 读 / `RegisterCallback` 写，**不直接持有 Procedure 引用**。
 
 来自 `MainMenuProcedure`（`Assets/GameScripts/HotFix/GameLogic/Procedure/Main/MainMenuProcedure.cs`）：
@@ -250,7 +252,7 @@ public class MainMenuProcedure : ProcedureBase
         PopulateFromConfig(_viewModel);               // 从配置表填 ReactiveProperty.Value
         _viewModel.StartRequested += OnStartRequested;
 
-        await _navigator.NavigateToAsync("MainMenu", _viewModel);
+        await _navigator.OpenAsync<MainView>(_viewModel);
     }
 
     private void OnStartRequested()
@@ -307,38 +309,57 @@ public class MainMenuProcedure : ProcedureBase
 
 ## 快速开始
 
-**第 1 步：在启动入口注册 Screen** —— 来自 `GameLogicEntry.InitializeNavigator`：
+**第 1 步：写一个 `{Stem}View` 类 + 同名 UXML/USS 资源**
+
+```csharp
+// Assets/GameScripts/HotFix/GameLogic/UI/MyFeature/MyFeatureView.cs
+public sealed class MyFeatureView : Screen<MyFeatureViewModel>
+{
+    protected override void OnSetup()
+    {
+        // UQuery + 绑定 ReactiveProperty + 注册命令意图
+    }
+}
+```
+
+资源放在 `Assets/AssetRaw/UI/MyFeature/`：`MyFeatureUxml.uxml` + `MyFeatureUss.uss`（USS 可选）。
+
+**第 2 步：构建 Navigator（启动期，仅一次）—— 来自 `GameLogicEntry.InitializeNavigator`**：
 
 ```csharp
 var uiDocument = Object.FindFirstObjectByType<UIDocument>();
 var shell = new Shell(uiDocument.rootVisualElement);
-
-var registry = new ScreenRegistry();
-registry.Register<MainMenuScreen, MainViewModel>("MainMenu", "MainView");
-registry.Register<GameScreen,     GameViewModel>("Game",     "GameView");
-
-_navigator = new Navigator(shell, registry, _resourceManager);
+_navigator = new Navigator(shell, _resourceManager);
+// 不再需要任何 Screen 注册——新增 Screen 由命名约定 + 反射在 OpenAsync 内部解析
 ```
 
-第 2 个参数 `"MainView"` 是 UXML 资源 location，由 `IResourceManager.LoadAssetAsync<VisualTreeAsset>`
-解析（YooAsset 路径或 location 别名）。
-
-**第 2 步：在 Procedure 中创建 ViewModel + 订阅命令意图**：
+**第 3 步：在 Procedure 中创建 ViewModel + 订阅命令意图**：
 
 ```csharp
-var vm = new MainViewModel();
+var vm = new MyFeatureViewModel();
 vm.StatusText.Value = "准备就绪";
-vm.CanStart.Value   = true;
-vm.StartRequested  += OnStartRequested;
+vm.SomeCommand    += OnSomeCommand;
 ```
 
-**第 3 步：通过 Navigator 打开 Screen**：
+**第 4 步：通过 Navigator 打开 Screen**：
 
 ```csharp
-await _navigator.NavigateToAsync("MainMenu", vm);
+await _navigator.OpenAsync<MyFeatureView>(vm);
+
+// 或者按字符串（数据驱动场景）：
+await _navigator.OpenAsync("MyFeatureView", vm);
 ```
 
-`Navigator` 会自动卸载当前 Screen、加载 UXML、构造 `MainMenuScreen` 实例、触发 `OnSetup` 完成绑定。
+`Navigator` 会按命名约定加载 `MyFeatureUxml.uxml`（必需）和 `MyFeatureUss.uss`（可选）、
+构造 `MyFeatureView` 实例、触发 `OnSetup` 完成绑定。
+
+**弹窗 Popup**：把基类换成 `Popup<TViewModel>`，Navigator 自动改走 PopupLayer 栈式管理：
+
+```csharp
+public sealed class SettingsView : Popup<SettingsViewModel> { ... }
+await _navigator.OpenAsync<SettingsView>(vm);   // 入栈
+_navigator.Close();                              // 关闭顶层弹窗
+```
 
 ### `LocalEventBus` vs 全局 `EventHub`
 
@@ -356,11 +377,13 @@ EditMode 测试在程序集 `GameLogic.Tests.EditMode`，目录 `Assets/GameScri
 
 | 文件                       | 一句话目的                                                              |
 | -------------------------- | ----------------------------------------------------------------------- |
-| `ShellAndRegistryTests`    | 验证 `Shell` 解析三层 / 缺层抛异常，`ScreenRegistry` 注册查询与名称大小写不敏感 |
-| `ScreenLifecycleTests`     | 验证 `Activator.CreateInstance` + 非泛型 `Screen` 引用 + `Setup(ViewModelBase)` 完整路径，错误类型快速失败，`OnDispose` 销毁 ViewModel + 自脱树 |
-| `ReactivePropertyTests`    | 验证 `Value` 仅在变化时触发 `Changed`、`ClearListeners` 后不再回调，`ViewModelBase.Prop` 追踪 + `Dispose` 清理 + 幂等性 |
+| `ShellAndRegistryTests`         | 验证 `Shell` 解析三层 / 缺层抛异常（ScreenRegistry 删除后该文件仅保留 Shell 部分） |
+| `ScreenConventionTests`         | 验证 `Screen<T>.UxmlLocation` / `UssLocation` 默认按 `{Stem}View → {Stem}Uxml/Uss` 推导，子类可 override，Popup 派生类型走相同约定 |
+| `NavigatorTypeResolutionTests`  | 验证 `Navigator` 字符串重载的早期失败路径（不存在类型 / 空字符串 / 构造参数 null），`Close` / `CloseAll` 在空栈下静默 |
+| `ScreenLifecycleTests`          | 验证 `Activator.CreateInstance` + 非泛型 `Screen` 引用 + `Setup(ViewModelBase)` 完整路径，错误类型快速失败，`OnDispose` 销毁 ViewModel + 自脱树 |
+| `ReactivePropertyTests`         | 验证 `Value` 仅在变化时触发 `Changed`、`ClearListeners` 后不再回调，`ViewModelBase.Prop` 追踪 + `Dispose` 清理 + 幂等性 |
 
-修改 `Shell` / `Navigator` / `Screen` / `ReactiveProperty` / `ViewModelBase` 时，先把这三个测试跑过。
+修改 `Shell` / `Navigator` / `Screen` / `Popup` / `ReactiveProperty` / `ViewModelBase` 时，先把这些测试跑过。
 
 ---
 

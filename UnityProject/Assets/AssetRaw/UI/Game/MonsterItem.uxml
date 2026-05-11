@@ -1,6 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements">
     <Style src="../Shared/SharedStyles.uss" />
-    <Style src="GameViewStyles.uss" />
+    <Style src="GameUss.uss" />
 
     <ui:VisualElement name="MonsterItem" class="monster-item">
         <ui:Label name="intent-text" text="" class="monster-intent" />

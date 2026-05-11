@@ -1,6 +1,6 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
     <Style src="../Shared/SharedStyles.uss" />
-    <Style src="GameViewStyles.uss" />
+    <Style src="GameUss.uss" />
 
     <ui:VisualElement name="BattlePanel" class="battle-panel" style="flex-grow: 1;">
         <!-- 顶部：怪物展示区 -->

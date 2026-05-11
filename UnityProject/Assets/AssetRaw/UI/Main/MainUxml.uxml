@@ -1,0 +1,78 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <Style src="../Shared/SharedStyles.uss" />
+    <Style src="MainUss.uss" />
+
+    <ui:VisualElement name="MainView" class="main-container">
+
+        <!-- 顶部资源栏：体力与金币 -->
+        <ui:VisualElement name="top-bar" class="top-bar">
+            <ui:VisualElement name="stamina-panel" class="resource-panel">
+                <ui:VisualElement name="stamina-icon" class="resource-icon resource-icon-stamina" />
+                <ui:VisualElement class="resource-content">
+                    <ui:Label name="stamina-title" text="体力" class="resource-title" />
+                    <ui:Label name="stamina-value" text="120/120" class="resource-value" />
+                </ui:VisualElement>
+                <ui:Button name="stamina-add-btn" text="+" class="resource-add-btn" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="gold-panel" class="resource-panel">
+                <ui:VisualElement name="gold-icon" class="resource-icon resource-icon-gold" />
+                <ui:VisualElement class="resource-content">
+                    <ui:Label name="gold-title" text="金币" class="resource-title" />
+                    <ui:Label name="gold-value" text="1,500,000" class="resource-value" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- 中部主内容区：关卡预览 + 关卡信息 + 开始按钮 -->
+        <ui:VisualElement name="content" class="main-content">
+
+            <!-- 关卡预览面板 -->
+            <ui:VisualElement name="preview-panel" class="preview-panel">
+                <ui:Label name="preview-title" text="关卡预览" class="preview-title" />
+                <ui:VisualElement name="preview-frame" class="preview-frame">
+                    <ui:VisualElement name="preview-image" class="preview-image" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <!-- 关卡信息 -->
+            <ui:VisualElement name="level-info" class="level-info">
+                <ui:Label name="level-name" text="关卡名称" class="level-name label-title" />
+                <ui:Label name="level-desc" text="关卡描述" class="level-desc label-subtitle" />
+                <ui:Label name="status-text" text="" class="status-text label-small" />
+            </ui:VisualElement>
+
+            <!-- 开始游戏 -->
+            <ui:VisualElement name="start-section" class="start-section">
+                <ui:Button name="start-btn" text="开始游戏" class="btn-start btn-primary" />
+                <ui:Label name="feedback-text" text="" class="feedback-text label-tips" />
+            </ui:VisualElement>
+
+        </ui:VisualElement>
+
+        <!-- 底部导航栏 -->
+        <ui:VisualElement name="nav-bar" class="nav-bar">
+            <ui:Button name="nav-shop-btn" class="nav-btn">
+                <ui:VisualElement class="nav-icon nav-icon-shop" />
+                <ui:Label text="[商城]" class="nav-label" />
+            </ui:Button>
+            <ui:Button name="nav-character-btn" class="nav-btn">
+                <ui:VisualElement class="nav-icon nav-icon-character" />
+                <ui:Label text="[角色]" class="nav-label" />
+            </ui:Button>
+            <ui:Button name="nav-home-btn" class="nav-btn nav-btn-active">
+                <ui:VisualElement class="nav-icon nav-icon-home" />
+                <ui:Label text="[主页]" class="nav-label" />
+            </ui:Button>
+            <ui:Button name="nav-challenge-btn" class="nav-btn">
+                <ui:VisualElement class="nav-icon nav-icon-challenge" />
+                <ui:Label text="[挑战]" class="nav-label" />
+            </ui:Button>
+            <ui:Button name="nav-rank-btn" class="nav-btn">
+                <ui:VisualElement class="nav-icon nav-icon-rank" />
+                <ui:Label text="[排行]" class="nav-label" />
+            </ui:Button>
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>
