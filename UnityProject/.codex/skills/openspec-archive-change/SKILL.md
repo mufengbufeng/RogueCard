@@ -91,6 +91,16 @@ Archive a completed change in the experimental workflow.
    - Whether specs were synced (if applicable)
    - Note about any warnings (incomplete artifacts/tasks)
 
+7. **Record MemPalace memory**
+
+   After a successful archive and before the final response, record the archive event in the local MemPalace diary:
+
+   ```bash
+   harness-workspace/mempalace-github-code/.venv/Scripts/python.exe harness-workspace/tools/mempalace_record_event.py openspec-archive --change "<name>" --archive-path "openspec/changes/archive/YYYY-MM-DD-<name>" --schema "<schema-name>" --specs "<synced|skipped|no-delta-specs>" --allow-failure
+   ```
+
+   If the command fails, report the warning in the final summary, but do not roll back the archive.
+
 **Output On Success**
 
 ```
