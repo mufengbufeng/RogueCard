@@ -71,7 +71,7 @@ namespace GameLogic
         /// MonsterTurn 阶段：对每只存活怪物按 PendingCards 依次调用 Executor，
         /// 之后弃光手牌、清空 PendingCards、TurnsAlive++。
         /// </summary>
-        public void ExecuteTurn()
+        public virtual void ExecuteTurn()
         {
             if (_cardSystem == null) return;
 

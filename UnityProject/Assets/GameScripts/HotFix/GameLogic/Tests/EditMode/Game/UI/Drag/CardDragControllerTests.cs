@@ -107,7 +107,7 @@ namespace GameLogic.Tests
         [Test]
         public void Dragging_DroppedOnDropZone_SingleManual_TriggersCallback_TrueFlag_KeepsGhost()
         {
-            _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleManual), NewCard(2, TargetMode.SingleAuto) });
+            _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleManual, CardReleaseKind.Melee), NewCard(2, TargetMode.SingleAuto) });
             _surface.ConfiguredCardCount = 2;
             _surface.CardBounds = new[] { new Rect(50, 400, 100, 200), new Rect(200, 400, 100, 200) };
 
@@ -119,6 +119,22 @@ namespace GameLogic.Tests
             CollectionAssert.AreEqual(new[] { (0, true) }, _callbacks.CardDroppedOnZoneLog);
             // SingleManual SHALL NOT 在 controller 内销毁 ghost（保留给 TargetSelector）
             Assert.AreEqual(0, _surface.DestroyGhostCallCount, "ghost SHALL be retained for SingleManual");
+        }
+
+        [Test]
+        public void Dragging_DroppedOnDropZone_SpellSingleManual_自动释放不进入手选()
+        {
+            _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleManual, CardReleaseKind.Spell), NewCard(2, TargetMode.SingleAuto) });
+            _surface.ConfiguredCardCount = 2;
+            _surface.CardBounds = new[] { new Rect(50, 400, 100, 200), new Rect(200, 400, 100, 200) };
+
+            _controller.OnPointerDown(0, 0, 0, new Vector2(100, 500));
+            _controller.OnPointerMove(0, new Vector2(120, 500));
+            _controller.OnPointerMove(0, new Vector2(400, 200));
+            _controller.OnPointerUp(0, new Vector2(400, 200));
+
+            CollectionAssert.AreEqual(new[] { (0, false) }, _callbacks.CardDroppedOnZoneLog);
+            Assert.GreaterOrEqual(_surface.DestroyGhostCallCount, 1);
         }
 
         [Test]
@@ -235,7 +251,7 @@ namespace GameLogic.Tests
         {
             // SingleManual 卡在位置 2，拖拽中 visual reorder 可能改 _activeVisualIndex；
             // _activeHandIndex 保持初始 hand 位置（用于 UseCard）。
-            _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleAuto), NewCard(2, TargetMode.SingleAuto), NewCard(3, TargetMode.SingleManual) });
+            _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleAuto), NewCard(2, TargetMode.SingleAuto), NewCard(3, TargetMode.SingleManual, CardReleaseKind.Melee) });
             _surface.ConfiguredCardCount = 3;
             _surface.CardBounds = new[]
             {
@@ -285,7 +301,7 @@ namespace GameLogic.Tests
 
         // ── 辅助 ──
 
-        private static Card NewCard(int id, TargetMode mode)
+        private static Card NewCard(int id, TargetMode mode, CardReleaseKind releaseKind = CardReleaseKind.Spell)
         {
             var card = (Card)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(Card));
             SetField(card, "Id", id);
@@ -293,7 +309,9 @@ namespace GameLogic.Tests
             SetField(card, "Desc", string.Empty);
             SetField(card, "Cost", 1);
             SetField(card, "OwnerKind", OwnerKind.Player);
+            SetField(card, "CardReleaseKind", releaseKind);
             SetField(card, "TargetMode", mode);
+            SetField(card, "TargetCount", 1);
             SetField(card, "IsBasic", true);
             SetField(card, "AssetId", string.Empty);
             return card;

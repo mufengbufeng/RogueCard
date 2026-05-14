@@ -37,7 +37,8 @@ namespace GameLogic
             IList<CardEffect> effects,
             IBattleActor caster,
             IList<IBattleActor> targets,
-            IBattleEventSink events)
+            IBattleEventSink events,
+            bool splitDamageAcrossTargets = true)
         {
             if (cardConfig == null) throw new ArgumentNullException(nameof(cardConfig));
             if (caster == null) throw new ArgumentNullException(nameof(caster));
@@ -49,7 +50,7 @@ namespace GameLogic
             int targetCount = finalTargets.Count;
             foreach (var effect in effects)
             {
-                ApplyEffect(effect, caster, finalTargets, cardConfig.TargetMode, targetCount, events);
+                ApplyEffect(effect, caster, finalTargets, cardConfig.TargetMode, targetCount, events, splitDamageAcrossTargets);
             }
         }
 
@@ -129,14 +130,15 @@ namespace GameLogic
             IList<IBattleActor> finalTargets,
             TargetMode mode,
             int targetCount,
-            IBattleEventSink events)
+            IBattleEventSink events,
+            bool splitDamageAcrossTargets)
         {
             switch (effect.Kind)
             {
                 case EffectKind.Damage:
                 {
                     int dmg = effect.Value;
-                    if (mode == TargetMode.SplitAcrossAll && targetCount > 0)
+                    if (splitDamageAcrossTargets && mode == TargetMode.SplitAcrossAll && targetCount > 0)
                     {
                         dmg = Math.Max(1, effect.Value / targetCount);
                     }
@@ -170,6 +172,7 @@ namespace GameLogic
                         target.AddBuff(new BuffRuntime
                         {
                             Kind = EffectKind.DamageDot,
+                            TriggerTiming = NormalizeTriggerTiming(effect.TriggerTiming),
                             Value = effect.Value,
                             RemainingTurns = effect.Duration,
                             SourceActor = caster,
@@ -184,6 +187,14 @@ namespace GameLogic
                     break;
                 }
             }
+        }
+
+        /// <summary>
+        /// 兼容测试反射构造或旧数据未写入 TriggerTiming 的情况，默认按 EnemyTurnStart 的 DoT 语义处理。
+        /// </summary>
+        private static EffectTriggerTiming NormalizeTriggerTiming(EffectTriggerTiming timing)
+        {
+            return timing == 0 ? EffectTriggerTiming.EnemyTurnStart : timing;
         }
     }
 }

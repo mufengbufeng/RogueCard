@@ -113,7 +113,8 @@ namespace GameLogic
                         var card = GetHandCardAt(handIdx);
                         bool needsManualTarget = card != null
                             && card.Config != null
-                            && card.Config.TargetMode == TargetMode.SingleManual;
+                            && card.Config.TargetMode == TargetMode.SingleManual
+                            && card.Config.CardReleaseKind != CardReleaseKind.Spell;
 
                         if (needsManualTarget)
                         {

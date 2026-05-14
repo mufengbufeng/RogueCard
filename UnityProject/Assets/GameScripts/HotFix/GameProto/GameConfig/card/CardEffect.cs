@@ -20,6 +20,7 @@ public sealed partial class CardEffect : Luban.BeanBase
         CardId = _buf.ReadInt();
         CardId_Ref = null;
         Kind = (card.EffectKind)_buf.ReadInt();
+        TriggerTiming = (card.EffectTriggerTiming)_buf.ReadInt();
         Value = _buf.ReadInt();
         Duration = _buf.ReadInt();
         Comment = _buf.ReadString();
@@ -43,6 +44,10 @@ public sealed partial class CardEffect : Luban.BeanBase
     /// 效果类型
     /// </summary>
     public readonly card.EffectKind Kind;
+    /// <summary>
+    /// 触发时机
+    /// </summary>
+    public readonly card.EffectTriggerTiming TriggerTiming;
     /// <summary>
     /// 效果数值
     /// </summary>
@@ -70,6 +75,7 @@ public sealed partial class CardEffect : Luban.BeanBase
         + "id:" + Id + ","
         + "cardId:" + CardId + ","
         + "kind:" + Kind + ","
+        + "triggerTiming:" + TriggerTiming + ","
         + "value:" + Value + ","
         + "duration:" + Duration + ","
         + "comment:" + Comment + ","

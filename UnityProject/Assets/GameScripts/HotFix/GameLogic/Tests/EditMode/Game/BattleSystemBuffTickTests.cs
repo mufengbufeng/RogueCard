@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using EF.UI;
@@ -117,6 +118,86 @@ namespace GameLogic.Tests.EditMode.Game
             }
         }
 
+        [Test]
+        public void EndTurn_EnemyTurnStart杀死玩家_立即失败并跳过怪物行动和EnemyTurnEnd()
+        {
+            var (battle, model, bus, cardSystem, monsterSystem) = CreateBattleWithSystems();
+            try
+            {
+                model.SetPhase(BattlePhase.PlayerTurn);
+                model.PlayerBuffs.Add(new BuffRuntime
+                {
+                    Kind = EffectKind.DamageDot,
+                    TriggerTiming = EffectTriggerTiming.EnemyTurnStart,
+                    Value = model.PlayerHp,
+                    RemainingTurns = 1,
+                });
+                model.PlayerBuffs.Add(new BuffRuntime
+                {
+                    Kind = EffectKind.DamageDot,
+                    TriggerTiming = EffectTriggerTiming.EnemyTurnEnd,
+                    Value = 99,
+                    RemainingTurns = 1,
+                });
+
+                bool failed = false;
+                bool turnEnded = false;
+                bus.GetChannel<BattleEndedEvent>().Subscribe(e => failed = !e.IsVictory);
+                bus.GetChannel<TurnEndedEvent>().Subscribe(_ => turnEnded = true);
+
+                battle.EndTurn();
+
+                Assert.IsTrue(failed);
+                Assert.IsTrue(model.IsPlayerDead);
+                Assert.IsFalse(turnEnded);
+                Assert.AreEqual(0, monsterSystem.ExecuteTurnCallCount);
+                Assert.AreEqual(1, model.PlayerBuffs.Count);
+                Assert.AreEqual(EffectTriggerTiming.EnemyTurnEnd, model.PlayerBuffs[0].TriggerTiming);
+            }
+            finally
+            {
+                battle.Dispose();
+                cardSystem.Dispose();
+                bus.Dispose();
+            }
+        }
+
+        [Test]
+        public void EndTurn_EnemyTurnEnd在怪物行动后结算并进入Check()
+        {
+            var (battle, model, bus, cardSystem, monsterSystem) = CreateBattleWithSystems();
+            try
+            {
+                var monster = new MonsterRuntime { Hp = 7, MaxHp = 30 };
+                model.SetMonsters(new List<MonsterRuntime> { monster });
+                monster.AddBuff(new BuffRuntime
+                {
+                    Kind = EffectKind.DamageDot,
+                    TriggerTiming = EffectTriggerTiming.EnemyTurnEnd,
+                    Value = 7,
+                    RemainingTurns = 1,
+                });
+                model.SetPhase(BattlePhase.PlayerTurn);
+
+                bool turnEnded = false;
+                bus.GetChannel<TurnEndedEvent>().Subscribe(_ => turnEnded = true);
+
+                battle.EndTurn();
+
+                Assert.AreEqual(1, monsterSystem.ExecuteTurnCallCount);
+                Assert.AreEqual(0, monster.Hp);
+                Assert.AreEqual(0, monster.Buffs.Count);
+                Assert.IsTrue(turnEnded);
+                Assert.AreEqual(BattlePhase.Check, model.Phase);
+            }
+            finally
+            {
+                battle.Dispose();
+                cardSystem.Dispose();
+                bus.Dispose();
+            }
+        }
+
         // ── 测试基础设施 ──
 
         private static (BattleSystem battle, GameModel model, LocalEventBus bus) CreateBattle()
@@ -129,13 +210,45 @@ namespace GameLogic.Tests.EditMode.Game
             return (battle, model, bus);
         }
 
+        private static (BattleSystem battle, GameModel model, LocalEventBus bus, CardSystem cardSystem, CountingMonsterSystem monsterSystem)
+            CreateBattleWithSystems()
+        {
+            var model = new GameModel();
+            model.InitBattleAttributes(maxEnergy: 3, handLimit: 5, maxHp: 50);
+            var bus = new LocalEventBus();
+            var cardSystem = new CardSystem();
+            cardSystem.Init(model, bus);
+            var monsterSystem = new CountingMonsterSystem();
+            monsterSystem.Init(model, bus);
+            var battle = new BattleSystem();
+            battle.Init(model, bus);
+            battle.Initialize(cardSystem, monsterSystem);
+            return (battle, model, bus, cardSystem, monsterSystem);
+        }
+
         private static void InvokeTick(BattleSystem battle)
         {
             var method = typeof(BattleSystem).GetMethod(
                 "TickBuffs",
-                BindingFlags.NonPublic | BindingFlags.Instance);
+                BindingFlags.NonPublic | BindingFlags.Instance,
+                binder: null,
+                types: Type.EmptyTypes,
+                modifiers: null);
             Assert.NotNull(method, "未找到私有方法 TickBuffs");
             method.Invoke(battle, null);
+        }
+
+        private sealed class CountingMonsterSystem : MonsterSystem
+        {
+            public int ExecuteTurnCallCount { get; private set; }
+
+            /// <summary>
+            /// 记录怪物行动调用次数，避免依赖 MonsterCardSystem 或配置表。
+            /// </summary>
+            public override void ExecuteTurn()
+            {
+                ExecuteTurnCallCount++;
+            }
         }
     }
 }

@@ -97,6 +97,27 @@ namespace GameLogic.Tests
         }
 
         [Test]
+        public void TargetMode_存活项保留原始怪物索引映射()
+        {
+            var view = new MonsterListView(_container, _ctx, _template);
+            _ctx.Monsters.Value = new[]
+            {
+                NewMonster(0, 10, "Dead"),
+                NewMonster(10, 10, "AliveA"),
+                NewMonster(5, 10, "AliveB"),
+            };
+
+            var field = typeof(MonsterListView).GetField(
+                "_itemMonsterIndices",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(field, "未找到 _itemMonsterIndices");
+            var indices = (List<int>)field.GetValue(view);
+
+            CollectionAssert.AreEqual(new[] { 1, 2 }, indices);
+            view.Dispose();
+        }
+
+        [Test]
         public void Dispose后_Monsters变化不再触发渲染()
         {
             var view = new MonsterListView(_container, _ctx, _template);

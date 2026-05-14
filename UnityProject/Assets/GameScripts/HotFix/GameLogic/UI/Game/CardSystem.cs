@@ -7,7 +7,7 @@ namespace GameLogic
 {
     /// <summary>
     /// 卡牌系统，管理出牌、抽牌、洗牌等卡牌操作。
-    /// 出牌效果统一委托给 <see cref="CardEffectExecutor"/>，自身不再实现具体效果分支。
+    /// 出牌释放统一委托给 <see cref="CardReleaseResolver"/>，自身不实现目标优先级或具体效果分支。
     /// </summary>
     public class CardSystem : IDisposable, IBattleEventSink
     {
@@ -15,6 +15,7 @@ namespace GameLogic
         private readonly Random _random = new();
         private GameModel _model;
         private IEventPublisher _events;
+        private CardReleaseResolver _releaseResolver;
         private Action<TurnEndedEvent> _turnEndedHandler;
         private bool _isDisposed;
 
@@ -24,12 +25,26 @@ namespace GameLogic
         public IReadOnlyList<CardRuntime> DrawPile => _drawPile;
 
         /// <summary>
+        /// 卡牌释放调度服务，供 BattleSystem 在敌人回合结算延迟效果。
+        /// </summary>
+        public CardReleaseResolver ReleaseResolver => _releaseResolver ??= new CardReleaseResolver();
+
+        /// <summary>
+        /// 创建卡牌系统。
+        /// </summary>
+        public CardSystem(CardReleaseResolver releaseResolver = null)
+        {
+            _releaseResolver = releaseResolver;
+        }
+
+        /// <summary>
         /// 初始化卡牌系统。
         /// </summary>
         public void Init(GameModel model, IEventPublisher events)
         {
             _model = model ?? throw new ArgumentNullException(nameof(model));
             _events = events ?? throw new ArgumentNullException(nameof(events));
+            _releaseResolver ??= new CardReleaseResolver();
             _turnEndedHandler = OnTurnEnded;
             _events.GetChannel<TurnEndedEvent>().Subscribe(_turnEndedHandler);
         }
@@ -81,7 +96,9 @@ namespace GameLogic
             }
 
             // SingleManual 模式下若调用方未指定有效目标且当前无任何存活敌方，视为 InvalidTarget
-            if (card.Config.TargetMode == TargetMode.SingleManual && monsterIndex < 0)
+            if (card.Config.TargetMode == TargetMode.SingleManual
+                && card.Config.CardReleaseKind != CardReleaseKind.Spell
+                && monsterIndex < 0)
             {
                 bool anyAlive = false;
                 foreach (var m in _model.Monsters)
@@ -104,49 +121,11 @@ namespace GameLogic
             _model.AddToDiscardPile(card);
 
             var caster = new PlayerActor(_model);
-            var targets = ResolveTargetCandidates(card.Config, monsterIndex);
-            CardEffectExecutor.Execute(card.Config, caster, targets, this);
+            ReleaseResolver.Release(card.Config, caster, _model.Monsters, monsterIndex, this);
+            _model.NotifyMonstersChanged();
 
             _events.GetChannel<CardPlayedEvent>().Publish(new CardPlayedEvent(card.Config.Id));
             return true;
-        }
-
-        /// <summary>
-        /// 根据 TargetMode 准备 Executor 的候选目标列表。
-        /// </summary>
-        private IList<IBattleActor> ResolveTargetCandidates(Card config, int monsterIndex)
-        {
-            switch (config.TargetMode)
-            {
-                case TargetMode.Self:
-                    return Array.Empty<IBattleActor>();
-
-                case TargetMode.SingleManual:
-                {
-                    var monsters = _model.Monsters;
-                    if (monsterIndex >= 0 && monsterIndex < monsters.Count)
-                    {
-                        return new List<IBattleActor> { monsters[monsterIndex] };
-                    }
-                    return CollectAliveMonsters();
-                }
-
-                default:
-                    return CollectAliveMonsters();
-            }
-        }
-
-        /// <summary>
-        /// 收集当前所有存活怪物。
-        /// </summary>
-        private IList<IBattleActor> CollectAliveMonsters()
-        {
-            var list = new List<IBattleActor>();
-            foreach (var m in _model.Monsters)
-            {
-                if (m != null && !m.IsDead) list.Add(m);
-            }
-            return list;
         }
 
         /// <summary>
@@ -243,6 +222,8 @@ namespace GameLogic
             }
 
             _drawPile.Clear();
+            _releaseResolver?.Clear();
+            _releaseResolver = null;
             _model = null;
             _events = null;
         }

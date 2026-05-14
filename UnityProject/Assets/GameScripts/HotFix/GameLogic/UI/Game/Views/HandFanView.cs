@@ -249,8 +249,18 @@ namespace GameLogic
 
         private void OnCardPointerMove(PointerMoveEvent evt)
         {
+            var previousState = _dragController?.State ?? CardInteractionState.Idle;
             _dragController?.OnPointerMove(evt.pointerId, evt.position);
+            ExitPreviewIfDragStarted(previousState);
             evt.StopPropagation();
+        }
+
+        private void ExitPreviewIfDragStarted(CardInteractionState previousState)
+        {
+            if (previousState == CardInteractionState.Dragging) return;
+            if (_dragController?.State != CardInteractionState.Dragging) return;
+
+            _previewController?.ExitPreview();
         }
 
         private void OnCardPointerUp(PointerUpEvent evt)

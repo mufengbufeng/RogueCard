@@ -369,6 +369,14 @@ namespace GameLogic
         }
 
         /// <summary>
+        /// 通知 ViewModel 怪物运行时状态已变化（HP、护甲、Buff、PendingCards 等字段变化）。
+        /// </summary>
+        public void NotifyMonstersChanged()
+        {
+            RaisePropertyChanged(nameof(Monsters));
+        }
+
+        /// <summary>
         /// 设置手牌列表。
         /// </summary>
         public void SetHand(List<CardRuntime> hand)

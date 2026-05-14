@@ -15,6 +15,7 @@ namespace GameLogic
         private IMonsterListContext _context;
         private VisualTreeAsset _itemTemplate;
         private readonly List<MonsterItemView> _items = new();
+        private readonly List<int> _itemMonsterIndices = new();
         private Action<IReadOnlyList<MonsterRuntime>> _onMonstersChanged;
         private bool _disposed;
 
@@ -75,14 +76,16 @@ namespace GameLogic
                 item.Dispose();
             }
             _items.Clear();
+            _itemMonsterIndices.Clear();
 
             var monsters = _context?.Monsters.Value;
             if (monsters == null || _itemTemplate == null) return;
 
             int aliveCount = CountAlive(monsters);
 
-            foreach (var monster in monsters)
+            for (int monsterIndex = 0; monsterIndex < monsters.Count; monsterIndex++)
             {
+                var monster = monsters[monsterIndex];
                 if (monster == null || monster.Hp <= 0) continue;
 
                 var template = _itemTemplate.CloneTree();
@@ -101,6 +104,7 @@ namespace GameLogic
                 var view = new MonsterItemView(root, monster, aliveCount);
                 _container.Add(root);
                 _items.Add(view);
+                _itemMonsterIndices.Add(monsterIndex);
             }
 
             // 若处于 target 模式，重建后需要对新存活怪物重新应用 target-selectable 类与点击回调
@@ -156,7 +160,7 @@ namespace GameLogic
                 root.AddToClassList("target-selectable");
                 root.AddToClassList("active");
 
-                int captured = i;
+                int captured = i < _itemMonsterIndices.Count ? _itemMonsterIndices[i] : i;
                 EventCallback<ClickEvent> handler = evt =>
                 {
                     onMonsterClick?.Invoke(captured);
@@ -230,6 +234,7 @@ namespace GameLogic
                 item.Dispose();
             }
             _items.Clear();
+            _itemMonsterIndices.Clear();
 
             _context = null;
             _container = null;

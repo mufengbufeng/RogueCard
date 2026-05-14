@@ -196,7 +196,7 @@ namespace GameLogic
                     IsPlayerDead.Value = _model.IsPlayerDead;
                     break;
                 case "Monsters":
-                    Monsters.Value = _model.Monsters;
+                    Monsters.Value = SnapshotMonsters();
                     break;
                 case "Hand":
                     Hand.Value = _model.Hand;
@@ -220,6 +220,18 @@ namespace GameLogic
             return copy;
         }
 
+        /// <summary>
+        /// 把 GameModel.Monsters 拷贝为只读快照，确保怪物字段变更通知能触发 ReactiveProperty。
+        /// </summary>
+        private IReadOnlyList<MonsterRuntime> SnapshotMonsters()
+        {
+            var src = _model.Monsters;
+            if (src == null || src.Count == 0) return Array.Empty<MonsterRuntime>();
+            var copy = new MonsterRuntime[src.Count];
+            for (int i = 0; i < src.Count; i++) copy[i] = src[i];
+            return copy;
+        }
+
         private void SyncAll()
         {
             Phase.Value = _model.Phase;
@@ -230,7 +242,7 @@ namespace GameLogic
             PlayerArmor.Value = _model.PlayerArmor;
             IsLevelComplete.Value = _model.IsLevelComplete;
             IsPlayerDead.Value = _model.IsPlayerDead;
-            Monsters.Value = _model.Monsters;
+            Monsters.Value = SnapshotMonsters();
             Hand.Value = _model.Hand;
             PlayerBuffs.Value = SnapshotPlayerBuffs();
         }

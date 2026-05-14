@@ -21,7 +21,9 @@ public sealed partial class Card : Luban.BeanBase
         Desc = _buf.ReadString();
         Cost = _buf.ReadInt();
         OwnerKind = (card.OwnerKind)_buf.ReadInt();
+        CardReleaseKind = (card.CardReleaseKind)_buf.ReadInt();
         TargetMode = (card.TargetMode)_buf.ReadInt();
+        TargetCount = _buf.ReadInt();
         IsBasic = _buf.ReadBool();
         AssetId = _buf.ReadString();
     }
@@ -52,9 +54,17 @@ public sealed partial class Card : Luban.BeanBase
     /// </summary>
     public readonly card.OwnerKind OwnerKind;
     /// <summary>
+    /// 释放类型
+    /// </summary>
+    public readonly card.CardReleaseKind CardReleaseKind;
+    /// <summary>
     /// 目标模式
     /// </summary>
     public readonly card.TargetMode TargetMode;
+    /// <summary>
+    /// 目标数量
+    /// </summary>
+    public readonly int TargetCount;
     /// <summary>
     /// 基础卡牌标记
     /// </summary>
@@ -79,7 +89,9 @@ public sealed partial class Card : Luban.BeanBase
         + "desc:" + Desc + ","
         + "cost:" + Cost + ","
         + "ownerKind:" + OwnerKind + ","
+        + "cardReleaseKind:" + CardReleaseKind + ","
         + "targetMode:" + TargetMode + ","
+        + "targetCount:" + TargetCount + ","
         + "isBasic:" + IsBasic + ","
         + "assetId:" + AssetId + ","
         + "}";

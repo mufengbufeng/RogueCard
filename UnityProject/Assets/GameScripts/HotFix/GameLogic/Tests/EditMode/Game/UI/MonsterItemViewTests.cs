@@ -56,7 +56,9 @@ namespace GameLogic.Tests
             SetField(card, "Desc", string.Empty);
             SetField(card, "Cost", 1);
             SetField(card, "OwnerKind", OwnerKind.Player);
+            SetField(card, "CardReleaseKind", mode == TargetMode.SplitAcrossAll ? CardReleaseKind.Projectile : CardReleaseKind.Melee);
             SetField(card, "TargetMode", mode);
+            SetField(card, "TargetCount", mode == TargetMode.SplitAcrossAll ? 0 : 1);
             SetField(card, "IsBasic", true);
             SetField(card, "AssetId", string.Empty);
             return card;
@@ -68,6 +70,7 @@ namespace GameLogic.Tests
             SetField(eff, "Id", id);
             SetField(eff, "CardId", cardId);
             SetField(eff, "Kind", kind);
+            SetField(eff, "TriggerTiming", EffectTriggerTiming.Immediate);
             SetField(eff, "Value", value);
             SetField(eff, "Duration", duration);
             SetField(eff, "Comment", string.Empty);

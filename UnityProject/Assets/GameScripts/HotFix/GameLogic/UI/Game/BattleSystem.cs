@@ -2,16 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using EF.Event;
+using GameConfig.card;
 
 namespace GameLogic
 {
     /// <summary>
     /// 战斗系统，管理战斗阶段循环和胜负判定。
     /// </summary>
-    public class BattleSystem : IDisposable
+    public class BattleSystem : IDisposable, IBattleEventSink
     {
         private CardSystem _cardSystem;
         private MonsterSystem _monsterSystem;
+        private CardReleaseResolver _releaseResolver;
         private GameModel _model;
         private IEventPublisher _events;
         private List<GameConfig.battle.BattleWaveSpawnBatch> _currentBatches;
@@ -33,6 +35,7 @@ namespace GameLogic
         {
             _cardSystem = cardSystem;
             _monsterSystem = monsterSystem;
+            _releaseResolver = cardSystem?.ReleaseResolver;
         }
 
         /// <summary>
@@ -43,6 +46,7 @@ namespace GameLogic
         {
             _cardSystem = cardSystem;
             _monsterSystem = monsterSystem;
+            _releaseResolver = cardSystem?.ReleaseResolver;
             // monsterCardSystem 已经在 GameProcedure 中通过 monsterSystem.Initialize 注入
             _ = monsterCardSystem;
         }
@@ -108,12 +112,12 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 执行怪物回合。先 tick 玩家与所有怪物的 Buffs（处理 DoT 扣血与倒计时），
-        /// 若玩家被 DoT 击杀则立即结算并跳过怪物行动。
+        /// 执行怪物回合。先结算敌人回合开始效果，玩家死亡则立即失败；
+        /// 怪物行动后再结算敌人回合结束效果，最后进入 Check。
         /// </summary>
         private void ExecuteMonsterTurn()
         {
-            TickBuffs();
+            ResolveEnemyTurnStartEffects();
 
             if (_model.PlayerHp <= 0)
             {
@@ -123,27 +127,33 @@ namespace GameLogic
             }
 
             _monsterSystem.ExecuteTurn();
+            ResolveEnemyTurnEndEffects();
             _events.GetChannel<TurnEndedEvent>().Publish(new TurnEndedEvent());
             SetPhase(BattlePhase.Check);
         }
 
         /// <summary>
-        /// 统一 tick 玩家和所有怪物的 Buffs。
-        /// 对 DamageDot 类型的 Buff 先扣血，再把所有 Buff 的剩余回合数减 1，归零的从列表移除。
-        /// 怪物因 DoT 死亡时发布 MonsterDeathEvent。
-        /// 完成后通知 PlayerBuffs / Monsters 变化，让 UI 刷新 buff 状态条。
+        /// 兼容旧测试入口：默认按 EnemyTurnStart 结算 Buffs。
         /// </summary>
         private void TickBuffs()
         {
+            TickBuffs(EffectTriggerTiming.EnemyTurnStart);
+        }
+
+        /// <summary>
+        /// 统一 tick 指定触发时机的玩家和怪物 Buffs。
+        /// </summary>
+        private void TickBuffs(EffectTriggerTiming timing)
+        {
             int playerBuffCountBefore = _model.PlayerBuffs.Count;
-            TickActorBuffs(new PlayerActor(_model), -1);
+            TickActorBuffs(new PlayerActor(_model), timing);
 
             for (int i = 0; i < _model.Monsters.Count; i++)
             {
                 var monster = _model.Monsters[i];
                 if (monster == null) continue;
                 bool wasAlive = !monster.IsDead;
-                TickActorBuffs(monster, i);
+                TickActorBuffs(monster, timing);
                 if (wasAlive && monster.IsDead)
                 {
                     _events.GetChannel<MonsterDeathEvent>().Publish(new MonsterDeathEvent(i));
@@ -153,14 +163,14 @@ namespace GameLogic
             // 玩家 Buff 列表始终通知（DoT 扣血即使数量未变也需要刷新 RemainingTurns 文本）
             _model.NotifyPlayerBuffsChanged();
 
-            // 怪物列表通知（包括 buff RemainingTurns 变化）
-            _model.SetMonsters(new List<MonsterRuntime>(_model.Monsters));
+            // 怪物列表通知（包括 HP、护甲、buff RemainingTurns 变化）
+            _model.NotifyMonstersChanged();
         }
 
         /// <summary>
-        /// 对单个 Actor 的 Buffs 执行 Tick：DoT 扣血 + RemainingTurns 倒数 + 归零移除。
+        /// 对单个 Actor 的 Buffs 执行指定时机 Tick：DoT 扣血 + RemainingTurns 倒数 + 归零移除。
         /// </summary>
-        private static void TickActorBuffs(IBattleActor actor, int monsterIndex)
+        private static void TickActorBuffs(IBattleActor actor, EffectTriggerTiming timing)
         {
             if (actor == null) return;
             var buffs = actor.Buffs;
@@ -175,6 +185,11 @@ namespace GameLogic
                     continue;
                 }
 
+                if (!ShouldTickBuff(buff, timing))
+                {
+                    continue;
+                }
+
                 if (buff.Kind == GameConfig.card.EffectKind.DamageDot && !actor.IsDead)
                 {
                     actor.TakeDamage(buff.Value);
@@ -186,6 +201,38 @@ namespace GameLogic
                     buffs.RemoveAt(i);
                 }
             }
+        }
+
+        /// <summary>
+        /// 判断 Buff 是否应该在当前触发时机结算；Immediate 兼容旧 DoT Tick 语义，归入 EnemyTurnStart。
+        /// </summary>
+        private static bool ShouldTickBuff(BuffRuntime buff, EffectTriggerTiming timing)
+        {
+            if (buff.TriggerTiming == timing) return true;
+            return timing == EffectTriggerTiming.EnemyTurnStart
+                && buff.TriggerTiming == EffectTriggerTiming.Immediate;
+        }
+
+        /// <summary>
+        /// 结算敌人回合开始效果。
+        /// </summary>
+        private void ResolveEnemyTurnStartEffects()
+        {
+            TickBuffs(EffectTriggerTiming.EnemyTurnStart);
+            var resolver = _releaseResolver ?? _cardSystem?.ReleaseResolver;
+            resolver?.ResolveDelayedEffects(EffectTriggerTiming.EnemyTurnStart, this);
+            _model.NotifyMonstersChanged();
+        }
+
+        /// <summary>
+        /// 结算敌人回合结束效果。
+        /// </summary>
+        private void ResolveEnemyTurnEndEffects()
+        {
+            TickBuffs(EffectTriggerTiming.EnemyTurnEnd);
+            var resolver = _releaseResolver ?? _cardSystem?.ReleaseResolver;
+            resolver?.ResolveDelayedEffects(EffectTriggerTiming.EnemyTurnEnd, this);
+            _model.NotifyMonstersChanged();
         }
 
         /// <summary>
@@ -263,6 +310,29 @@ namespace GameLogic
                 maxHp: data.BaseHp);
         }
 
+        /// <inheritdoc />
+        public void OnActorDied(IBattleActor actor)
+        {
+            if (actor is MonsterRuntime monster)
+            {
+                int index = -1;
+                var list = _model.Monsters;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    if (ReferenceEquals(list[i], monster))
+                    {
+                        index = i;
+                        break;
+                    }
+                }
+
+                if (index >= 0)
+                {
+                    _events.GetChannel<MonsterDeathEvent>().Publish(new MonsterDeathEvent(index));
+                }
+            }
+        }
+
         /// <summary>
         /// 释放战斗系统资源。
         /// </summary>
@@ -270,6 +340,7 @@ namespace GameLogic
         {
             if (_isDisposed) return;
             _isDisposed = true;
+            _releaseResolver = null;
             _model = null;
             _events = null;
         }

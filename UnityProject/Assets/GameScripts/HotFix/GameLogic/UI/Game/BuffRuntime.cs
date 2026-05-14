@@ -23,6 +23,11 @@ namespace GameLogic
         public int RemainingTurns { get; set; }
 
         /// <summary>
+        /// 触发时机。Immediate 表示当前已生效的普通 Buff；EnemyTurnStart / EnemyTurnEnd 用于延迟结算。
+        /// </summary>
+        public EffectTriggerTiming TriggerTiming { get; set; } = EffectTriggerTiming.Immediate;
+
+        /// <summary>
         /// 来源施法者（用于伤害归因或反馈）。
         /// </summary>
         public IBattleActor SourceActor { get; set; }

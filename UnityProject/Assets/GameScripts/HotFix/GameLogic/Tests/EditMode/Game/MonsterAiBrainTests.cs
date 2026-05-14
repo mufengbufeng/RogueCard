@@ -21,7 +21,9 @@ namespace GameLogic.Tests.EditMode.Game
             SetReadonly(card, "Desc", string.Empty);
             SetReadonly(card, "Cost", cost);
             SetReadonly(card, "OwnerKind", OwnerKind.Monster);
+            SetReadonly(card, "CardReleaseKind", CardReleaseKind.Melee);
             SetReadonly(card, "TargetMode", TargetMode.SingleAuto);
+            SetReadonly(card, "TargetCount", 1);
             SetReadonly(card, "IsBasic", true);
             SetReadonly(card, "AssetId", string.Empty);
             return card;

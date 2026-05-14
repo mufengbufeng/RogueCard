@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using NUnit.Framework;
+using UnityEngine;
 using UnityEngine.UIElements;
 
 namespace GameLogic.Tests
@@ -91,6 +92,53 @@ namespace GameLogic.Tests
             Assert.AreEqual(0, _surface.RemoveFromPreviewLayerCallCount);
         }
 
+        [Test]
+        public void PreviewRemainsVisible_WhenPressedCardHasNotCrossedDragThreshold()
+        {
+            var dragController = CreateDragController();
+            SetPrivateField(_view, "_dragController", dragController);
+            _previewController.EnterPreview(0, new VisualElement());
+
+            dragController.OnPointerDown(handIdx: 0, visualIdx: 0, pointerId: 1, pos: new Vector2(100, 100));
+
+            ExitPreviewIfDragStarted(_view, CardInteractionState.Idle);
+
+            Assert.AreEqual(CardInteractionState.Idle, dragController.State);
+            Assert.IsTrue(_previewController.IsPreviewing);
+            Assert.AreEqual(0, _surface.RemoveFromPreviewLayerCallCount);
+        }
+
+        [Test]
+        public void PreviewExits_WhenPointerMoveTransitionsIntoDragging()
+        {
+            var dragController = CreateDragController();
+            SetPrivateField(_view, "_dragController", dragController);
+            _previewController.EnterPreview(0, new VisualElement());
+
+            dragController.OnPointerDown(handIdx: 0, visualIdx: 0, pointerId: 1, pos: new Vector2(100, 100));
+            dragController.OnPointerMove(pointerId: 1, pos: new Vector2(120, 100));
+
+            ExitPreviewIfDragStarted(_view, CardInteractionState.Idle);
+
+            Assert.AreEqual(CardInteractionState.Dragging, dragController.State);
+            Assert.IsFalse(_previewController.IsPreviewing);
+            Assert.AreEqual(1, _surface.RemoveFromPreviewLayerCallCount);
+        }
+
+        [Test]
+        public void PreviewRemainsToggleControlled_WhenCardGestureStaysWithinDragThreshold()
+        {
+            var source = AddCardItemRoot();
+            _previewController.EnterPreview(0, source);
+            Assert.IsTrue(_previewController.IsPreviewing);
+
+            ExitPreviewIfDragStarted(_view, CardInteractionState.Idle);
+            InvokeCardClickedCallback(_view, handIdx: 0);
+
+            Assert.IsFalse(_previewController.IsPreviewing);
+            Assert.AreEqual(1, _surface.RemoveFromPreviewLayerCallCount);
+        }
+
         private VisualElement AddCardItemRoot()
         {
             var cardRoot = new VisualElement();
@@ -98,6 +146,19 @@ namespace GameLogic.Tests
             var item = new CardItemView(cardRoot, handIndex: 0, card: new CardRuntime());
             GetCardItems(_view).Add(item);
             return cardRoot;
+        }
+
+        private static CardDragController CreateDragController()
+        {
+            var surface = new MockDragSurface(new CapturingDragHostCallbacks())
+            {
+                ConfiguredCardCount = 1,
+                ConfiguredHandFanWidth = 800f,
+                ConfiguredHandFanHeight = 280f,
+            };
+            var ctx = new FakeHandContext();
+            ctx.Phase.Value = BattlePhase.PlayerTurn;
+            return new CardDragController(surface, ctx, new HandFanLayoutOptions { DragThreshold = 10f });
         }
 
         private static List<CardItemView> GetCardItems(HandFanView view)
@@ -121,6 +182,27 @@ namespace GameLogic.Tests
                 BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.NotNull(method);
             return (bool)method.Invoke(view, new object[] { target });
+        }
+
+        private static void ExitPreviewIfDragStarted(HandFanView view, CardInteractionState previousState)
+        {
+            var method = typeof(HandFanView).GetMethod(
+                "ExitPreviewIfDragStarted",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(method);
+            method.Invoke(view, new object[] { previousState });
+        }
+
+        private static void InvokeCardClickedCallback(HandFanView view, int handIdx)
+        {
+            var field = typeof(HandFanView).GetField("_callbacks", BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(field);
+            var callbacks = field.GetValue(view);
+            Assert.NotNull(callbacks);
+
+            var method = callbacks.GetType().GetMethod("CardClicked", BindingFlags.Public | BindingFlags.Instance);
+            Assert.NotNull(method);
+            method.Invoke(callbacks, new object[] { handIdx });
         }
     }
 }

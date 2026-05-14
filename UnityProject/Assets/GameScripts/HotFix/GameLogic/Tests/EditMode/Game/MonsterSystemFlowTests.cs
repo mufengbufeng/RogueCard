@@ -22,7 +22,9 @@ namespace GameLogic.Tests.EditMode.Game
             SetReadonly(card, "Desc", string.Empty);
             SetReadonly(card, "Cost", cost);
             SetReadonly(card, "OwnerKind", owner);
+            SetReadonly(card, "CardReleaseKind", owner == OwnerKind.Monster ? CardReleaseKind.Melee : CardReleaseKind.Spell);
             SetReadonly(card, "TargetMode", mode);
+            SetReadonly(card, "TargetCount", 1);
             SetReadonly(card, "IsBasic", true);
             SetReadonly(card, "AssetId", string.Empty);
             return card;
@@ -34,6 +36,7 @@ namespace GameLogic.Tests.EditMode.Game
             SetReadonly(eff, "Id", id);
             SetReadonly(eff, "CardId", cardId);
             SetReadonly(eff, "Kind", kind);
+            SetReadonly(eff, "TriggerTiming", EffectTriggerTiming.Immediate);
             SetReadonly(eff, "Value", value);
             SetReadonly(eff, "Duration", duration);
             SetReadonly(eff, "Comment", string.Empty);
