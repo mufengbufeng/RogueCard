@@ -1,170 +1,138 @@
 using System.Collections.Generic;
 using GameConfig.card;
 using NUnit.Framework;
-using UnityEngine.UIElements;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameLogic.Tests
 {
     /// <summary>
-    /// PlayerStatusView 单元测试：通过 FakePlayerStatusContext 修改 ReactiveProperty.Value 触发刷新，
-    /// 验证 info-text / hp-bar-fill / hp-text / armor-text / energy-* / player-buff-bar 元素的可观察行为。
-    /// 不依赖 Unity PlayerLoop 与配置表。
+    /// UGUI PlayerStatusView 行为测试。
     /// </summary>
     [TestFixture]
-    public class PlayerStatusViewTests
+    public sealed class PlayerStatusViewTests
     {
-        private VisualElement _root;
-        private FakePlayerStatusContext _ctx;
+        private GameObject _root;
+        private FakePlayerStatusContext _context;
 
         [SetUp]
         public void SetUp()
         {
-            _root = BuildRoot();
-            _ctx = new FakePlayerStatusContext();
+            _root = UguiTestFactory.CreateRectObject("PlayerStatusRoot");
+            _context = new FakePlayerStatusContext();
+        }
+
+        [TearDown]
+        public void TearDown()
+        {
+            Object.DestroyImmediate(_root);
         }
 
         /// <summary>
-        /// 构造一棵只含 PlayerStatusView 关心的 7 个元素的最小 VisualElement 树，
-        /// 模拟 GameUxml 加载后的根节点结构。
+        /// 玩家状态变化会刷新阶段、HP、能量和护甲文本。
         /// </summary>
-        private static VisualElement BuildRoot()
+        [Test]
+        public void 状态变化_刷新文本和进度条()
         {
-            var root = new VisualElement();
-            root.Add(new Label { name = "info-text" });
-            root.Add(new VisualElement { name = "hp-bar-fill" });
-            root.Add(new Label { name = "hp-text" });
-            root.Add(new Label { name = "armor-text" });
-            root.Add(new VisualElement { name = "energy-bar-fill" });
-            root.Add(new Label { name = "energy-text" });
-            root.Add(new VisualElement { name = "player-buff-bar" });
-            return root;
+            PlayerStatusBindings bindings = CreateBindings();
+            using var view = new PlayerStatusView(bindings, _context);
+
+            _context.Phase.Value = BattlePhase.PlayerTurn;
+            _context.PlayerMaxHp.Value = 100;
+            _context.PlayerHp.Value = 30;
+            _context.PlayerArmor.Value = 5;
+            _context.MaxEnergy.Value = 3;
+            _context.Energy.Value = 2;
+
+            Assert.AreEqual("你的回合", bindings.InfoText.text);
+            Assert.AreEqual("30/100", bindings.HpText.text);
+            Assert.AreEqual(0.3f, bindings.HpFill.fillAmount, 0.001f);
+            Assert.AreEqual("5", bindings.ArmorText.text);
+            Assert.AreEqual("2/3", bindings.EnergyText.text);
+            Assert.AreEqual(2f / 3f, bindings.EnergyFill.fillAmount, 0.001f);
         }
 
+        /// <summary>
+        /// 关卡完成和玩家死亡按优先级覆盖阶段文本。
+        /// </summary>
         [Test]
-        public void HP百分比_PlayerHp变化时进度条按比例更新()
+        public void 阶段文本_关卡完成优先于玩家死亡()
         {
-            _ctx.PlayerMaxHp.Value = 100;
-            _ctx.PlayerHp.Value = 40;
+            PlayerStatusBindings bindings = CreateBindings();
+            using var view = new PlayerStatusView(bindings, _context);
 
-            var view = new PlayerStatusView(_root, _ctx);
+            _context.Phase.Value = BattlePhase.MonsterTurn;
+            _context.IsPlayerDead.Value = true;
+            _context.IsLevelComplete.Value = true;
 
-            _ctx.PlayerHp.Value = 30;
-
-            var fill = _root.Q("hp-bar-fill");
-            Assert.AreEqual(LengthUnit.Percent, fill.style.width.value.unit);
-            Assert.AreEqual(30f, fill.style.width.value.value, 0.01f);
-
-            var hpText = _root.Q<Label>("hp-text");
-            Assert.AreEqual("30/100", hpText.text);
-            view.Dispose();
+            Assert.AreEqual("关卡完成！", bindings.InfoText.text);
         }
 
+        /// <summary>
+        /// 玩家 Buff 使用模板渲染。
+        /// </summary>
         [Test]
-        public void 阶段文本_PlayerTurn映射为你的回合()
+        public void 玩家Buff_使用模板渲染()
         {
-            var view = new PlayerStatusView(_root, _ctx);
-            _ctx.Phase.Value = BattlePhase.PlayerTurn;
+            PlayerStatusBindings bindings = CreateBindings();
+            using var view = new PlayerStatusView(bindings, _context);
 
-            Assert.AreEqual("你的回合", _root.Q<Label>("info-text").text);
-            view.Dispose();
+            _context.PlayerBuffs.Value = new[]
+            {
+                new BuffRuntime { Kind = EffectKind.DamageDot, Value = 4, RemainingTurns = 2 },
+            };
+
+            Assert.AreEqual(1, RuntimeChildCount(bindings.PlayerBuffBar, bindings.BuffIconTemplate));
+            TextMeshProUGUI text = bindings.PlayerBuffBar.GetComponentInChildren<TextMeshProUGUI>(false);
+            Assert.AreEqual("4×2", text.text);
         }
 
+        /// <summary>
+        /// Dispose 后不再响应上下文变化。
+        /// </summary>
         [Test]
-        public void 阶段文本_关卡完成优先于Phase()
+        public void Dispose后_不再刷新()
         {
-            var view = new PlayerStatusView(_root, _ctx);
-            _ctx.Phase.Value = BattlePhase.MonsterTurn;
-            _ctx.IsLevelComplete.Value = true;
-
-            Assert.AreEqual("关卡完成！", _root.Q<Label>("info-text").text);
+            PlayerStatusBindings bindings = CreateBindings();
+            var view = new PlayerStatusView(bindings, _context);
             view.Dispose();
-        }
 
-        [Test]
-        public void 阶段文本_玩家死亡次优()
-        {
-            var view = new PlayerStatusView(_root, _ctx);
-            _ctx.Phase.Value = BattlePhase.PlayerTurn;
-            _ctx.IsPlayerDead.Value = true;
+            _context.PlayerMaxHp.Value = 100;
+            _context.PlayerHp.Value = 10;
 
-            Assert.AreEqual("玩家死亡", _root.Q<Label>("info-text").text);
-            view.Dispose();
-        }
-
-        [Test]
-        public void 护甲文本_零时显示零()
-        {
-            var view = new PlayerStatusView(_root, _ctx);
-            _ctx.PlayerArmor.Value = 0;
-
-            // 触发 RefreshInfo —— 护甲字段需要主动变化（已在 SetUp 时为 0，需要先设非零再回零）
-            _ctx.PlayerArmor.Value = 5;
-            _ctx.PlayerArmor.Value = 0;
-            Assert.AreEqual("0", _root.Q<Label>("armor-text").text);
-            view.Dispose();
-        }
-
-        [Test]
-        public void 护甲文本_大于零时显示数值()
-        {
-            var view = new PlayerStatusView(_root, _ctx);
-            _ctx.PlayerArmor.Value = 7;
-
-            Assert.AreEqual("7", _root.Q<Label>("armor-text").text);
-            view.Dispose();
-        }
-
-        [Test]
-        public void 空Buff列表_清空容器()
-        {
-            // 预填一个 child，验证刷新会清空
-            _root.Q("player-buff-bar").Add(new Label("stale"));
-
-            var view = new PlayerStatusView(_root, _ctx);
-            _ctx.PlayerBuffs.Value = new List<BuffRuntime>();
-
-            Assert.AreEqual(0, _root.Q("player-buff-bar").childCount);
-            view.Dispose();
-        }
-
-        [Test]
-        public void DoT_Buff渲染_含dot类与文本()
-        {
-            var view = new PlayerStatusView(_root, _ctx);
-            var buff = new BuffRuntime { Kind = EffectKind.DamageDot, Value = 4, RemainingTurns = 2 };
-            _ctx.PlayerBuffs.Value = new List<BuffRuntime> { buff };
-
-            var bar = _root.Q("player-buff-bar");
-            Assert.AreEqual(1, bar.childCount);
-            var icon = bar[0] as Label;
-            Assert.NotNull(icon);
-            Assert.IsTrue(icon.ClassListContains("buff-icon"));
-            Assert.IsTrue(icon.ClassListContains("buff-icon-dot"));
-            Assert.AreEqual("4×2", icon.text);
-            view.Dispose();
-        }
-
-        [Test]
-        public void Dispose后_PlayerHp变化不再触发刷新()
-        {
-            _ctx.PlayerMaxHp.Value = 100;
-            var view = new PlayerStatusView(_root, _ctx);
-            // 触发首次同步：当前 HP=0/100
-            _ctx.PlayerHp.Value = 50;
-            string before = _root.Q<Label>("hp-text").text;
-
-            view.Dispose();
-            _ctx.PlayerHp.Value = 25;
-
-            Assert.AreEqual(before, _root.Q<Label>("hp-text").text);
-        }
-
-        [Test]
-        public void 重复Dispose_安全()
-        {
-            var view = new PlayerStatusView(_root, _ctx);
-            view.Dispose();
+            Assert.AreNotEqual("10/100", bindings.HpText.text);
             Assert.DoesNotThrow(() => view.Dispose());
+        }
+
+        private PlayerStatusBindings CreateBindings()
+        {
+            RectTransform buffBar = UguiTestFactory.CreateRectObject("PlayerBuffBar", _root.transform).GetComponent<RectTransform>();
+            return new PlayerStatusBindings
+            {
+                InfoText = UguiTestFactory.CreateText("InfoText", _root.transform),
+                HpFill = UguiTestFactory.CreateImage("PlayerHpFill", _root.transform),
+                HpText = UguiTestFactory.CreateText("PlayerHpText", _root.transform),
+                ArmorText = UguiTestFactory.CreateText("PlayerArmorText", _root.transform),
+                EnergyFill = UguiTestFactory.CreateImage("PlayerEnergyFill", _root.transform),
+                EnergyText = UguiTestFactory.CreateText("PlayerEnergyText", _root.transform),
+                PlayerBuffBar = buffBar,
+                BuffIconTemplate = UguiTestFactory.CreateIconTemplate("BuffIconTemplate", buffBar),
+            };
+        }
+
+        private static int RuntimeChildCount(RectTransform parent, GameObject template)
+        {
+            int count = 0;
+            for (int i = 0; i < parent.childCount; i++)
+            {
+                if (parent.GetChild(i).gameObject != template)
+                {
+                    count++;
+                }
+            }
+
+            return count;
         }
     }
 }

@@ -5,7 +5,7 @@ namespace GameLogic
 {
     /// <summary>
     /// 玩家状态面板所需的 ViewModel 切片接口。
-    /// 仅暴露 PlayerStatusView 所需的 9 个 ReactiveProperty，避免子模块越界访问 Hand / Monsters 等其它字段。
+    /// 仅暴露玩家状态 UI 所需的 9 个 ReactiveProperty，避免子模块越界访问 Hand / Monsters 等其它字段。
     /// 由 GameViewModel 显式实现；测试时可由 Fake 实现替代。
     /// </summary>
     public interface IPlayerStatusContext

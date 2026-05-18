@@ -163,6 +163,57 @@ namespace GameLogic.Tests.EditMode.Game
         }
 
         [Test]
+        public void CardPlayed_自动结束玩家回合_不Tick敌人回合开始或结束的Buff()
+        {
+            var (battle, model, bus, cardSystem, monsterSystem) = CreateBattleWithSystems();
+            try
+            {
+                var monster = new MonsterRuntime { Hp = 0, MaxHp = 30 };
+                monster.AddBuff(new BuffRuntime
+                {
+                    Kind = EffectKind.DamageDot,
+                    TriggerTiming = EffectTriggerTiming.EnemyTurnStart,
+                    Value = 99,
+                    RemainingTurns = 2,
+                });
+                model.SetMonsters(new List<MonsterRuntime> { monster });
+
+                int beforeHp = model.PlayerHp;
+                model.PlayerBuffs.Add(new BuffRuntime
+                {
+                    Kind = EffectKind.DamageDot,
+                    TriggerTiming = EffectTriggerTiming.EnemyTurnStart,
+                    Value = 5,
+                    RemainingTurns = 2,
+                });
+                model.PlayerBuffs.Add(new BuffRuntime
+                {
+                    Kind = EffectKind.DamageDot,
+                    TriggerTiming = EffectTriggerTiming.EnemyTurnEnd,
+                    Value = 5,
+                    RemainingTurns = 2,
+                });
+                model.SetPhase(BattlePhase.PlayerTurn);
+
+                bus.GetChannel<CardPlayedEvent>().Publish(new CardPlayedEvent(1));
+
+                Assert.AreEqual(BattlePhase.Check, model.Phase);
+                Assert.AreEqual(0, monsterSystem.ExecuteTurnCallCount, "自动结束玩家回合不应执行怪物行动");
+                Assert.AreEqual(beforeHp, model.PlayerHp, "EnemyTurnStart DoT 不应被 Tick");
+                Assert.AreEqual(2, model.PlayerBuffs.Count, "EnemyTurnStart/End Buff 都不应被消耗");
+                Assert.AreEqual(2, model.PlayerBuffs[0].RemainingTurns);
+                Assert.AreEqual(2, model.PlayerBuffs[1].RemainingTurns);
+                Assert.AreEqual(2, monster.Buffs[0].RemainingTurns, "怪物身上的 EnemyTurnStart DoT 也不应被 Tick");
+            }
+            finally
+            {
+                battle.Dispose();
+                cardSystem.Dispose();
+                bus.Dispose();
+            }
+        }
+
+        [Test]
         public void EndTurn_EnemyTurnEnd在怪物行动后结算并进入Check()
         {
             var (battle, model, bus, cardSystem, monsterSystem) = CreateBattleWithSystems();

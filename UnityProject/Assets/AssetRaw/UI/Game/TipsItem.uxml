@@ -1,8 +1,0 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements">
-    <Style src="../Shared/SharedStyles.uss" />
-    <Style src="GameUss.uss" />
-
-    <ui:VisualElement name="TipsItem" class="tips-item">
-        <ui:Label name="tips-text" text="" class="label-tips" />
-    </ui:VisualElement>
-</ui:UXML>

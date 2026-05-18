@@ -1,192 +1,251 @@
 using System;
 using System.Collections.Generic;
 using GameConfig.card;
-using UnityEngine.UIElements;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameLogic
 {
     /// <summary>
-    /// 单只怪物的视图控制器。封装名称 / HP 进度条与文本（含护甲附加） / PendingCard 意图渲染 / Buff 状态条。
-    /// 不订阅 ReactiveProperty —— MonsterRuntime 是一次性快照，调用方在外部刷新时整体重建。
-    /// IDisposable 仅作为生命周期约定，留接口给后续 change 扩展（如 SetTargetSelectable）。
+    /// 单只怪物的 UGUI 项视图，渲染名称、血量、护甲、意图和 Buff。
     /// </summary>
-    public class MonsterItemView : IDisposable
+    public sealed class MonsterItemView : IDisposable
     {
         /// <summary>
-        /// EditMode 测试钩子：覆盖默认的 effects 解析逻辑。
-        /// 默认从 `GameLogicEntry.Config.Tables.TbCardEffect.DataList` 按 CardId 收集；
-        /// 测试中通过此委托注入手工构造的 effect 列表，避免依赖静态配置加载。
-        /// 生产代码 SHALL NOT 设置此字段。
+        /// 测试钩子：覆盖默认卡牌效果解析，避免测试依赖配置表。
         /// </summary>
         public static Func<Card, List<CardEffect>> EffectResolverOverride { get; set; }
 
-        private VisualElement _root;
+        private MonsterItemBindings _bindings;
         private bool _disposed;
 
         /// <summary>
-        /// 怪物项根节点（CloneTree 后从 TemplateContainer 中分离的真正容器）。
-        /// 由 MonsterListView 添加到 monster-container，对应 UXML 的 monster-item 模板。
+        /// 怪物项根对象。
         /// </summary>
-        public VisualElement Root => _root;
+        public GameObject Root { get; private set; }
 
         /// <summary>
-        /// 构造单只怪物视图并完成全部渲染。
+        /// 怪物在原始 Monsters 列表中的索引。
         /// </summary>
-        /// <param name="root">已经 CloneTree 的怪物项根节点（含 name-text / hp-bar / hp-text / intent-container / buff-bar 子元素）。</param>
-        /// <param name="monster">怪物运行时数据；null 时不做任何渲染（防御性）。</param>
-        /// <param name="aliveMonsterCount">当前存活怪物数；供 SplitAcrossAll 类卡牌平分伤害文本计算。</param>
-        public MonsterItemView(VisualElement root, MonsterRuntime monster, int aliveMonsterCount)
-        {
-            _root = root;
-            if (_root == null || monster == null) return;
+        public int MonsterIndex { get; }
 
+        /// <summary>
+        /// 是否处于可选择目标视觉态。
+        /// </summary>
+        public bool IsTargetSelectable { get; private set; }
+
+        /// <summary>
+        /// 怪物点击事件，参数为原始怪物索引。
+        /// </summary>
+        public event Action<int> Clicked;
+
+        /// <summary>
+        /// 创建怪物项视图并渲染。
+        /// </summary>
+        public MonsterItemView(GameObject root, MonsterRuntime monster, int monsterIndex, int aliveMonsterCount, GameObject buffTemplate, GameObject intentTemplate)
+        {
+            Root = root;
+            MonsterIndex = monsterIndex;
+            _bindings = MonsterItemBindings.From(root, buffTemplate, intentTemplate);
             Render(monster, aliveMonsterCount);
+
+            if (_bindings.Button != null)
+            {
+                _bindings.Button.onClick.AddListener(OnClicked);
+            }
         }
 
         /// <summary>
-        /// 渲染怪物所有视觉元素。HP 进度条按百分比，文本含护甲附加，intent-container 与 buff-bar 全量重建。
+        /// 切换目标选择高亮。
         /// </summary>
+        public void SetTargetSelectable(bool selectable)
+        {
+            IsTargetSelectable = selectable;
+            if (_bindings.TargetHighlight != null)
+            {
+                _bindings.TargetHighlight.SetActive(selectable);
+            }
+        }
+
+        /// <summary>
+        /// 释放按钮事件。
+        /// </summary>
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            if (_bindings.Button != null)
+            {
+                _bindings.Button.onClick.RemoveListener(OnClicked);
+            }
+
+            Clicked = null;
+            Root = null;
+            _bindings = default;
+        }
+
         private void Render(MonsterRuntime monster, int aliveMonsterCount)
         {
-            // 兼容旧 intent-text 标签（清空，避免遗留文本影响新意图区显示）
-            var legacyIntent = _root.Q<Label>("intent-text");
-            if (legacyIntent != null) legacyIntent.text = string.Empty;
-
-            // 名称
-            var nameLabel = _root.Q<Label>("name-text");
-            if (nameLabel != null && monster.Config != null)
+            if (monster == null)
             {
-                nameLabel.text = monster.Config.Name;
+                return;
             }
 
-            // HP 进度条
-            var hpBar = _root.Q("hp-bar");
-            if (hpBar != null && monster.MaxHp > 0)
+            UguiViewUtil.SetText(_bindings.NameText, monster.Config != null ? monster.Config.Name : $"怪物{MonsterIndex + 1}");
+            UguiViewUtil.SetText(_bindings.HpText, monster.Armor > 0 ? $"{monster.Hp}/{monster.MaxHp} 护甲:{monster.Armor}" : $"{monster.Hp}/{monster.MaxHp}");
+
+            float? hpRatio = UguiViewUtil.SafeRatio(monster.Hp, monster.MaxHp);
+            if (hpRatio.HasValue)
             {
-                float hpPercent = (float)monster.Hp / monster.MaxHp;
-                hpBar.style.width = new StyleLength(new Length(hpPercent * 100, LengthUnit.Percent));
+                UguiViewUtil.SetFillAmount(_bindings.HpFill, hpRatio.Value);
             }
 
-            // HP 文本（含护甲附加）
-            var hpText = _root.Q<Label>("hp-text");
-            if (hpText != null)
-            {
-                string hpStr = $"HP:{monster.Hp}/{monster.MaxHp}";
-                if (monster.Armor > 0) hpStr += $" 护甲:{monster.Armor}";
-                hpText.text = hpStr;
-            }
-
-            // PendingCards 意图：每张卡一个 .intent-card，内部按 effects 渲染 .intent-icon
-            var intentContainer = _root.Q("intent-container");
-            if (intentContainer != null)
-            {
-                intentContainer.Clear();
-                if (monster.PendingCards != null)
-                {
-                    foreach (var card in monster.PendingCards)
-                    {
-                        RenderIntentCard(intentContainer, card, aliveMonsterCount);
-                    }
-                }
-            }
-
-            // Buff 状态条（共享渲染规则）
-            var buffBar = _root.Q("buff-bar");
-            BuffBarRenderer.Render(buffBar, monster.Buffs);
+            RenderIntents(monster, aliveMonsterCount);
+            BuffIconRenderer.Render(_bindings.BuffBar, _bindings.BuffIconTemplate, monster.Buffs);
+            SetTargetSelectable(false);
         }
 
-        /// <summary>
-        /// 把一张 PendingCard 的 effects 列表渲染到 intent-container 中：
-        /// 每张卡一个 .intent-card，每条 effect 一个 .intent-icon，按 EffectKind 加颜色类与文本格式。
-        /// SplitAcrossAll + Damage 时按 max(1, value/aliveCount) 显示平分伤害。
-        /// </summary>
-        private static void RenderIntentCard(VisualElement intentContainer, Card card, int aliveMonsterCount)
+        private void RenderIntents(MonsterRuntime monster, int aliveMonsterCount)
         {
-            if (intentContainer == null || card == null) return;
-
-            var effects = ResolveCardEffects(card);
-            if (effects.Count == 0) return;
-
-            var intentCard = new VisualElement
+            if (_bindings.IntentBar == null)
             {
-                pickingMode = PickingMode.Ignore
-            };
-            intentCard.AddToClassList("intent-card");
-
-            bool isSplit = card.TargetMode == TargetMode.SplitAcrossAll;
-
-            foreach (var effect in effects)
-            {
-                var icon = new Label
-                {
-                    pickingMode = PickingMode.Ignore
-                };
-                icon.AddToClassList("intent-icon");
-
-                int displayValue = effect.Value;
-                if (isSplit && effect.Kind == EffectKind.Damage && aliveMonsterCount > 0)
-                {
-                    displayValue = Math.Max(1, effect.Value / aliveMonsterCount);
-                }
-
-                switch (effect.Kind)
-                {
-                    case EffectKind.Damage:
-                        icon.AddToClassList("intent-icon-damage");
-                        icon.text = displayValue.ToString();
-                        break;
-                    case EffectKind.Shield:
-                        icon.AddToClassList("intent-icon-shield");
-                        icon.text = displayValue.ToString();
-                        break;
-                    case EffectKind.DamageDot:
-                        icon.AddToClassList("intent-icon-dot");
-                        icon.text = $"{displayValue}×{effect.Duration}";
-                        break;
-                    case EffectKind.EnergyGain:
-                        icon.AddToClassList("intent-icon-energy");
-                        icon.text = $"+{displayValue}";
-                        break;
-                    default:
-                        icon.text = displayValue.ToString();
-                        break;
-                }
-
-                intentCard.Add(icon);
+                return;
             }
 
-            intentContainer.Add(intentCard);
+            UguiViewUtil.ClearChildren(_bindings.IntentBar, _bindings.IntentIconTemplate);
+            if (_bindings.IntentIconTemplate == null || monster.PendingCards == null)
+            {
+                return;
+            }
+
+            int iconIndex = 0;
+            foreach (Card card in monster.PendingCards)
+            {
+                if (card == null)
+                {
+                    continue;
+                }
+
+                var effects = ResolveCardEffects(card);
+                foreach (CardEffect effect in effects)
+                {
+                    GameObject icon = UguiViewUtil.InstantiateTemplate(_bindings.IntentIconTemplate, _bindings.IntentBar, $"IntentIcon_{iconIndex++}");
+                    BuffIconRenderer.RenderIcon(icon, GetIntentText(card, effect, aliveMonsterCount), effect.Kind);
+                }
+            }
         }
 
-        /// <summary>
-        /// 收集指定卡的全部 CardEffect 行（按表中顺序）。
-        /// 配置表缺失时（编辑器/测试边界）返回空列表，调用方按"无意图"处理。
-        /// </summary>
+        private static string GetIntentText(Card card, CardEffect effect, int aliveMonsterCount)
+        {
+            int displayValue = effect.Value;
+            if (effect.Kind == EffectKind.Damage && card.TargetMode == TargetMode.SplitAcrossAll && aliveMonsterCount > 0)
+            {
+                displayValue = Math.Max(1, effect.Value / aliveMonsterCount);
+            }
+
+            return effect.Kind == EffectKind.DamageDot
+                ? $"{displayValue}×{effect.Duration}"
+                : displayValue.ToString();
+        }
+
         private static List<CardEffect> ResolveCardEffects(Card card)
         {
-            if (card == null) return new List<CardEffect>();
+            if (card == null)
+            {
+                return new List<CardEffect>();
+            }
 
-            // 测试钩子优先于默认解析（仅 EditMode 测试场景设置）
-            var overrideFunc = EffectResolverOverride;
-            if (overrideFunc != null) return overrideFunc(card);
+            Func<Card, List<CardEffect>> overrideFunc = EffectResolverOverride;
+            if (overrideFunc != null)
+            {
+                return overrideFunc(card) ?? new List<CardEffect>();
+            }
 
             var result = new List<CardEffect>();
             var tables = GameLogicEntry.Config?.Tables;
-            if (tables == null) return result;
-
-            foreach (var effect in tables.TbCardEffect.DataList)
+            if (tables == null)
             {
-                if (effect.CardId == card.Id) result.Add(effect);
+                return result;
             }
+
+            foreach (CardEffect effect in tables.TbCardEffect.DataList)
+            {
+                if (effect.CardId == card.Id)
+                {
+                    result.Add(effect);
+                }
+            }
+
             return result;
         }
 
-        /// <inheritdoc />
-        public void Dispose()
+        private void OnClicked()
         {
-            if (_disposed) return;
-            _disposed = true;
-            _root = null;
+            Clicked?.Invoke(MonsterIndex);
+        }
+    }
+
+    /// <summary>
+    /// 怪物项 UGUI 绑定。
+    /// </summary>
+    internal struct MonsterItemBindings
+    {
+        public TextMeshProUGUI NameText;
+        public Image HpFill;
+        public TextMeshProUGUI HpText;
+        public RectTransform IntentBar;
+        public RectTransform BuffBar;
+        public Button Button;
+        public GameObject TargetHighlight;
+        public GameObject BuffIconTemplate;
+        public GameObject IntentIconTemplate;
+
+        /// <summary>
+        /// 从根对象按约定名称解析绑定。
+        /// </summary>
+        public static MonsterItemBindings From(GameObject root, GameObject buffTemplate, GameObject intentTemplate)
+        {
+            return new MonsterItemBindings
+            {
+                NameText = UguiViewUtil.FindText(root, "NameText") ?? UguiViewUtil.FindText(root, "MonsterNameText"),
+                HpFill = UguiViewUtil.FindImage(root, "HpFill") ?? UguiViewUtil.FindImage(root, "MonsterHpFill"),
+                HpText = UguiViewUtil.FindText(root, "HpText") ?? UguiViewUtil.FindText(root, "MonsterHpText"),
+                IntentBar = FindRect(root, "IntentBar"),
+                BuffBar = FindRect(root, "BuffBar"),
+                Button = root != null ? root.GetComponent<Button>() ?? root.GetComponentInChildren<Button>(true) : null,
+                TargetHighlight = FindGameObject(root, "TargetHighlight"),
+                BuffIconTemplate = buffTemplate,
+                IntentIconTemplate = intentTemplate,
+            };
+        }
+
+        private static RectTransform FindRect(GameObject root, string name)
+        {
+            GameObject target = FindGameObject(root, name);
+            return target != null ? target.GetComponent<RectTransform>() : null;
+        }
+
+        private static GameObject FindGameObject(GameObject root, string name)
+        {
+            if (root == null)
+            {
+                return null;
+            }
+
+            foreach (Transform transform in root.GetComponentsInChildren<Transform>(true))
+            {
+                if (string.Equals(transform.gameObject.name, name, StringComparison.Ordinal))
+                {
+                    return transform.gameObject;
+                }
+            }
+
+            return null;
         }
     }
 }

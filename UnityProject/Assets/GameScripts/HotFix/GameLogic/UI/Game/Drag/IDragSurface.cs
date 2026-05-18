@@ -6,7 +6,7 @@ namespace GameLogic
     /// <summary>
     /// 拖拽控制器与 UI 副作用的边界。CardDragController 通过此接口操作 ghost、占位卡、卡牌 transform、
     /// pointer capture、worldBound 命中等所有 UI 行为，便于在测试中用 MockDragSurface 记录调用序列。
-    /// 生产实现位于 HandFanView 内部，封装 _handFan / _dropZone / _previewLayer / _cardItems 引用。
+    /// 生产实现由具体 UGUI 适配层提供，封装手牌容器、出牌区域和拖拽 ghost 引用。
     /// </summary>
     public interface IDragSurface
     {
@@ -18,25 +18,25 @@ namespace GameLogic
         /// <summary>取第 cardIdx 张卡的 worldBound（命中检测、insertSlot 计算用）。</summary>
         Rect GetCardWorldBound(int cardIdx);
 
-        /// <summary>把扇形布局结果应用到第 cardIdx 张卡的 inline style（left/top/translate/rotate）。</summary>
+        /// <summary>把扇形布局结果应用到第 cardIdx 张卡的视觉变换。</summary>
         void ApplyFanTransform(int cardIdx, FanSlotAssignment slot);
 
-        /// <summary>设置第 cardIdx 张卡的 opacity（0=隐藏、1=完全可见、null=恢复 USS 默认）。</summary>
+        /// <summary>设置第 cardIdx 张卡的透明度（0=隐藏、1=完全可见）。</summary>
         void SetCardOpacity(int cardIdx, float opacity);
 
         /// <summary>
-        /// 重置第 cardIdx 张卡的 opacity 为 USS 默认值（StyleKeyword.Null 等价）。
+        /// 重置第 cardIdx 张卡的透明度为适配层默认值。
         /// 单独提供方法以便 mock 区分"重置"与"显式设 0/1"调用。
         /// </summary>
         void ResetCardOpacity(int cardIdx);
 
-        /// <summary>设置第 cardIdx 张卡的 pickingMode（true=Position 可点、false=Ignore 不抢点击）。</summary>
+        /// <summary>设置第 cardIdx 张卡是否可接收指针点击。</summary>
         void SetCardPickingMode(int cardIdx, bool pickable);
 
-        /// <summary>设置第 cardIdx 张卡的 inline transitionDuration（秒）。0=立即生效，0.15=回弹动画。</summary>
+        /// <summary>设置第 cardIdx 张卡的过渡时长（秒）。0=立即生效，0.15=回弹动画。</summary>
         void SetCardTransitionDuration(int cardIdx, float seconds);
 
-        /// <summary>清除第 cardIdx 张卡的 inline transitionDuration，让 USS 默认生效。</summary>
+        /// <summary>清除第 cardIdx 张卡的过渡时长，让适配层默认值生效。</summary>
         void ClearCardTransitionDuration(int cardIdx);
 
         /// <summary>调整 _cardItems 列表顺序：把 from 位置的卡移到 to 位置（仅 UI 层）。</summary>
@@ -87,7 +87,7 @@ namespace GameLogic
 
         // ── 调度（用于 ReboundDurationMs 延迟回弹）──
 
-        /// <summary>延迟 delayMs 毫秒后执行 action。生产用 VisualElement.schedule.Execute。</summary>
+        /// <summary>延迟 delayMs 毫秒后执行 action。生产可用计时器或 UI 适配层调度。</summary>
         void Schedule(Action action, long delayMs);
 
         // ── PointerCapture ──
@@ -100,7 +100,7 @@ namespace GameLogic
 
         // ── 上层回调 ──
 
-        /// <summary>拖拽控制器抛事件给 HandFanView 的桥。</summary>
+        /// <summary>拖拽控制器抛事件给上层 UI 适配器的桥。</summary>
         IDragHostCallbacks Callbacks { get; }
     }
 }

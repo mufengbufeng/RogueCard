@@ -26,7 +26,7 @@ namespace GameLogic
         private int _capturedPointerId = -1;
         private bool _disposed;
 
-        /// <summary>当前状态机状态（只读，HandFanView 可查询是否处于 Dragging 等）。</summary>
+        /// <summary>当前状态机状态（只读，上层 UGUI 适配器可查询是否处于 Dragging 等）。</summary>
         public CardInteractionState State => _state;
 
         /// <summary>当前 Drag 子态（仅 State == Dragging 时有效）。</summary>
@@ -118,8 +118,8 @@ namespace GameLogic
 
                         if (needsManualTarget)
                         {
-                            // 保留 ghost：所有权转移到上层 TargetSelector（change 3）
-                            // 不调 ExitDragging（保留 ghost），但仍需复位 inline transitionDuration / opacity / picking
+                            // 保留 ghost：所有权转移到上层目标选择适配器。
+                            // 不调 ExitDragging（保留 ghost），但仍需复位过渡时长、透明度和指针命中状态。
                             ReleasePointerCapture(visualIdx, pointerId);
                             _surface.SetDropZoneActive(false);
                             // 通知上层 + 状态机内部归位（ghost 由上层接管）
@@ -192,13 +192,13 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 外部触发的协同回弹（由 HandFanView.RequestGhostRebound 调用，typically 来自 TargetSelector.Cancel）。
+        /// 外部触发的协同回弹（由上层 UGUI 适配器调用，typically 来自目标选择取消）。
         /// 复用 StartReboundAnimation：立即销毁 ghost、被拖卡 opacity 恢复、其他卡 transition 0.15s 回到 N 张布局，
         /// ReboundDurationMs 后 ExitDragging 完成清理。
-        /// 适用场景：SingleManual 卡 dropped on zone 后 ghost 仍在屏幕上，TargetSelector 取消 → 需触发协同回弹。
+        /// 适用场景：SingleManual 卡 dropped on zone 后 ghost 仍在屏幕上，目标选择取消 → 需触发协同回弹。
         /// 调用时控制器状态可能为 Idle（内部会暂时切到 Dragging 让回弹流程跑完）。
         /// </summary>
-        /// <param name="visualIdx">被拖卡当前在 _cardItems 中的视觉索引（HandFanView 通过 handIdx 查得）。</param>
+        /// <param name="visualIdx">被拖卡当前在 UI 列表中的视觉索引。</param>
         public void BeginExternalRebound(int visualIdx)
         {
             if (_disposed) return;
@@ -218,7 +218,7 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 外部触发的 ghost 立即销毁（由 HandFanView.RequestGhostCleanup 调用，typically 来自 TargetSelector 确认怪物点击）。
+        /// 外部触发的 ghost 立即销毁（由上层 UGUI 适配器调用，typically 来自目标选择确认）。
         /// 不触发回弹动画——仅销毁 ghost；卡牌 visual state 由后续 Hand.Changed 触发 RefreshCards 自然重建。
         /// </summary>
         public void RequestGhostCleanup()
@@ -256,7 +256,7 @@ namespace GameLogic
             int activeIdx = _activeVisualIndex;
             int n = _surface.CardCount;
 
-            // 拖拽中其他卡的 transform 变更必须立即生效（无 transition），用 inline style 而非 USS class
+            // 拖拽中其他卡的 transform 变更必须立即生效（无过渡）。
             for (int i = 0; i < n; i++)
             {
                 _surface.SetCardTransitionDuration(i, 0f);

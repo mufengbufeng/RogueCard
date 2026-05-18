@@ -105,7 +105,9 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 推进到下一波次，所有波次完成则发布关卡完成事件。
+        /// 推进到下一波次，所有波次完成则在本地事件总线发布关卡完成事件。
+        /// 关卡完成不再向全局 StartLevelRequestedEvent 复用发布，避免 MainMenuProcedure 误把它当成"再来一关"。
+        /// 关卡完成后切回主菜单流程由 GameProcedure 订阅 <see cref="LevelCompleteEvent"/> 完成。
         /// </summary>
         private void AdvanceToNextWave()
         {
@@ -118,12 +120,6 @@ namespace GameLogic
 
             _model.SetLevelComplete(true);
             _events.GetChannel<LevelCompleteEvent>().Publish(new LevelCompleteEvent(_levelId));
-
-            var globalHub = GameLogicEntry.Event;
-            if (globalHub != null)
-            {
-                globalHub.StartLevelRequestedEvent.Publish(new StartLevelRequestedEvent(_levelId, ""));
-            }
         }
 
         private void OnBattleEnded(BattleEndedEvent e)

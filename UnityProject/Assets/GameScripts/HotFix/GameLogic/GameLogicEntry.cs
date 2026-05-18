@@ -12,7 +12,7 @@ using EF.Sound;
 using EF.Timer;
 using EF.UI;
 using UnityEngine;
-using UnityEngine.UIElements;
+using UnityEngine.UI;
 using GameConfig;
 
 namespace GameLogic
@@ -24,7 +24,7 @@ namespace GameLogic
     {
         private static IResourceManager _resourceManager;
         private static EventHub _eventHub;
-        private static INavigator _navigator;
+        private static IUIManager _uiManager;
         private static ISoundManager _soundManager;
         private static ITimerManager _timerManager;
         private static IObjectPoolManager _objectPoolManager;
@@ -47,9 +47,9 @@ namespace GameLogic
         public static EventHub Event => _eventHub;
 
         /// <summary>
-        /// 导航服务。
+        /// UI 管理器。
         /// </summary>
-        public static INavigator Navigator => _navigator;
+        public static IUIManager UI => _uiManager;
 
         /// <summary>
         /// 音频管理器。
@@ -120,81 +120,167 @@ namespace GameLogic
             _saveManager = ModuleSystem.Get<ISaveManager>();
             _entityManager = ModuleSystem.Get<IEntityManager>();
             _modelManager = ModuleSystem.Get<ModelManager>();
+            _uiManager = ModuleSystem.Get<IUIManager>();
 
-            InitializeNavigator();
+            InitializeUI();
             InitializeProcedures();
 
             Log.Info("[GameLogicEntry] 游戏逻辑初始化完成。");
         }
 
         /// <summary>
-        /// 初始化导航服务：找到场景中的 UIDocument、构造 Shell（从 rootVisualElement 解析层级）、
-        /// 注册所有 Screen、创建 Navigator。
-        ///
-        /// UIDocument 必须配置 SourceAsset = Root.uxml（推荐），或场景外部已经把 Root.uxml 内容
-        /// 添加到了 rootVisualElement 下。Root.uxml 必须包含 screen-layer / popup-layer / system-layer
-        /// 三个命名 VisualElement。
+        /// 初始化 UGUI 层级根节点。
         /// </summary>
-        private static void InitializeNavigator()
+        internal static void InitializeUI()
         {
-            var uiDocument = Object.FindFirstObjectByType<UIDocument>();
-            if (uiDocument == null)
+            var entryGo = GameObject.Find("Entry");
+            if (entryGo == null)
             {
-                Log.Error("[GameLogicEntry] 场景中未找到 UIDocument 组件，无法初始化导航服务。"
-                          + "请在启动场景中放置一个带 UIDocument 的 GameObject。");
+                Log.Error("[GameLogicEntry] 场景中未找到 Entry 节点，无法注册 UGUI 层级。");
                 return;
             }
 
-            var root = uiDocument.rootVisualElement;
+            var rc = entryGo.GetComponent<ReferenceCollector>();
+            if (rc == null)
+            {
+                Log.Error("[GameLogicEntry] Entry 节点缺少 ReferenceCollector，无法注册 UGUI 层级。");
+                return;
+            }
+
+            var uiCamera = rc.Get<GameObject>("UICamera");
+            if (uiCamera != null)
+            {
+                _uiCamera = uiCamera.GetComponent<Camera>();
+            }
+
+            bool hasBackground = RegisterLayerRoot(rc, UILayer.Background, "Background");
+            bool hasNormal = RegisterLayerRoot(rc, UILayer.Normal, "Normal");
+            bool hasPopup = RegisterLayerRoot(rc, UILayer.Popup, "Popup");
+            bool hasOverlay = RegisterLayerRoot(rc, UILayer.Overlay, "Overlay");
+
+            var uiRoot = rc.Get<GameObject>("UIRoot");
+            if (uiRoot != null)
+            {
+                EnsureCanvasRoot(uiRoot);
+                _uiManager.SetFallbackRoot(uiRoot.transform);
+
+                if (!hasBackground)
+                {
+                    RegisterLayerRoot(UILayer.Background, EnsureLayerRoot(uiRoot.transform, "Background"));
+                }
+
+                if (!hasNormal)
+                {
+                    RegisterLayerRoot(UILayer.Normal, EnsureLayerRoot(uiRoot.transform, "Normal"));
+                }
+
+                if (!hasPopup)
+                {
+                    RegisterLayerRoot(UILayer.Popup, EnsureLayerRoot(uiRoot.transform, "Popup"));
+                }
+
+                if (!hasOverlay)
+                {
+                    RegisterLayerRoot(UILayer.Overlay, EnsureLayerRoot(uiRoot.transform, "Overlay"));
+                }
+            }
+
+            Log.Info("[GameLogicEntry] UGUI UIManager 层级初始化完成。");
+        }
+
+        /// <summary>
+        /// 从 ReferenceCollector 注册指定 UI 层级根节点。
+        /// </summary>
+        private static bool RegisterLayerRoot(ReferenceCollector rc, UILayer layer, string key)
+        {
+            var root = rc.Get<GameObject>(key);
             if (root == null)
             {
-                Log.Error("[GameLogicEntry] UIDocument.rootVisualElement 为 null，无法初始化导航服务。");
-                return;
+                Log.Warning($"[GameLogicEntry] Entry.ReferenceCollector 未配置 {key} 层级。");
+                return false;
             }
 
-            // 如果 UIDocument 没配 SourceAsset，rootVisualElement 是空的——回退到运行时加载 Root.uxml
-            if (root.childCount == 0)
+            RegisterLayerRoot(layer, root.transform);
+            return true;
+        }
+
+        /// <summary>
+        /// 注册指定 UI 层级根节点。
+        /// </summary>
+        private static void RegisterLayerRoot(UILayer layer, Transform root)
+        {
+            _uiManager.RegisterLayerRoot(layer, root);
+        }
+
+        /// <summary>
+        /// 确保 UIRoot 具备 UGUI Canvas 基础组件。
+        /// </summary>
+        private static void EnsureCanvasRoot(GameObject uiRoot)
+        {
+            if (uiRoot.GetComponent<Canvas>() == null)
             {
-                Log.Warning("[GameLogicEntry] UIDocument 未配置 SourceAsset，回退到运行时加载 Root.uxml。"
-                            + "建议在 UIDocument 上配置 SourceAsset = Assets/AssetRaw/UI/Root.uxml 以获得最佳尺寸适配。");
-                var rootHandle = _resourceManager.LoadAssetSync<VisualTreeAsset>("Root");
-                var rootVta = rootHandle?.AssetObject as VisualTreeAsset;
-                if (rootVta == null)
-                {
-                    Log.Error("[GameLogicEntry] 加载 Root.uxml 失败，导航服务初始化中止。");
-                    return;
-                }
-                rootVta.CloneTree(root);
+                var canvas = uiRoot.AddComponent<Canvas>();
+                canvas.renderMode = _uiCamera != null ? RenderMode.ScreenSpaceCamera : RenderMode.ScreenSpaceOverlay;
+                canvas.worldCamera = _uiCamera;
             }
 
-            Shell shell;
-            try
+            if (uiRoot.GetComponent<CanvasScaler>() == null)
             {
-                shell = new Shell(root);
+                var scaler = uiRoot.AddComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = new Vector2(1920f, 1080f);
             }
-            catch (System.Exception e)
+
+            if (uiRoot.GetComponent<GraphicRaycaster>() == null)
             {
-                Log.Error($"[GameLogicEntry] 构造 Shell 失败：{e.Message}");
-                return;
+                uiRoot.AddComponent<GraphicRaycaster>();
             }
+        }
 
-            // 可选：UI 摄像机仍然通过 Entry/UICamera 引用（向下兼容）
-            var entryGo = GameObject.Find("Entry");
-            if (entryGo != null)
+        /// <summary>
+        /// 在 UIRoot 下查找或创建指定层级根节点。
+        /// </summary>
+        private static Transform EnsureLayerRoot(Transform uiRoot, string layerName)
+        {
+            Transform existing = uiRoot.Find(layerName);
+            if (existing != null)
             {
-                var rc = entryGo.GetComponent<ReferenceCollector>();
-                var uiCamera = rc != null ? rc.Get<GameObject>("UICamera") : null;
-                if (uiCamera != null)
-                {
-                    _uiCamera = uiCamera.GetComponent<Camera>();
-                }
+                return existing;
             }
 
-            // 创建 Navigator——不再需要 ScreenRegistry，新增 Screen 由命名约定 + 反射在打开时解析。
-            // 详见 ui-screen-conventions / ui-navigation 规约。
-            _navigator = new Navigator(shell, _resourceManager);
+            var layerObject = new GameObject(layerName, typeof(RectTransform));
+            var rectTransform = layerObject.GetComponent<RectTransform>();
+            rectTransform.SetParent(uiRoot, false);
+            rectTransform.anchorMin = Vector2.zero;
+            rectTransform.anchorMax = Vector2.one;
+            rectTransform.offsetMin = Vector2.zero;
+            rectTransform.offsetMax = Vector2.zero;
+            rectTransform.localScale = Vector3.one;
+            return rectTransform;
+        }
 
-            Log.Info($"[GameLogicEntry] 导航服务初始化完成，UIDocument={uiDocument.gameObject.name}");
+        /// <summary>
+        /// 测试专用：注入 UIManager。
+        /// </summary>
+        internal static void SetUIManagerForTests(IUIManager uiManager)
+        {
+            _uiManager = uiManager;
+        }
+
+        /// <summary>
+        /// 测试专用：注入事件总线。
+        /// </summary>
+        internal static void SetEventHubForTests(EventHub eventHub)
+        {
+            _eventHub = eventHub;
+        }
+
+        /// <summary>
+        /// 测试专用：触发 UGUI 层级初始化。
+        /// </summary>
+        internal static void InitializeUIForTests()
+        {
+            InitializeUI();
         }
 
         /// <summary>

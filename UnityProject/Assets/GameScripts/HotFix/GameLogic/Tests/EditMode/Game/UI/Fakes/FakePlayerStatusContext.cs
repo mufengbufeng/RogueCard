@@ -5,8 +5,7 @@ using EF.UI;
 namespace GameLogic.Tests
 {
     /// <summary>
-    /// 测试用 IPlayerStatusContext 实现。所有字段是 ReactiveProperty，
-    /// 测试中可直接修改 .Value 触发 PlayerStatusView 的订阅刷新。
+    /// 测试用 IPlayerStatusContext 实现。所有字段是 ReactiveProperty。
     /// </summary>
     public class FakePlayerStatusContext : IPlayerStatusContext
     {

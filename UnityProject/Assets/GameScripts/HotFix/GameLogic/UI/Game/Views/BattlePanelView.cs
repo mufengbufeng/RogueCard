@@ -1,167 +1,212 @@
 using System;
 using EF.Debugger;
-using UnityEngine.UIElements;
+using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameLogic
 {
     /// <summary>
-    /// 战斗子界面顶层协调器：在 Region.ShowAsync("BattlePanel") 后由 GameView 实例化，
-    /// 内部装配 MonsterListView + HandFanView + TurnControlView + TargetSelector，
-    /// 订阅 HandFanView 三事件按 needsManualTarget 路由，订阅 Phase.Changed 强制取消选目标。
-    /// 持有 6 个共享元素引用（preview-layer / drop-zone / monster-container / hand-fan / end-turn-btn / fail-toast）。
+    /// UGUI 战斗面板协调器，统一装配怪物、手牌、回合控制和目标选择子视图。
     /// </summary>
     public sealed class BattlePanelView : IDisposable
     {
-        // === 共享元素（仅 BattlePanelView 生命周期内有效）===
-        private VisualElement _content;
-        private VisualElement _previewLayer;
-        private VisualElement _dropZone;
-        private VisualElement _monsterContainer;
-        private VisualElement _handFan;
-        private Button _endTurnBtn;
-        private Label _failToast;
-
-        // === 子模块 ===
-        private MonsterListView _monsterListView;
-        private HandFanView _handFanView;
-        private TurnControlView _turnControlView;
-        private TargetSelector _targetSelector;
-
-        // === Context（含 Phase.Changed 订阅）===
-        private IBattleContext _context;
+        private readonly IBattleContext _context;
         private Action<BattlePhase> _onPhaseChanged;
-
+        private bool _suppressNextEndTurnClick;
         private bool _disposed;
 
         /// <summary>
-        /// 构造 BattlePanelView：查询 6 个共享元素 + 装配 4 个子模块 + 订阅 HandFanView 三事件 + Phase.Changed。
+        /// 怪物列表视图。
         /// </summary>
-        /// <param name="content">BattlePanel.uxml 加载后的根 VisualElement（_mainRegion.CurrentContent）。</param>
-        /// <param name="context">IBattleContext 切片（生产为 GameViewModel）。</param>
-        /// <param name="monsterItemTpl">MonsterItem.uxml 模板。</param>
-        /// <param name="cardItemTpl">CardItem.uxml 模板。</param>
-        /// <param name="handFanOptions">扇形布局与拖拽手感参数。</param>
-        public BattlePanelView(
-            VisualElement content,
-            IBattleContext context,
-            VisualTreeAsset monsterItemTpl,
-            VisualTreeAsset cardItemTpl,
-            HandFanLayoutOptions handFanOptions)
+        public MonsterListView MonsterListView { get; private set; }
+
+        /// <summary>
+        /// 手牌视图。
+        /// </summary>
+        public HandFanView HandFanView { get; private set; }
+
+        /// <summary>
+        /// 回合控制视图。
+        /// </summary>
+        public TurnControlView TurnControlView { get; private set; }
+
+        /// <summary>
+        /// 目标选择器。
+        /// </summary>
+        public TargetSelector TargetSelector { get; private set; }
+
+        /// <summary>
+        /// 创建战斗面板并装配子视图。
+        /// </summary>
+        public BattlePanelView(BattlePanelBindings bindings, IBattleContext context, HandFanLayoutOptions options)
         {
-            _content = content ?? throw new ArgumentNullException(nameof(content));
             _context = context ?? throw new ArgumentNullException(nameof(context));
 
-            // 防御性检测：旧版 BattlePanel.uxml 残留 card-scroll
-            var legacyScroll = content.Q<ScrollView>("card-scroll");
-            if (legacyScroll != null)
+            if (!bindings.HasRequiredBindings)
             {
-                Log.Error("[BattlePanelView] 检测到旧版 BattlePanel.uxml（仍有 card-scroll ScrollView）。" +
-                          "请：① 停止 Play 模式 ② 在 Project 面板对 BattlePanel.uxml 右键 Reimport ③ 重新进入 Play。");
-                legacyScroll.style.display = DisplayStyle.None;
-                legacyScroll.pickingMode = PickingMode.Ignore;
+                Log.Error("[BattlePanelView] 关键绑定缺失，仍会尝试按可用绑定装配。");
             }
 
-            // 查询 6 个共享元素
-            _monsterContainer = content.Q("monster-container");
-            _handFan = content.Q("hand-fan");
-            _previewLayer = content.Q("preview-layer");
-            _dropZone = content.Q("drop-zone");
-            _endTurnBtn = content.Q<Button>("end-turn-btn");
-            _failToast = content.Q<Label>("fail-toast");
+            MonsterListView = new MonsterListView(bindings.MonsterContainer, _context, bindings.MonsterItemTemplate, bindings.BuffIconTemplate, bindings.IntentIconTemplate);
+            HandFanView = new HandFanView(bindings.HandContainer, bindings.DropZone, bindings.PreviewLayer, _context, bindings.HandCardTemplate, options);
+            TurnControlView = new TurnControlView(bindings.EndTurnButton, bindings.FailToastText, bindings.FailToastGroup, _context, ShouldSuppressEndTurn);
+            TargetSelector = new TargetSelector(MonsterListView, HandFanView, _context, bindings.CancelTargetButton);
 
-            if (_handFan == null) Log.Error("[BattlePanelView] BattlePanel.uxml 缺少 name=\"hand-fan\" 容器");
-            if (_previewLayer == null) Log.Error("[BattlePanelView] BattlePanel.uxml 缺少 name=\"preview-layer\" 容器");
+            HandFanView.CardDroppedOnZone += OnCardDroppedOnZone;
+            HandFanView.CardClicked += OnCardClicked;
+            HandFanView.CardDragCancelled += OnCardDragCancelled;
+            if (bindings.EndTurnButton != null)
+            {
+                var relay = bindings.EndTurnButton.GetComponent<PreviewDismissBeforeClickRelay>() ??
+                            bindings.EndTurnButton.gameObject.AddComponent<PreviewDismissBeforeClickRelay>();
+                relay.Initialize(HandFanView, () => _suppressNextEndTurnClick = true);
+            }
 
-            // 装配子模块（按设计 §1 顺序：MonsterListView → HandFanView → TurnControlView → TargetSelector）
-            _monsterListView = new MonsterListView(_monsterContainer, _context, monsterItemTpl);
-            _handFanView = new HandFanView(_handFan, _dropZone, _previewLayer, _content, _context, cardItemTpl, handFanOptions ?? new HandFanLayoutOptions());
-            _turnControlView = new TurnControlView(_endTurnBtn, _failToast, _context);
-            _targetSelector = new TargetSelector(_content, _monsterListView, _handFanView, _context);
-
-            // 订阅 HandFanView 三事件
-            _handFanView.CardDroppedOnZone += OnCardDroppedOnZone;
-            _handFanView.CardClicked += OnCardClicked;
-            _handFanView.CardDragCancelled += OnCardDragCancelled;
-
-            // 订阅 Phase.Changed：怪物回合开始强制取消选目标
-            // 通过 ITurnContext.Phase 消解多接口下的二义性
             _onPhaseChanged = OnPhaseChanged;
             ((ITurnContext)_context).Phase.Changed += _onPhaseChanged;
         }
 
-        // ── HandFanView 事件路由 ──
-
         /// <summary>
-        /// 在 drop-zone 内松手：needsManualTarget=true → TargetSelector.Enter；否则直接 UseCard。
+        /// 释放子视图。
         /// </summary>
-        private void OnCardDroppedOnZone(int handIdx, bool needsManualTarget)
-        {
-            if (_disposed) return;
-            if (needsManualTarget)
-            {
-                _targetSelector?.Enter(handIdx);
-            }
-            else
-            {
-                _context.UseCard(handIdx);
-            }
-        }
-
-        /// <summary>单击某卡：预览态由 HandFanView 内部 CardPreviewController 处理，本视图无操作。</summary>
-        private void OnCardClicked(int handIdx) { }
-
-        /// <summary>中间地带松手 / capture lost：rebound 由 CardDragController 内部完成，本视图无操作。</summary>
-        private void OnCardDragCancelled(int handIdx) { }
-
-        /// <summary>Phase 离开 PlayerTurn 时强制取消 TargetSelector，避免怪物回合期间残留选目标 UI。</summary>
-        private void OnPhaseChanged(BattlePhase phase)
-        {
-            if (_disposed) return;
-            if (_targetSelector != null && _targetSelector.IsActive && phase != BattlePhase.PlayerTurn)
-            {
-                _targetSelector.Cancel();
-            }
-        }
-
-        /// <inheritdoc />
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
+            if (_disposed)
+            {
+                return;
+            }
 
-            // 1. 解绑 Phase.Changed
+            _disposed = true;
             if (_context != null && _onPhaseChanged != null)
             {
                 ((ITurnContext)_context).Phase.Changed -= _onPhaseChanged;
             }
-            _onPhaseChanged = null;
 
-            // 2. 解绑 HandFanView 三事件
-            if (_handFanView != null)
+            if (HandFanView != null)
             {
-                _handFanView.CardDroppedOnZone -= OnCardDroppedOnZone;
-                _handFanView.CardClicked -= OnCardClicked;
-                _handFanView.CardDragCancelled -= OnCardDragCancelled;
+                HandFanView.CardDroppedOnZone -= OnCardDroppedOnZone;
+                HandFanView.CardClicked -= OnCardClicked;
+                HandFanView.CardDragCancelled -= OnCardDragCancelled;
             }
 
-            // 3-6. 按反序释放：TargetSelector → TurnControlView → HandFanView → MonsterListView
-            _targetSelector?.Dispose();
-            _targetSelector = null;
-            _turnControlView?.Dispose();
-            _turnControlView = null;
-            _handFanView?.Dispose();
-            _handFanView = null;
-            _monsterListView?.Dispose();
-            _monsterListView = null;
-
-            _context = null;
-            _content = null;
-            _previewLayer = null;
-            _dropZone = null;
-            _monsterContainer = null;
-            _handFan = null;
-            _endTurnBtn = null;
-            _failToast = null;
+            TargetSelector?.Dispose();
+            TurnControlView?.Dispose();
+            HandFanView?.Dispose();
+            MonsterListView?.Dispose();
+            TargetSelector = null;
+            TurnControlView = null;
+            HandFanView = null;
+            MonsterListView = null;
         }
+
+        /// <summary>
+        /// 显示出牌失败提示。
+        /// </summary>
+        public void ShowCardPlayFailed(string reason)
+        {
+            TurnControlView?.ShowCardPlayFailed(reason);
+        }
+
+        private void OnCardDroppedOnZone(int handIdx, bool needsManualTarget)
+        {
+            if (needsManualTarget)
+            {
+                TargetSelector?.Enter(handIdx);
+                return;
+            }
+
+            _context.UseCard(handIdx);
+        }
+
+        private void OnCardClicked(int handIdx)
+        {
+            // 点击预览由 HandFanView 内部处理，BattlePanel 只保留事件订阅边界。
+        }
+
+        private void OnCardDragCancelled(int handIdx)
+        {
+            // 拖拽取消后的回弹和清理由 HandFanView/CardDragController 负责。
+        }
+
+        private void OnPhaseChanged(BattlePhase phase)
+        {
+            if (phase != BattlePhase.PlayerTurn && TargetSelector != null && TargetSelector.IsActive)
+            {
+                TargetSelector.Cancel();
+            }
+        }
+
+        private bool ShouldSuppressEndTurn()
+        {
+            if (_suppressNextEndTurnClick)
+            {
+                _suppressNextEndTurnClick = false;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// 在 Button.onClick 前尝试关闭预览，并标记跳过本次按钮命令。
+        /// </summary>
+        private sealed class PreviewDismissBeforeClickRelay : MonoBehaviour, UnityEngine.EventSystems.IPointerDownHandler
+        {
+            private HandFanView _handFanView;
+            private Action _onConsumed;
+
+            public void Initialize(HandFanView handFanView, Action onConsumed)
+            {
+                _handFanView = handFanView;
+                _onConsumed = onConsumed;
+            }
+
+            public void OnPointerDown(UnityEngine.EventSystems.PointerEventData eventData)
+            {
+                if (_handFanView != null && _handFanView.TryDismissPreviewFromPointerTarget(gameObject))
+                {
+                    _onConsumed?.Invoke();
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// 战斗面板 UGUI 绑定集合。
+    /// </summary>
+    public struct BattlePanelBindings
+    {
+        public RectTransform MonsterContainer;
+        public RectTransform HandContainer;
+        public RectTransform DropZone;
+        public RectTransform PreviewLayer;
+        public Button EndTurnButton;
+        public TextMeshProUGUIProxy FailToast;
+        public Button CancelTargetButton;
+        public GameObject HandCardTemplate;
+        public GameObject MonsterItemTemplate;
+        public GameObject BuffIconTemplate;
+        public GameObject IntentIconTemplate;
+
+        public TMPro.TextMeshProUGUI FailToastText => FailToast.Text;
+        public CanvasGroup FailToastGroup => FailToast.Group;
+
+        public bool HasRequiredBindings =>
+            MonsterContainer != null &&
+            HandContainer != null &&
+            DropZone != null &&
+            PreviewLayer != null &&
+            EndTurnButton != null &&
+            HandCardTemplate != null &&
+            MonsterItemTemplate != null;
+    }
+
+    /// <summary>
+    /// 失败提示文本和 CanvasGroup 绑定。
+    /// </summary>
+    public struct TextMeshProUGUIProxy
+    {
+        public TMPro.TextMeshProUGUI Text;
+        public CanvasGroup Group;
     }
 }

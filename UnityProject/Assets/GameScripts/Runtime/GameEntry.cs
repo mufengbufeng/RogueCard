@@ -50,7 +50,7 @@ public class GameEntry : MonoBehaviour
         _modelManager = ModuleSystem.Get<ModelManager>();
 
         // 4. 注册需要 ResourceManager 的管理器
-        // Navigator 由 GameLogicEntry.InitializeNavigator() 在热更层创建
+        ModuleSystem.Register<IUIManager>(new UIManager(_resourceManager, _modelManager));
         ModuleSystem.Register<ISoundManager>(new SoundManager(_resourceManager));
 
         // 5. 注册 EntityManager（依赖 ObjectPoolManager 和 ResourceManager）

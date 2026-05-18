@@ -1,188 +1,133 @@
 using System;
 using EF.Debugger;
 using UnityEngine;
-using UnityEngine.UIElements;
+using UnityEngine.UI;
 
 namespace GameLogic
 {
     /// <summary>
-    /// 目标选择编排器。负责"出 SingleManual 卡 → 选目标"跨模块流程：
-    /// 调 MonsterListView.EnterTargetMode 高亮存活怪物 + 注册 ESC / 空白点击监听；
-    /// 怪物点击 → 调 ITargetContext.UseCardOnMonster + HandFanView.RequestGhostCleanup；
-    /// ESC/空白/外部 Cancel → 调 HandFanView.RequestGhostRebound 协同回弹。
+    /// UGUI 手动目标选择协调器，负责怪物项高亮、确认和取消回弹。
     /// </summary>
     public sealed class TargetSelector : IDisposable
     {
-        private enum TargetSelectorState { Idle, Active }
-
-        private VisualElement _rootElement;
-        private IMonsterTargetSurface _monsterList;
-        private IHandGhostSurface _handFan;
-        private ITargetContext _context;
-
-        private TargetSelectorState _state = TargetSelectorState.Idle;
+        private readonly MonsterListView _monsterListView;
+        private readonly HandFanView _handFanView;
+        private readonly ITargetContext _context;
+        private readonly Button _cancelButton;
+        private Action<BattlePhase> _onPhaseChanged;
         private int _selectedHandIdx = -1;
-
-        private EventCallback<KeyDownEvent> _keyHandler;
-        private EventCallback<PointerDownEvent> _backdropHandler;
-
         private bool _disposed;
 
-        /// <summary>当前是否处于目标选择中。</summary>
-        public bool IsActive => _state == TargetSelectorState.Active;
+        /// <summary>
+        /// 当前是否处于目标选择态。
+        /// </summary>
+        public bool IsActive { get; private set; }
 
-        /// <summary>构造目标选择编排器。</summary>
-        /// <param name="rootElement">用于注册 ESC / 空白点击监听的根 VisualElement（typically GameView 自身）。</param>
-        /// <param name="monsterList">怪物列表视图，调 EnterTargetMode/ExitTargetMode 切换高亮态。</param>
-        /// <param name="handFan">手牌视图，调 RequestGhostCleanup/RequestGhostRebound 处理 ghost。</param>
-        /// <param name="context">实现 ITargetContext 的切片对象。</param>
-        public TargetSelector(VisualElement rootElement, IMonsterTargetSurface monsterList, IHandGhostSurface handFan, ITargetContext context)
+        /// <summary>
+        /// 创建目标选择器。
+        /// </summary>
+        public TargetSelector(MonsterListView monsterListView, HandFanView handFanView, ITargetContext context, Button cancelButton)
         {
-            _rootElement = rootElement ?? throw new ArgumentNullException(nameof(rootElement));
-            _monsterList = monsterList ?? throw new ArgumentNullException(nameof(monsterList));
-            _handFan = handFan ?? throw new ArgumentNullException(nameof(handFan));
+            _monsterListView = monsterListView ?? throw new ArgumentNullException(nameof(monsterListView));
+            _handFanView = handFanView ?? throw new ArgumentNullException(nameof(handFanView));
             _context = context ?? throw new ArgumentNullException(nameof(context));
+            _cancelButton = cancelButton;
+
+            if (_cancelButton != null)
+            {
+                _cancelButton.onClick.AddListener(Cancel);
+            }
+
+            _onPhaseChanged = OnPhaseChanged;
+            _context.Phase.Changed += _onPhaseChanged;
         }
 
         /// <summary>
-        /// 进入目标选择态：MonsterListView 高亮存活怪物 + 注册 ESC / 空白点击监听。
-        /// 重复进入（IsActive==true）会被忽略并通过 Log.Warning 记录。
+        /// 进入目标选择态。
         /// </summary>
         public void Enter(int handIdx)
         {
-            if (_disposed) return;
-            if (_state == TargetSelectorState.Active)
+            if (_disposed)
             {
-                Log.Warning($"[TargetSelector] Enter({handIdx}) 时已处于 Active 态，忽略");
                 return;
             }
 
-            _state = TargetSelectorState.Active;
-            _selectedHandIdx = handIdx;
-
-            // MonsterListView 进入 target 模式：每只存活怪物加 .target-selectable.active 类与点击回调
-            _monsterList.EnterTargetMode(OnMonsterClicked);
-
-            // 注册 ESC 监听
-            _keyHandler = OnKeyDown;
-            _rootElement.RegisterCallback(_keyHandler, TrickleDown.TrickleDown);
-            _rootElement.focusable = true;
-            _rootElement.Focus();
-
-            // 注册空白点击监听（点击非怪物 / 非 drop-zone 区域为取消）
-            _backdropHandler = OnBackdropPointerDown;
-            _rootElement.RegisterCallback(_backdropHandler, TrickleDown.TrickleDown);
-        }
-
-        /// <summary>外部强制取消（如 Phase 中途变化）。等价于 ESC / 空白点击取消。</summary>
-        public void Cancel()
-        {
-            if (_disposed || _state != TargetSelectorState.Active) return;
-            ExitInternal(confirmed: false);
-        }
-
-        // ── 内部事件处理 ──
-
-        private void OnMonsterClicked(int monsterIdx)
-        {
-            if (_disposed || _state != TargetSelectorState.Active) return;
-            int handIdx = _selectedHandIdx;
-            ExitInternal(confirmed: true);
-            _context.UseCardOnMonster(handIdx, monsterIdx);
-        }
-
-        private void OnKeyDown(KeyDownEvent evt)
-        {
-            if (evt.keyCode != KeyCode.Escape) return;
-            ExitInternal(confirmed: false);
-            evt.StopPropagation();
-        }
-
-        private void OnBackdropPointerDown(PointerDownEvent evt)
-        {
-            // 仅响应非怪物的点击为取消（怪物自身点击会通过 MonsterListView 内部 ClickEvent 路径走 OnMonsterClicked）
-            if (!(evt.target is VisualElement target)) return;
-
-            // 检查是否点在某个怪物上 —— 若是则交给 MonsterListView 的 ClickEvent 处理，本回调不取消
-            if (_monsterList?.Items != null)
+            if (IsActive)
             {
-                foreach (var view in _monsterList.Items)
-                {
-                    var root = view?.Root;
-                    if (root != null && IsSameOrAncestor(root, target)) return;
-                }
+                Log.Warning($"[TargetSelector] 已经处于目标选择态，忽略 Enter({handIdx})。");
+                return;
             }
 
-            ExitInternal(confirmed: false);
-            evt.StopPropagation();
+            IsActive = true;
+            _selectedHandIdx = handIdx;
+            _monsterListView.EnterTargetMode(OnMonsterClicked);
         }
 
         /// <summary>
-        /// 退出目标选择态。confirmed 路径调 RequestGhostCleanup（怪物点击后），
-        /// cancelled 路径调 RequestGhostRebound（ESC / 空白 / 外部 Cancel）。
+        /// 取消目标选择并触发 ghost 回弹。
         /// </summary>
-        private void ExitInternal(bool confirmed)
+        public void Cancel()
         {
+            if (_disposed || !IsActive)
+            {
+                return;
+            }
+
             int handIdx = _selectedHandIdx;
-
-            // 解除 MonsterListView 目标态
-            _monsterList?.ExitTargetMode();
-
-            // 解除 ESC / 空白点击监听
-            if (_keyHandler != null)
-            {
-                _rootElement?.UnregisterCallback(_keyHandler, TrickleDown.TrickleDown);
-                _keyHandler = null;
-            }
-            if (_backdropHandler != null)
-            {
-                _rootElement?.UnregisterCallback(_backdropHandler, TrickleDown.TrickleDown);
-                _backdropHandler = null;
-            }
-
-            // 状态归位
-            _state = TargetSelectorState.Idle;
-            _selectedHandIdx = -1;
-
-            // ghost 处理：confirmed → cleanup（自然由 Hand.Changed 重建）；cancelled → rebound 协同动画
-            if (confirmed)
-            {
-                _handFan?.RequestGhostCleanup();
-            }
-            else
-            {
-                _handFan?.RequestGhostRebound(handIdx);
-            }
+            Exit();
+            _handFanView.RequestGhostRebound(handIdx);
         }
 
-        /// <summary>判断 target 是否等于 ancestor 或为其后代。</summary>
-        private static bool IsSameOrAncestor(VisualElement ancestor, VisualElement target)
-        {
-            var current = target;
-            while (current != null)
-            {
-                if (current == ancestor) return true;
-                current = current.parent;
-            }
-            return false;
-        }
-
-        /// <inheritdoc />
+        /// <summary>
+        /// 释放事件订阅。
+        /// </summary>
         public void Dispose()
         {
-            if (_disposed) return;
-
-            // 兜底：若仍 Active，等价于 Cancel（cancelled 路径，触发 RequestGhostRebound）
-            if (_state == TargetSelectorState.Active)
+            if (_disposed)
             {
-                ExitInternal(confirmed: false);
+                return;
+            }
+
+            if (IsActive)
+            {
+                Cancel();
             }
 
             _disposed = true;
-            _rootElement = null;
-            _monsterList = null;
-            _handFan = null;
-            _context = null;
+            if (_cancelButton != null)
+            {
+                _cancelButton.onClick.RemoveListener(Cancel);
+            }
+
+            _context.Phase.Changed -= _onPhaseChanged;
+        }
+
+        private void OnMonsterClicked(int monsterIndex)
+        {
+            if (_disposed || !IsActive)
+            {
+                return;
+            }
+
+            int handIdx = _selectedHandIdx;
+            Exit();
+            _context.UseCardOnMonster(handIdx, monsterIndex);
+            _handFanView.RequestGhostCleanup();
+        }
+
+        private void OnPhaseChanged(BattlePhase phase)
+        {
+            if (IsActive && phase != BattlePhase.PlayerTurn)
+            {
+                Cancel();
+            }
+        }
+
+        private void Exit()
+        {
+            _monsterListView.ExitTargetMode();
+            IsActive = false;
+            _selectedHandIdx = -1;
         }
     }
 }

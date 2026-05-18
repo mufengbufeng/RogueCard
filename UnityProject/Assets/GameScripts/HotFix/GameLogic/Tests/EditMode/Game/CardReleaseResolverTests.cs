@@ -179,32 +179,43 @@ namespace GameLogic.Tests.EditMode.Game
         }
 
         [Test]
-        public void Release_Spell_立即效果执行_Dot按触发时机登记为Buff()
+        public void Release_Spell_主伤害与Dot均登记为延迟效果按EnemyTurnStart结算()
         {
+            // 对应基础卡 1003 在 card_effect 配置中的新语义：
+            // 一条 Damage=EnemyTurnStart（主伤害延迟到怪物回合开始），一条 DamageDot=EnemyTurnStart。
             var spell = NewCard(1003, CardReleaseKind.Spell, TargetMode.SingleManual, targetCount: 1);
-            var immediate = NewEffect(1, spell.Id, EffectKind.Damage, EffectTriggerTiming.Immediate, 8);
+            var delayedDamage = NewEffect(1, spell.Id, EffectKind.Damage, EffectTriggerTiming.EnemyTurnStart, 8);
             var dot = NewEffect(2, spell.Id, EffectKind.DamageDot, EffectTriggerTiming.EnemyTurnStart, 2, 3);
             var resolver = NewResolver(new Dictionary<int, List<CardEffect>>
             {
-                [spell.Id] = new() { immediate, dot },
+                [spell.Id] = new() { delayedDamage, dot },
             });
             var caster = new FakeActor();
             var target = NewMonster(30);
 
             resolver.Release(spell, caster, new List<MonsterRuntime> { target }, 0, new CapturingSink());
 
-            Assert.AreEqual(22, target.Hp);
+            // 出牌瞬间不扣血：主伤害进入延迟队列，DoT 登记成 Buff
+            Assert.AreEqual(30, target.Hp);
+            Assert.AreEqual(1, resolver.PendingCount);
             Assert.AreEqual(1, target.Buffs.Count);
             Assert.AreEqual(EffectKind.DamageDot, target.Buffs[0].Kind);
             Assert.AreEqual(EffectTriggerTiming.EnemyTurnStart, target.Buffs[0].TriggerTiming);
             Assert.AreEqual(3, target.Buffs[0].RemainingTurns);
+
+            // 进入怪物回合开始结算点：延迟伤害到账，PendingCount 归零（DoT 由 BattleSystem.TickBuffs 单独处理，不在 PendingCount 里）
+            resolver.ResolveDelayedEffects(EffectTriggerTiming.EnemyTurnStart, new CapturingSink());
+            Assert.AreEqual(22, target.Hp);
+            Assert.AreEqual(0, resolver.PendingCount);
         }
 
         [Test]
         public void Release_SpellSingleManual_未传手动目标时自动选择攻击意图敌人()
         {
+            // 这里用虚构卡 id 9001 + Immediate Damage 解耦基础卡配置，
+            // 专门覆盖 SpellSingleManual 的目标解析路径（不依赖延迟效果）。
             var intentCard = NewCard(3001, CardReleaseKind.Melee, TargetMode.SingleAuto);
-            var spell = NewCard(1003, CardReleaseKind.Spell, TargetMode.SingleManual, targetCount: 1);
+            var spell = NewCard(9001, CardReleaseKind.Spell, TargetMode.SingleManual, targetCount: 1);
             var resolver = NewResolver(new Dictionary<int, List<CardEffect>>
             {
                 [intentCard.Id] = new() { NewEffect(1, intentCard.Id, EffectKind.Damage, EffectTriggerTiming.Immediate, 1) },

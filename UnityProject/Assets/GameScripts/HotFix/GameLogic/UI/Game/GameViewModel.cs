@@ -10,7 +10,7 @@ namespace GameLogic
     /// 将变化镜像到 ReactiveProperty 供 GameView 绑定。
     /// 显式实现 IPlayerStatusContext / IMonsterListContext 切片接口，供子模块按需订阅。
     /// </summary>
-    public class GameViewModel : ViewModelBase, IPlayerStatusContext, IMonsterListContext, IHandContext, ITurnContext, ITargetContext, IBattleContext
+    public class GameViewModel : IDisposable, IPlayerStatusContext, IMonsterListContext, IHandContext, ITurnContext, ITargetContext, IBattleContext
     {
         private GameModel _model;
 
@@ -79,17 +79,17 @@ namespace GameLogic
         /// </summary>
         public GameViewModel()
         {
-            Phase = Prop(BattlePhase.Idle);
-            Monsters = Prop<IReadOnlyList<MonsterRuntime>>(Array.Empty<MonsterRuntime>());
-            Hand = Prop<IReadOnlyList<CardRuntime>>(Array.Empty<CardRuntime>());
-            Energy = Prop(0);
-            MaxEnergy = Prop(0);
-            PlayerHp = Prop(0);
-            PlayerMaxHp = Prop(0);
-            PlayerArmor = Prop(0);
-            IsLevelComplete = Prop(false);
-            IsPlayerDead = Prop(false);
-            PlayerBuffs = Prop<IReadOnlyList<BuffRuntime>>(Array.Empty<BuffRuntime>());
+            Phase = new ReactiveProperty<BattlePhase>(BattlePhase.Idle);
+            Monsters = new ReactiveProperty<IReadOnlyList<MonsterRuntime>>(Array.Empty<MonsterRuntime>());
+            Hand = new ReactiveProperty<IReadOnlyList<CardRuntime>>(Array.Empty<CardRuntime>());
+            Energy = new ReactiveProperty<int>(0);
+            MaxEnergy = new ReactiveProperty<int>(0);
+            PlayerHp = new ReactiveProperty<int>(0);
+            PlayerMaxHp = new ReactiveProperty<int>(0);
+            PlayerArmor = new ReactiveProperty<int>(0);
+            IsLevelComplete = new ReactiveProperty<bool>(false);
+            IsPlayerDead = new ReactiveProperty<bool>(false);
+            PlayerBuffs = new ReactiveProperty<IReadOnlyList<BuffRuntime>>(Array.Empty<BuffRuntime>());
         }
 
         // ── 命令意图事件 ──
@@ -126,7 +126,7 @@ namespace GameLogic
         }
 
         /// <inheritdoc />
-        public override void Dispose()
+        public void Dispose()
         {
             if (_model != null)
             {
@@ -139,7 +139,17 @@ namespace GameLogic
             RewardSelected = null;
             CardPlayFailed = null;
 
-            base.Dispose();
+            Phase.ClearListeners();
+            Monsters.ClearListeners();
+            Hand.ClearListeners();
+            Energy.ClearListeners();
+            MaxEnergy.ClearListeners();
+            PlayerHp.ClearListeners();
+            PlayerMaxHp.ClearListeners();
+            PlayerArmor.ClearListeners();
+            IsLevelComplete.ClearListeners();
+            IsPlayerDead.ClearListeners();
+            PlayerBuffs.ClearListeners();
         }
 
         /// <summary>

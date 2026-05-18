@@ -25,9 +25,9 @@ WaveSystem SHALL 从配置表加载关卡数据，按 Order 排序波次，按�
 
 ### Requirement: BattleSystem 管理战斗阶段和胜负判定
 
-BattleSystem SHALL 管理 `Prepare → PlayerTurn → MonsterTurn → Check` 阶段循环。**进入战斗前 SHALL 通过 `InitPlayerAttributes` 从 `TbPlayerLevel` 读取玩家当前等级对应的 `BaseHp` / `BaseEnergy` / `HandLimit`，调用 `GameModel.InitBattleAttributes(maxEnergy, handLimit, maxHp)` 完成玩家属性初始化**。`Prepare` 阶段 SHALL 恢复玩家能量、触发玩家抽牌、调用 `MonsterSystem.BeginMonsterPrepare` 让每只怪物按牌组驱动生成 `PendingCards`。`MonsterTurn` 阶段 SHALL 在调用 `MonsterSystem.ExecuteTurn` 之前，统一 tick 玩家与所有怪物的 Buffs（处理 DoT 扣血、buff 倒计时、归零移除）。`Check` 阶段 SHALL 判断胜负条件。
+BattleSystem SHALL 管理 `Prepare → PlayerTurn → MonsterTurn → Check` 阶段循环。**进入战斗前 SHALL 通过 `InitPlayerAttributes` 从 `TbPlayerLevel` 读取玩家当前等级对应的 `BaseHp` / `BaseEnergy` / `HandLimit`，调用 `GameModel.InitBattleAttributes(maxEnergy, handLimit, maxHp)` 完成玩家属性初始化**。`Prepare` 阶段 SHALL 恢复玩家能量、触发玩家抽牌、调用 `MonsterSystem.BeginMonsterPrepare` 让每只怪物按牌组驱动生成 `PendingCards`。`MonsterTurn` 阶段 SHALL 先结算敌人回合开始效果（包含现有 DoT tick 语义），再调用 `MonsterSystem.ExecuteTurn`，之后结算敌人回合结束效果，最后进入 `Check` 阶段判断胜负条件。
 
-> 本 Requirement 是 Change 1 → Change 2 → Change 3 三次 MODIFIED 的累积态：Change 1 引入 DoT tick；Change 2 引入 BeginMonsterPrepare；Change 3 引入按等级初始化玩家属性。三者必须保留全部 Scenarios。
+> 本 Requirement 是 Change 1 → Change 2 → Change 3 以及本变更的累积态：Change 1 引入 DoT tick；Change 2 引入 BeginMonsterPrepare；Change 3 引入按等级初始化玩家属性；本变更引入 EnemyTurnStart / EnemyTurnEnd 结算点。所有 Scenarios 必须保留。
 
 #### Scenario: 进入战斗时按等级初始化玩家属性
 - **WHEN** `BattleSystem.EnterBattle` 被调用
@@ -55,22 +55,29 @@ BattleSystem SHALL 管理 `Prepare → PlayerTurn → MonsterTurn → Check` 阶
 - **AND** SHALL 调用 `MonsterSystem.BeginMonsterPrepare`（怪物恢复能量、抽牌或读剧本、生成 PendingCards）
 - **AND** SHALL 在两侧准备完毕后切换到 `PlayerTurn`
 
-#### Scenario: 回合结束流转包含 DoT tick
+#### Scenario: 回合结束流转包含敌人回合开始和结束结算
 - **WHEN** 调用 `BattleSystem.EndTurn()`
 - **THEN** SHALL 将阶段切换到 `MonsterTurn`
-- **AND** SHALL 先 tick 所有 `IBattleActor` 的 Buffs（DoT 扣血、buff RemainingTurns 倒数、归零移除）
+- **AND** SHALL 先结算所有 `EnemyTurnStart` 效果（包含 DoT 扣血、buff RemainingTurns 倒数、归零移除）
 - **AND** SHALL 再执行 `MonsterSystem.ExecuteTurn`
-- **AND** SHALL 在执行完后进入 `Check` 阶段
+- **AND** SHALL 在怪物行动完成后结算所有 `EnemyTurnEnd` 效果
+- **AND** SHALL 在敌人回合结束效果结算完毕后进入 `Check` 阶段
 
-#### Scenario: DoT tick 杀死玩家立即结算
-- **WHEN** DoT tick 导致 `_model.PlayerHp <= 0`
+#### Scenario: EnemyTurnStart 杀死玩家立即结算
+- **WHEN** EnemyTurnStart 效果导致 `_model.PlayerHp <= 0`
 - **THEN** SHALL 标记玩家死亡，发布 `BattleEndedEvent(IsVictory=false)`
 - **AND** SHALL 跳过 `MonsterSystem.ExecuteTurn`
+- **AND** SHALL 跳过 EnemyTurnEnd 效果结算
 
-#### Scenario: DoT tick 杀死怪物发布死亡事件
-- **WHEN** DoT tick 导致某只怪物 `Hp <= 0`
+#### Scenario: EnemyTurnStart 杀死怪物发布死亡事件
+- **WHEN** EnemyTurnStart 效果导致某只怪物 `Hp <= 0`
 - **THEN** SHALL 通过事件总线发布对应 `MonsterDeathEvent`
 - **AND** 该怪物在后续 `MonsterSystem.ExecuteTurn` 中 SHALL 被跳过
+
+#### Scenario: EnemyTurnEnd 结算后进入 Check
+- **WHEN** EnemyTurnEnd 效果完成结算
+- **THEN** SHALL 进入 `Check` 阶段
+- **AND** SHALL 由 `Check` 阶段统一处理玩家死亡、怪物全灭、批次推进或战斗胜利
 
 #### Scenario: Check 阶段玩家死亡
 - **WHEN** Check 阶段检测到玩家血量 <= 0
@@ -82,19 +89,19 @@ BattleSystem SHALL 管理 `Prepare → PlayerTurn → MonsterTurn → Check` 阶
 
 ### Requirement: CardSystem 管理卡牌操作
 
-CardSystem SHALL 处理出牌、抽牌、洗牌。出牌 SHALL 校验阶段和能量，校验通过后 SHALL 调用 `CardEffectExecutor.Execute` 并把 caster 设为 `PlayerActor(_model)`、targets 按 `card.TargetMode` 计算后传入；执行完毕 SHALL 发布 `CardPlayedEvent`。弃牌堆非空且牌库空时 SHALL 自动将弃牌堆洗入牌库。CardSystem SHALL NOT 自己实现伤害/护盾/DoT/能量等具体效果。
+CardSystem SHALL 处理出牌、抽牌、洗牌。出牌 SHALL 校验阶段和能量，校验通过后 SHALL 扣除能量、移除手牌、加入弃牌堆，并通过卡牌释放调度层按 `CardReleaseKind`、`TargetMode`、`TargetCount` 和效果触发时机解析目标与结算效果；执行完毕 SHALL 发布 `CardPlayedEvent`。弃牌堆非空且牌库空时 SHALL 自动将弃牌堆洗入牌库。CardSystem SHALL NOT 自己实现伤害/护盾/DoT/能量等具体效果。
 
-#### Scenario: 出牌校验通过并通过 Executor 执行效果
+#### Scenario: 出牌校验通过并通过释放调度层执行效果
 - **WHEN** 调用 `CardSystem.Play(handIndex)`，阶段为 `PlayerTurn`，手牌索引有效，能量足够
 - **THEN** CardSystem SHALL 扣除能量、移除手牌、加入弃牌堆
 - **AND** SHALL 构造 `caster = new PlayerActor(_model)`
-- **AND** SHALL 根据 `card.Config.TargetMode` 计算 `targets`：`SingleAuto`/`SingleManual` 取一个怪物（Manual 来自 UI 选择）、`All`/`SplitAcrossAll` 取全部存活怪物、`Self` 取 caster
-- **AND** SHALL 调用 `CardEffectExecutor.Execute(card.Config, caster, targets, events)`
+- **AND** SHALL 调用卡牌释放调度层处理该卡释放
+- **AND** 释放调度层 SHALL 根据 `card.Config.CardReleaseKind`、`card.Config.TargetMode`、`card.Config.TargetCount` 和效果触发时机计算目标并调用 `CardEffectExecutor.Execute`
 - **AND** SHALL 发布 `CardPlayedEvent(card.Config.Id)`
 
 #### Scenario: 出牌校验失败
 - **WHEN** 调用 `CardSystem.Play(handIndex)`，阶段不是 `PlayerTurn` 或能量不足
-- **THEN** SHALL 不扣能量、不移除手牌、不调用 Executor、不发布 `CardPlayedEvent`
+- **THEN** SHALL 不扣能量、不移除手牌、不调用释放调度层、不调用 Executor、不发布 `CardPlayedEvent`
 
 #### Scenario: 牌库耗尽自动洗牌
 - **WHEN** 抽牌时牌库为空但弃牌堆非空
@@ -132,7 +139,7 @@ MonsterSystem SHALL 在 `Prepare` 阶段调用 `MonsterCardSystem` 与 `MonsterA
 - **AND** 在手牌内按 Cost 降序贪心选牌
 
 #### Scenario: MonsterTurn 执行 PendingCards
-- **WHEN** `BattleSystem` 进入 `MonsterTurn`，DoT tick 已完成
+- **WHEN** `BattleSystem` 进入 `MonsterTurn`，EnemyTurnStart 结算已完成
 - **THEN** MonsterSystem.ExecuteTurn SHALL 遍历每只存活怪物的 `PendingCards`
 - **AND** 对每张卡 SHALL 调用 `CardEffectExecutor.Execute(card, monster, [playerActor], events)`
 - **AND** 在该怪物所有 PendingCards 执行完毕后 SHALL 调用 `MonsterCardSystem.DiscardAllHand(monster)`
@@ -143,4 +150,3 @@ MonsterSystem SHALL 在 `Prepare` 阶段调用 `MonsterCardSystem` 与 `MonsterA
 - **WHEN** 进入 `MonsterTurn` 时某只怪物 `IsDead == true`
 - **THEN** MonsterSystem SHALL 跳过该怪物的 `ExecuteTurn` 处理
 - **AND** SHALL 跳过 `DiscardAllHand` 与 `TurnsAlive++`
-

@@ -5,8 +5,8 @@ using EF.UI;
 namespace GameLogic
 {
     /// <summary>
-    /// 手牌子系统所需的 ViewModel 切片接口。
-    /// 仅暴露 HandFanView / CardDragController / CardPreviewController 所需的 Hand / Phase 字段、UseCard 命令、CardPlayFailed 事件，
+    /// 手牌子系统所需的数据切片接口。
+    /// 仅暴露手牌交互逻辑所需的 Hand / Phase 字段、UseCard 命令、CardPlayFailed 事件，
     /// 避免子模块越界访问 Monsters / PlayerHp 等其它字段。
     /// 由 GameViewModel 显式实现；测试时可由 Fake 实现替代。
     /// </summary>

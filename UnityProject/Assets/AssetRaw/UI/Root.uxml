@@ -1,7 +1,0 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" editor-extension-mode="True">
-    <ui:VisualElement name="root" style="flex-grow: 1; width: 100%; height: 100%;">
-        <ui:VisualElement name="screen-layer" picking-mode="Ignore" style="position: absolute; left: 0; top: 0; right: 0; bottom: 0;"/>
-        <ui:VisualElement name="popup-layer" picking-mode="Ignore" style="position: absolute; left: 0; top: 0; right: 0; bottom: 0;"/>
-        <ui:VisualElement name="system-layer" picking-mode="Ignore" style="position: absolute; left: 0; top: 0; right: 0; bottom: 0;"/>
-    </ui:VisualElement>
-</ui:UXML>

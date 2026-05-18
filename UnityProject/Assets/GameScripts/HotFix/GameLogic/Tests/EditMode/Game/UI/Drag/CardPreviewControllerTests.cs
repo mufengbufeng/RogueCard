@@ -1,128 +1,146 @@
-using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
-using UnityEngine.UIElements;
+using UnityEngine.UI;
 
 namespace GameLogic.Tests
 {
     /// <summary>
-    /// CardPreviewController 单元测试：通过 MockPreviewSurface 验证 TogglePreview 的同卡退出 / 别卡切换 / Dispose 行为。
-    /// 重点验证 _previewSource 引用比较语义（reorder 后仍正确识别同卡）。
+    /// UGUI CardPreviewController 行为测试。
     /// </summary>
     [TestFixture]
-    public class CardPreviewControllerTests
+    public sealed class CardPreviewControllerTests
     {
         private MockPreviewSurface _surface;
         private HandFanLayoutOptions _options;
         private CardPreviewController _controller;
+        private GameObject _sourceRoot;
+        private CardItemView _sourceA;
+        private CardItemView _sourceB;
 
         [SetUp]
         public void SetUp()
         {
             _surface = new MockPreviewSurface();
-            _options = new HandFanLayoutOptions();
+            _options = new HandFanLayoutOptions { CardWidth = 120f, CardHeight = 180f };
             _controller = new CardPreviewController(_surface, _options);
+            _sourceRoot = UguiTestFactory.CreateRectObject("SourceRoot");
+            _sourceA = new CardItemView(UguiTestFactory.CreateCardTemplate("CardA", _sourceRoot.transform), 0, new CardRuntime { Config = UguiTestFactory.NewCard(1, "火球", 2, GameConfig.card.TargetMode.SingleAuto) });
+            _sourceB = new CardItemView(UguiTestFactory.CreateCardTemplate("CardB", _sourceRoot.transform), 1, new CardRuntime { Config = UguiTestFactory.NewCard(2, "冰锥", 1, GameConfig.card.TargetMode.SingleAuto) });
         }
 
         [TearDown]
-        public void TearDown() => _controller?.Dispose();
-
-        [Test]
-        public void TogglePreview_SameCard_ExitsPreview()
+        public void TearDown()
         {
-            var sourceA = new VisualElement();
+            _controller.Dispose();
+            _sourceA.Dispose();
+            _sourceB.Dispose();
+            Object.DestroyImmediate(_sourceRoot);
+        }
 
-            _controller.TogglePreview(handIdx: 1, source: sourceA);
+        /// <summary>
+        /// 同一张卡再次点击会关闭预览。
+        /// </summary>
+        [Test]
+        public void TogglePreview_同卡关闭()
+        {
+            _controller.TogglePreview(0, _sourceA);
             Assert.IsTrue(_controller.IsPreviewing);
-            Assert.AreEqual(1, _surface.AddToPreviewLayerCallCount);
 
-            _controller.TogglePreview(handIdx: 1, source: sourceA);
+            _controller.TogglePreview(0, _sourceA);
+
             Assert.IsFalse(_controller.IsPreviewing);
-            Assert.AreEqual(1, _surface.RemoveFromPreviewLayerCallCount);
+            Assert.AreEqual(1, _surface.RemoveCallCount);
         }
 
+        /// <summary>
+        /// 点击另一张卡会替换预览。
+        /// </summary>
         [Test]
-        public void TogglePreview_DifferentCard_SwitchesPreview()
+        public void TogglePreview_别卡切换()
         {
-            var sourceA = new VisualElement();
-            var sourceB = new VisualElement();
+            _controller.TogglePreview(0, _sourceA);
+            _controller.TogglePreview(1, _sourceB);
 
-            _controller.TogglePreview(1, sourceA);
-            _controller.TogglePreview(2, sourceB);
-
-            // 切换：先 Remove A clone，再 Add B clone
-            Assert.AreEqual(2, _surface.AddToPreviewLayerCallCount);
-            Assert.AreEqual(1, _surface.RemoveFromPreviewLayerCallCount);
             Assert.IsTrue(_controller.IsPreviewing);
+            Assert.AreEqual(2, _surface.CloneCallCount);
+            Assert.AreEqual(1, _surface.RemoveCallCount);
         }
 
+        /// <summary>
+        /// 进入预览会清 hover、定位并关闭 raycast。
+        /// </summary>
         [Test]
-        public void TogglePreview_AfterReorder_SameSourceReferenceStillExits()
+        public void EnterPreview_清Hover并创建不可点击克隆()
         {
-            // sourceA 在 reorder 前 handIdx=2，reorder 后 handIdx=0；引用不变
-            var sourceA = new VisualElement();
-            _controller.TogglePreview(handIdx: 2, source: sourceA);
-            Assert.IsTrue(_controller.IsPreviewing);
+            _controller.EnterPreview(0, _sourceA);
 
-            // reorder 后 handIdx 改为 0，但 source 引用不变 → SHALL 识别为同卡 → ExitPreview
-            _controller.TogglePreview(handIdx: 0, source: sourceA);
-            Assert.IsFalse(_controller.IsPreviewing);
+            Assert.AreEqual(1, _surface.ClearHoverCallCount);
+            Assert.AreEqual(new Vector2(10f, 20f), _surface.LastAppliedTopCenter);
+            Assert.IsNotNull(_surface.LastClone);
+            foreach (Graphic graphic in _surface.LastClone.GetComponentsInChildren<Graphic>(true))
+            {
+                Assert.IsFalse(graphic.raycastTarget);
+            }
         }
 
+        /// <summary>
+        /// Dispose 会销毁残留预览，且幂等。
+        /// </summary>
         [Test]
-        public void EnterPreview_ClearsAllHoverState_BeforeCloning()
+        public void Dispose_销毁预览且幂等()
         {
-            var sourceA = new VisualElement();
-            _controller.EnterPreview(0, sourceA);
-
-            Assert.AreEqual(1, _surface.ClearAllHoverStateCallCount);
-        }
-
-        [Test]
-        public void EnterPreview_AppliesPreviewClassAndPickingModeIgnore()
-        {
-            var sourceA = new VisualElement();
-            _controller.EnterPreview(0, sourceA);
-
-            var clone = _surface.LastClone;
-            Assert.NotNull(clone);
-            Assert.IsTrue(clone.ClassListContains("card-item--preview"));
-            Assert.AreEqual(PickingMode.Ignore, clone.pickingMode);
-        }
-
-        [Test]
-        public void Dispose_DuringPreview_DestroysClone_AndIsIdempotent()
-        {
-            var sourceA = new VisualElement();
-            _controller.EnterPreview(0, sourceA);
-            Assert.IsTrue(_controller.IsPreviewing);
+            _controller.EnterPreview(0, _sourceA);
 
             _controller.Dispose();
-            Assert.IsFalse(_controller.IsPreviewing);
-            Assert.AreEqual(1, _surface.RemoveFromPreviewLayerCallCount);
 
+            Assert.IsFalse(_controller.IsPreviewing);
+            Assert.AreEqual(1, _surface.RemoveCallCount);
             Assert.DoesNotThrow(() => _controller.Dispose());
         }
     }
 
-    /// <summary>测试用 IPreviewSurface 实现：每次 ClonePreviewElement 返回新 VisualElement，记录调用计数。</summary>
-    public class MockPreviewSurface : IPreviewSurface
+    /// <summary>
+    /// 测试用 IPreviewSurface。
+    /// </summary>
+    public sealed class MockPreviewSurface : IPreviewSurface
     {
-        public int AddToPreviewLayerCallCount;
-        public int RemoveFromPreviewLayerCallCount;
-        public int ClearAllHoverStateCallCount;
-        public Vector2 ConvertResult = Vector2.zero;
-        public VisualElement LastClone;
+        public int CloneCallCount;
+        public int RemoveCallCount;
+        public int ClearHoverCallCount;
+        public GameObject LastClone;
+        public Vector2 LastAppliedTopCenter;
 
-        public VisualElement ClonePreviewElement(VisualElement source)
+        public GameObject ClonePreviewElement(CardItemView source)
         {
-            LastClone = new VisualElement();
+            CloneCallCount++;
+            LastClone = Object.Instantiate(source.Root);
+            foreach (Graphic graphic in LastClone.GetComponentsInChildren<Graphic>(true))
+            {
+                graphic.raycastTarget = false;
+            }
+
             return LastClone;
         }
 
-        public void AddToPreviewLayer(VisualElement element) => AddToPreviewLayerCallCount++;
-        public void RemoveFromPreviewLayer(VisualElement element) => RemoveFromPreviewLayerCallCount++;
-        public Vector2 ConvertHandFanLocalToPreviewLocal(Vector2 sourceTopCenterInHandFan) => ConvertResult;
-        public void ClearAllHoverState() => ClearAllHoverStateCallCount++;
+        public void AddToPreviewLayer(GameObject element)
+        {
+        }
+
+        public void RemoveFromPreviewLayer(GameObject element)
+        {
+            RemoveCallCount++;
+            UguiViewUtil.DestroyObject(element);
+        }
+
+        public Vector2 GetSourceTopCenterInHandFanLocal(CardItemView source) => new Vector2(3f, 4f);
+
+        public Vector2 ConvertHandFanLocalToPreviewLocal(Vector2 sourceTopCenterInHandFan) => new Vector2(10f, 20f);
+
+        public void ApplyPreviewTransform(GameObject element, Vector2 topCenterInPreviewLayer, HandFanLayoutOptions options)
+        {
+            LastAppliedTopCenter = topCenterInPreviewLayer;
+        }
+
+        public void ClearAllHoverState() => ClearHoverCallCount++;
     }
 }

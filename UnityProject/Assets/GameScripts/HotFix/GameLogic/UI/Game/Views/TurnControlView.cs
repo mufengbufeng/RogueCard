@@ -1,118 +1,185 @@
 using System;
-using EF.Debugger;
-using UnityEngine.UIElements;
+using Cysharp.Threading.Tasks;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameLogic
 {
     /// <summary>
-    /// 回合控制视图：封装 end-turn-btn 启用控制（按 Phase）+ 出牌失败 toast 显示（含中文映射 + 1.2s 自动隐藏 +
-    /// 版本号"新失败覆盖旧失败"机制）。订阅 ITurnContext.Phase 与 CardPlayFailed。
+    /// UGUI 回合控制视图，控制结束回合按钮和出牌失败提示。
     /// </summary>
     public sealed class TurnControlView : IDisposable
     {
-        private Button _endTurnBtn;
-        private Label _failToast;
-        private ITurnContext _context;
+        private const int ToastDurationMs = 1200;
 
-        // 缓存订阅委托引用，便于对称解绑
-        private EventCallback<ClickEvent> _onEndTurnClicked;
+        private readonly ITurnContext _context;
+        private readonly Action<TurnControlView, long, int> _scheduleHideToast;
+        private readonly Func<bool> _shouldSuppressEndTurn;
+        private Button _endTurnButton;
+        private TextMeshProUGUI _failToastText;
+        private CanvasGroup _failToastGroup;
+        private GameObject _failToastRoot;
         private Action<BattlePhase> _onPhaseChanged;
         private Action<string> _onCardPlayFailed;
-
-        // 版本号：每次 fail toast 显示自增；schedule 检查版本一致才隐藏（实现"新失败覆盖旧失败"）
         private long _toastVersion;
         private bool _disposed;
 
-        /// <summary>构造回合控制视图。</summary>
-        public TurnControlView(Button endTurnBtn, Label failToast, ITurnContext context)
+        /// <summary>
+        /// 创建回合控制视图。
+        /// </summary>
+        public TurnControlView(Button endTurnButton, TextMeshProUGUI failToastText, CanvasGroup failToastGroup, ITurnContext context)
+            : this(endTurnButton, failToastText, failToastGroup, context, ScheduleHideToastAsync, null)
         {
-            _endTurnBtn = endTurnBtn;
-            _failToast = failToast;
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+        }
 
-            // 注册 end-turn 点击转发
-            if (_endTurnBtn != null)
+        /// <summary>
+        /// 创建回合控制视图，并允许外部在预览消费同次点击时跳过结束回合命令。
+        /// </summary>
+        internal TurnControlView(
+            Button endTurnButton,
+            TextMeshProUGUI failToastText,
+            CanvasGroup failToastGroup,
+            ITurnContext context,
+            Func<bool> shouldSuppressEndTurn)
+            : this(endTurnButton, failToastText, failToastGroup, context, ScheduleHideToastAsync, shouldSuppressEndTurn)
+        {
+        }
+
+        /// <summary>
+        /// 创建回合控制视图，并允许测试替换 toast 延迟调度。
+        /// </summary>
+        internal TurnControlView(
+            Button endTurnButton,
+            TextMeshProUGUI failToastText,
+            CanvasGroup failToastGroup,
+            ITurnContext context,
+            Action<TurnControlView, long, int> scheduleHideToast,
+            Func<bool> shouldSuppressEndTurn = null)
+        {
+            _endTurnButton = endTurnButton;
+            _failToastText = failToastText;
+            _failToastGroup = failToastGroup;
+            _failToastRoot = failToastGroup != null ? failToastGroup.gameObject : failToastText != null ? failToastText.gameObject : null;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _scheduleHideToast = scheduleHideToast ?? ScheduleHideToastAsync;
+            _shouldSuppressEndTurn = shouldSuppressEndTurn;
+
+            if (_endTurnButton != null)
             {
-                _onEndTurnClicked = _ => _context.EndTurn();
-                _endTurnBtn.RegisterCallback(_onEndTurnClicked);
+                _endTurnButton.onClick.AddListener(OnEndTurnClicked);
             }
 
-            // 订阅 Phase / CardPlayFailed
             _onPhaseChanged = OnPhaseChanged;
             _onCardPlayFailed = OnCardPlayFailed;
             _context.Phase.Changed += _onPhaseChanged;
             _context.CardPlayFailed += _onCardPlayFailed;
 
-            // 立即同步首帧（避免首次 Show 时按钮启用状态错位）
             OnPhaseChanged(_context.Phase.Value);
-        }
-
-        /// <summary>按 Phase 启用 / 禁用结束回合按钮。</summary>
-        private void OnPhaseChanged(BattlePhase phase)
-        {
-            if (_disposed || _endTurnBtn == null) return;
-            _endTurnBtn.SetEnabled(phase == BattlePhase.PlayerTurn);
+            SetToastVisible(false);
         }
 
         /// <summary>
-        /// 出牌失败 → 显示红色 toast，按 reason 映射中文，1.2 秒后自动隐藏。
-        /// 用版本号实现"新失败覆盖旧失败"：每次显示自增，定时器只在版本一致时才隐藏。
+        /// 供测试或外部调度推进 toast 隐藏版本。
         /// </summary>
-        private void OnCardPlayFailed(string reason)
+        public void HideToastIfVersionMatches(long version)
         {
-            if (_disposed || _failToast == null) return;
-
-            string text = MapReasonToZh(reason);
-            _failToast.text = text;
-            _failToast.AddToClassList("fail-toast--visible");
-
-            long ver = ++_toastVersion;
-            _failToast.schedule.Execute(() =>
+            if (!_disposed && version == _toastVersion)
             {
-                if (_disposed) return;
-                if (ver == _toastVersion && _failToast != null)
-                {
-                    _failToast.RemoveFromClassList("fail-toast--visible");
-                }
-            }).StartingIn(1200);
+                SetToastVisible(false);
+            }
         }
 
-        /// <summary>把后端失败原因字符串映射为中文文案。</summary>
-        private static string MapReasonToZh(string reason) => reason switch
+        /// <summary>
+        /// 外部直接显示出牌失败提示。
+        /// </summary>
+        public void ShowCardPlayFailed(string reason)
         {
-            "InsufficientEnergy" => "能量不足",
-            "NotPlayerTurn" => "现在不是你的回合",
-            "InvalidTarget" => "无效目标",
-            "InvalidHandIndex" => "卡牌索引错误",
-            _ => "出牌失败",
-        };
+            OnCardPlayFailed(reason);
+        }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 释放事件订阅。
+        /// </summary>
         public void Dispose()
         {
-            if (_disposed) return;
+            if (_disposed)
+            {
+                return;
+            }
+
             _disposed = true;
-
-            // 自增版本号，让任何已调度的 schedule 在触发时检查不通过 → 不操作 _failToast
             _toastVersion++;
-
-            if (_endTurnBtn != null && _onEndTurnClicked != null)
+            if (_endTurnButton != null)
             {
-                _endTurnBtn.UnregisterCallback(_onEndTurnClicked);
+                _endTurnButton.onClick.RemoveListener(OnEndTurnClicked);
             }
-            _onEndTurnClicked = null;
 
-            if (_context != null)
+            _context.Phase.Changed -= _onPhaseChanged;
+            _context.CardPlayFailed -= _onCardPlayFailed;
+            _endTurnButton = null;
+            _failToastText = null;
+            _failToastGroup = null;
+            _failToastRoot = null;
+        }
+
+        private void OnEndTurnClicked()
+        {
+            if (_shouldSuppressEndTurn != null && _shouldSuppressEndTurn())
             {
-                if (_onPhaseChanged != null) _context.Phase.Changed -= _onPhaseChanged;
-                if (_onCardPlayFailed != null) _context.CardPlayFailed -= _onCardPlayFailed;
+                return;
             }
-            _onPhaseChanged = null;
-            _onCardPlayFailed = null;
 
-            _context = null;
-            _endTurnBtn = null;
-            _failToast = null;
+            _context.EndTurn();
+        }
+
+        private void OnPhaseChanged(BattlePhase phase)
+        {
+            if (!_disposed && _endTurnButton != null)
+            {
+                _endTurnButton.interactable = phase == BattlePhase.PlayerTurn;
+            }
+        }
+
+        private void OnCardPlayFailed(string reason)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            UguiViewUtil.SetText(_failToastText, MapReasonToZh(reason));
+            SetToastVisible(true);
+            long version = ++_toastVersion;
+            _scheduleHideToast(this, version, ToastDurationMs);
+        }
+
+        private void SetToastVisible(bool visible)
+        {
+            UguiViewUtil.SetVisible(_failToastRoot, _failToastGroup, visible);
+        }
+
+        private static void ScheduleHideToastAsync(TurnControlView view, long version, int delayMs)
+        {
+            view.HideToastAfterDelayAsync(version, delayMs).Forget();
+        }
+
+        private async UniTaskVoid HideToastAfterDelayAsync(long version, int delayMs)
+        {
+            await UniTask.Delay(delayMs);
+            HideToastIfVersionMatches(version);
+        }
+
+        private static string MapReasonToZh(string reason)
+        {
+            return reason switch
+            {
+                "InsufficientEnergy" => "能量不足",
+                "NotPlayerTurn" => "现在不是你的回合",
+                "InvalidTarget" => "无效目标",
+                "InvalidHandIndex" => "卡牌索引错误",
+                _ => "出牌失败",
+            };
         }
     }
 }

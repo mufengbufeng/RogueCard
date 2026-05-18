@@ -11,7 +11,7 @@ namespace GameLogic.Tests
     /// <summary>
     /// CardDragController 状态机单元测试。通过 MockDragSurface 记录 UI 调用序列与 CapturingDragHostCallbacks
     /// 记录三类回调，验证 PointerDown / Move / Up 序列在不同子态下的行为契约。
-    /// 不依赖 Unity PlayerLoop / VisualElement。
+    /// 不依赖 Unity PlayerLoop 或具体 UI 框架。
     /// </summary>
     [TestFixture]
     public class CardDragControllerTests
@@ -117,7 +117,7 @@ namespace GameLogic.Tests
             _controller.OnPointerUp(0, new Vector2(400, 200));
 
             CollectionAssert.AreEqual(new[] { (0, true) }, _callbacks.CardDroppedOnZoneLog);
-            // SingleManual SHALL NOT 在 controller 内销毁 ghost（保留给 TargetSelector）
+            // SingleManual SHALL NOT 在 controller 内销毁 ghost（保留给上层目标选择适配器）
             Assert.AreEqual(0, _surface.DestroyGhostCallCount, "ghost SHALL be retained for SingleManual");
         }
 
@@ -285,7 +285,7 @@ namespace GameLogic.Tests
         }
 
         [Test]
-        public void EnterDragging_UsesInlineTransitionDuration_NotUssClass()
+        public void EnterDragging_UsesTransitionDuration_NotClassSwitch()
         {
             _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleAuto), NewCard(2, TargetMode.SingleAuto) });
             _surface.ConfiguredCardCount = 2;
@@ -296,7 +296,7 @@ namespace GameLogic.Tests
             // 所有卡都被设置 transitionDuration=0
             Assert.IsTrue(_surface.TransitionDurationCallLog.Contains((0, 0f)));
             Assert.IsTrue(_surface.TransitionDurationCallLog.Contains((1, 0f)));
-            // IDragSurface 没有 AddToClassList/RemoveFromClassList 接口，进一步保证不可能用 USS 类切换
+            // IDragSurface 没有样式类切换接口，进一步保证拖拽状态只依赖明确的适配层调用。
         }
 
         // ── 辅助 ──

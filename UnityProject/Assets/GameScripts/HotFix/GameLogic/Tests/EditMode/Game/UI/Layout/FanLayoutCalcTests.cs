@@ -5,7 +5,7 @@ namespace GameLogic.Tests
 {
     /// <summary>
     /// FanLayoutCalc 单元测试：纯函数验证扇形布局公式与 ComputeInsertSlot 命中规则。
-    /// 不依赖 Unity PlayerLoop / VisualElement，可在 EditMode 即时运行。
+    /// 不依赖 Unity PlayerLoop 或具体 UI 框架，可在 EditMode 即时运行。
     /// </summary>
     [TestFixture]
     public class FanLayoutCalcTests

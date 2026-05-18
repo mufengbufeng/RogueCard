@@ -28,7 +28,7 @@ namespace GameLogic
         /// <summary>卡牌底边距 hand-fan 底部留白。</summary>
         public float HandFanBottomPadding { get; set; } = 20f;
 
-        /// <summary>回弹动画时长（略大于 USS transition 0.15s，单位 ms）。</summary>
+        /// <summary>回弹动画时长（略大于默认过渡 0.15s，单位 ms）。</summary>
         public long ReboundDurationMs { get; set; } = 160L;
     }
 }

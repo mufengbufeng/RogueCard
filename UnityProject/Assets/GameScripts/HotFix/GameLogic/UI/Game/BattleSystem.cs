@@ -17,15 +17,20 @@ namespace GameLogic
         private GameModel _model;
         private IEventPublisher _events;
         private List<GameConfig.battle.BattleWaveSpawnBatch> _currentBatches;
+        private Action<CardPlayedEvent> _cardPlayedHandler;
         private bool _isDisposed;
 
         /// <summary>
         /// 初始化战斗系统。
+        /// 订阅本地 <see cref="CardPlayedEvent"/>，在每次出牌结算完成后尝试自动结束玩家回合。
         /// </summary>
         public void Init(GameModel model, IEventPublisher events)
         {
             _model = model ?? throw new ArgumentNullException(nameof(model));
             _events = events ?? throw new ArgumentNullException(nameof(events));
+
+            _cardPlayedHandler = OnCardPlayed;
+            _events.GetChannel<CardPlayedEvent>().Subscribe(_cardPlayedHandler);
         }
 
         /// <summary>
@@ -334,12 +339,50 @@ namespace GameLogic
         }
 
         /// <summary>
+        /// 出牌结算完成回调：每次玩家成功打出一张卡之后，尝试自动结束玩家回合。
+        /// </summary>
+        private void OnCardPlayed(CardPlayedEvent _)
+        {
+            TryAutoEndPlayerTurnIfCleared();
+        }
+
+        /// <summary>
+        /// 玩家回合内当前批次怪物被清空时，自动跳过怪物回合直接进入检查阶段。
+        /// 仅在 PlayerTurn 才工作，避免在卡牌效果内层递归或其他阶段误触发；
+        /// 直接走 <see cref="BattlePhase.Check"/> 而非 <see cref="EndTurn"/>，
+        /// 以跳过敌人回合开始/结束的 Buff Tick 与延迟效果结算（"清场即胜利"语义）。
+        /// </summary>
+        private void TryAutoEndPlayerTurnIfCleared()
+        {
+            if (_model == null) return;
+            if (_model.Phase != BattlePhase.PlayerTurn) return;
+
+            var monsters = _model.Monsters;
+            if (monsters == null || monsters.Count == 0) return;
+
+            for (int i = 0; i < monsters.Count; i++)
+            {
+                var monster = monsters[i];
+                if (monster != null && monster.Hp > 0) return;
+            }
+
+            SetPhase(BattlePhase.Check);
+        }
+
+        /// <summary>
         /// 释放战斗系统资源。
         /// </summary>
         public void Dispose()
         {
             if (_isDisposed) return;
             _isDisposed = true;
+
+            if (_events != null && _cardPlayedHandler != null)
+            {
+                _events.GetChannel<CardPlayedEvent>().Unsubscribe(_cardPlayedHandler);
+            }
+            _cardPlayedHandler = null;
+
             _releaseResolver = null;
             _model = null;
             _events = null;

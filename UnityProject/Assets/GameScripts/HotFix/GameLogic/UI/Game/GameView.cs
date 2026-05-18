@@ -1,180 +1,280 @@
-using System;
 using EF.Debugger;
 using EF.UI;
-using UnityEngine.UIElements;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameLogic
 {
     /// <summary>
-    /// 局内界面顶层 Screen，作为路由协调器：
-    /// 装配常驻 PlayerStatusView；按 Phase 切换 Region 加载 BattlePanel / RewardPanel；
-    /// BattlePanel 内的全部装配（怪物列表 / 手牌 / 选目标 / 回合控制）由 BattlePanelView 接管。
-    /// 类名 `GameView` 决定按命名约定加载的资源：UXML=`GameUxml`、USS=`GameUss`。
+    /// UGUI 局内界面视图，负责从 Prefab 绑定组件并装配局内战斗子视图。
     /// </summary>
-    public class GameView : Screen<GameViewModel>
+    public class GameView : UIView
     {
-        private enum GameRegionKind
-        {
-            None,
-            Battle,
-            Reward
-        }
+#pragma warning disable 0649
+        [UHubBind("BattlePanel")]
+        private GameObject _battlePanel;
+
+        [UHubBind("RewardPanel")]
+        private GameObject _rewardPanel;
+
+        [UHubBind("PlayerStatusPanel")]
+        private RectTransform _playerStatusPanel;
+
+        [UHubBind("InfoText")]
+        private TextMeshProUGUI _infoText;
+
+        [UHubBind("PlayerHpFill")]
+        private Image _playerHpFill;
+
+        [UHubBind("PlayerHpText")]
+        private TextMeshProUGUI _playerHpText;
+
+        [UHubBind("PlayerArmorText")]
+        private TextMeshProUGUI _playerArmorText;
+
+        [UHubBind("PlayerEnergyFill")]
+        private Image _playerEnergyFill;
+
+        [UHubBind("PlayerEnergyText")]
+        private TextMeshProUGUI _playerEnergyText;
+
+        [UHubBind("PlayerBuffBar")]
+        private RectTransform _playerBuffBar;
+
+        [UHubBind("MonsterRect")]
+        private RectTransform _monsterContainer;
+
+        [UHubBind("CardSc")]
+        private RectTransform _handContainer;
+
+        [UHubBind("DropZone")]
+        private RectTransform _dropZone;
+
+        [UHubBind("PreviewLayer")]
+        private RectTransform _previewLayer;
+
+        [UHubBind("EndBtn")]
+        private Button _endTurnButton;
+
+        [UHubBind("FailToast")]
+        private TextMeshProUGUI _failToastText;
+
+        [UHubBind("RewardConfirmBtn")]
+        private Button _rewardConfirmButton;
+
+        [UHubBind("HandCardTemplate")]
+        private GameObject _handCardTemplate;
+
+        [UHubBind("MonsterItemTemplate")]
+        private GameObject _monsterItemTemplate;
+
+        [UHubBind("BuffIconTemplate")]
+        private GameObject _buffIconTemplate;
+
+        [UHubBind("IntentIconTemplate")]
+        private GameObject _intentIconTemplate;
+#pragma warning restore 0649
 
         private PlayerStatusView _playerStatusView;
         private BattlePanelView _battlePanelView;
-        private Button _rewardConfirmBtn;
+        private GameViewModel _viewModel;
 
-        private Region _mainRegion;
-        private GameRegionKind _activeRegion = GameRegionKind.None;
-        private int _regionSwitchVersion;
+        /// <summary>
+        /// 奖励确认按钮点击事件。
+        /// </summary>
+        public event System.Action RewardConfirmClicked;
 
-        private VisualTreeAsset _monsterItemVta;
-        private VisualTreeAsset _cardItemVta;
+        /// <summary>
+        /// 兼容测试与旧 Controller 边界的结束回合事件。
+        /// </summary>
+        public event System.Action EndTurnClicked;
 
-        private readonly HandFanLayoutOptions _handFanLayoutOptions = new();
+        /// <summary>
+        /// 兼容测试与旧 Controller 边界的手牌点击事件。
+        /// </summary>
+        public event System.Action<int> HandCardClicked;
 
-        /// <inheritdoc />
-        protected override void OnSetup()
+        /// <summary>
+        /// 兼容测试与旧 Controller 边界的怪物目标选择事件。
+        /// </summary>
+        public event System.Action<int, int> MonsterTargetSelected;
+
+        /// <summary>
+        /// 初始化 UHub 组件绑定。
+        /// </summary>
+        protected override void OnInitialize()
         {
-            // 常驻区域：玩家状态面板（位于 GameUxml.uxml 顶部 info-bar / player-status / player-buff-bar）
-            _playerStatusView = new PlayerStatusView(this, ViewModel);
+            base.OnInitialize();
+            UHub.Initialize();
+        }
 
-            var slot = this.Q("main-region");
-            if (slot == null)
+        /// <summary>
+        /// 绑定奖励确认按钮。
+        /// </summary>
+        protected override void OnBindings()
+        {
+            base.OnBindings();
+            if (_rewardConfirmButton != null)
             {
-                Log.Error("[GameView] GameUxml.uxml 缺少 name=\"main-region\" 容器");
+                BindEvent(_rewardConfirmButton.onClick, () => RewardConfirmClicked?.Invoke());
+            }
+        }
+
+        /// <summary>
+        /// 打开局内界面。
+        /// </summary>
+        protected override void OnOpen(object userData)
+        {
+            base.OnOpen(userData);
+            Log.Info("[GameView] 局内 UGUI 界面已打开");
+        }
+
+        /// <summary>
+        /// 刷新局内界面。
+        /// </summary>
+        public void Render(GameViewModel viewModel)
+        {
+            if (viewModel == null)
+            {
                 return;
             }
-            _mainRegion = new Region(slot, GameLogicEntry.Resource);
 
-            ViewModel.Phase.Changed += OnPhaseChanged;
-
-            Log.Info("[GameView] 局内界面绑定完成");
-        }
-
-        /// <inheritdoc />
-        public override void OnShow()
-        {
-            LoadItemTemplates();
-            OnPhaseChanged(ViewModel.Phase.Value);
-            Log.Info("[GameView] 局内界面已显示");
-        }
-
-        private async void OnPhaseChanged(BattlePhase phase)
-        {
-            if (_mainRegion == null) return;
-
-            GameRegionKind target = MapPhaseToRegion(phase);
-            if (target == _activeRegion) return;
-            _activeRegion = target;
-
-            int switchVersion = ++_regionSwitchVersion;
-
-            try
+            if (!ReferenceEquals(_viewModel, viewModel))
             {
-                switch (target)
+                DisposeBattleViews();
+                _viewModel = viewModel;
+                _playerStatusView = new PlayerStatusView(BuildPlayerStatusBindings(), _viewModel);
+            }
+
+            bool rewardPhase = viewModel.Phase.Value == BattlePhase.Reward || viewModel.IsLevelComplete.Value;
+            SetPanelActive(_battlePanel, !rewardPhase);
+            SetPanelActive(_rewardPanel, rewardPhase);
+
+            if (rewardPhase)
+            {
+                DisposeBattlePanelOnly();
+                return;
+            }
+
+            EnsureBattlePanel();
+        }
+
+        /// <summary>
+        /// 显示出牌失败提示。
+        /// </summary>
+        public void ShowCardPlayFailed(string reason)
+        {
+            _battlePanelView?.ShowCardPlayFailed(reason);
+        }
+
+        /// <summary>
+        /// 释放子视图和事件。
+        /// </summary>
+        protected override void OnRelease()
+        {
+            DisposeBattleViews();
+            RewardConfirmClicked = null;
+            EndTurnClicked = null;
+            HandCardClicked = null;
+            MonsterTargetSelected = null;
+            base.OnRelease();
+        }
+
+        /// <summary>
+        /// 测试专用：模拟结束回合点击。
+        /// </summary>
+        internal void NotifyEndTurnClickedForTests() => EndTurnClicked?.Invoke();
+
+        /// <summary>
+        /// 测试专用：模拟奖励确认点击。
+        /// </summary>
+        internal void NotifyRewardConfirmClickedForTests() => RewardConfirmClicked?.Invoke();
+
+        /// <summary>
+        /// 测试专用：模拟点击手牌。
+        /// </summary>
+        internal void NotifyHandCardClickedForTests(int handIndex) => HandCardClicked?.Invoke(handIndex);
+
+        /// <summary>
+        /// 测试专用：模拟选择怪物目标。
+        /// </summary>
+        internal void NotifyMonsterTargetSelectedForTests(int handIndex, int monsterIndex) =>
+            MonsterTargetSelected?.Invoke(handIndex, monsterIndex);
+
+        private void EnsureBattlePanel()
+        {
+            if (_battlePanelView != null || _viewModel == null)
+            {
+                return;
+            }
+
+            _battlePanelView = new BattlePanelView(BuildBattlePanelBindings(), _viewModel, new HandFanLayoutOptions());
+        }
+
+        private PlayerStatusBindings BuildPlayerStatusBindings()
+        {
+            return new PlayerStatusBindings
+            {
+                InfoText = _infoText,
+                HpFill = _playerHpFill,
+                HpText = _playerHpText,
+                ArmorText = _playerArmorText,
+                EnergyFill = _playerEnergyFill,
+                EnergyText = _playerEnergyText,
+                PlayerBuffBar = _playerBuffBar,
+                BuffIconTemplate = _buffIconTemplate,
+            };
+        }
+
+        private BattlePanelBindings BuildBattlePanelBindings()
+        {
+            CanvasGroup failToastGroup = null;
+            if (_failToastText != null)
+            {
+                failToastGroup = _failToastText.GetComponent<CanvasGroup>();
+                if (failToastGroup == null)
                 {
-                    case GameRegionKind.Battle:
-                        await _mainRegion.ShowAsync("BattlePanel");
-                        if (switchVersion != _regionSwitchVersion) return;
-                        BindBattleContent();
-                        break;
-                    case GameRegionKind.Reward:
-                        DisposeBattlePanel();
-                        await _mainRegion.ShowAsync("RewardPanel");
-                        if (switchVersion != _regionSwitchVersion) return;
-                        BindRewardContent();
-                        break;
-                    default:
-                        // Idle 等阶段保持当前内容
-                        break;
+                    failToastGroup = _failToastText.gameObject.AddComponent<CanvasGroup>();
                 }
             }
-            catch (Exception e)
+
+            return new BattlePanelBindings
             {
-                Log.Error($"[GameView] 切换 Region 失败：{e.Message}");
-            }
+                MonsterContainer = _monsterContainer,
+                HandContainer = _handContainer,
+                DropZone = _dropZone,
+                PreviewLayer = _previewLayer,
+                EndTurnButton = _endTurnButton,
+                FailToast = new TextMeshProUGUIProxy { Text = _failToastText, Group = failToastGroup },
+                CancelTargetButton = _dropZone != null ? _dropZone.GetComponent<Button>() : null,
+                HandCardTemplate = _handCardTemplate,
+                MonsterItemTemplate = _monsterItemTemplate,
+                BuffIconTemplate = _buffIconTemplate,
+                IntentIconTemplate = _intentIconTemplate,
+            };
         }
 
-        /// <summary>把详细 Phase 映射到 UI Region 路由：战斗中各阶段都用 BattlePanel；Reward 用 RewardPanel。</summary>
-        private static GameRegionKind MapPhaseToRegion(BattlePhase phase) => phase switch
+        private void DisposeBattleViews()
         {
-            BattlePhase.Prepare => GameRegionKind.Battle,
-            BattlePhase.PlayerTurn => GameRegionKind.Battle,
-            BattlePhase.MonsterTurn => GameRegionKind.Battle,
-            BattlePhase.Check => GameRegionKind.Battle,
-            BattlePhase.Reward => GameRegionKind.Reward,
-            _ => GameRegionKind.None
-        };
-
-        private void BindBattleContent()
-        {
-            var content = _mainRegion?.CurrentContent;
-            if (content == null) return;
-            _battlePanelView?.Dispose();
-            _battlePanelView = new BattlePanelView(content, ViewModel, _monsterItemVta, _cardItemVta, _handFanLayoutOptions);
+            DisposeBattlePanelOnly();
+            _playerStatusView?.Dispose();
+            _playerStatusView = null;
+            _viewModel = null;
         }
 
-        private void BindRewardContent()
-        {
-            var content = _mainRegion?.CurrentContent;
-            if (content == null) return;
-            _rewardConfirmBtn = content.Q<Button>("reward-confirm-btn");
-            _rewardConfirmBtn?.RegisterCallback<ClickEvent>(_ => ViewModel.SelectReward());
-        }
-
-        private void DisposeBattlePanel()
+        private void DisposeBattlePanelOnly()
         {
             _battlePanelView?.Dispose();
             _battlePanelView = null;
         }
 
-        private void LoadItemTemplates()
+        private static void SetPanelActive(GameObject panel, bool active)
         {
-            if (_monsterItemVta != null && _cardItemVta != null) return;
-            try
+            if (panel != null && panel.activeSelf != active)
             {
-                var rm = GameLogicEntry.Resource;
-                if (rm == null) return;
-                _monsterItemVta = LoadTemplate(rm, "MonsterItem");
-                _cardItemVta = LoadTemplate(rm, "CardItem");
+                panel.SetActive(active);
             }
-            catch (Exception e)
-            {
-                Log.Warning($"[GameView] 加载模板失败：{e.Message}");
-            }
-        }
-
-        private static VisualTreeAsset LoadTemplate(EF.Resource.IResourceManager rm, string location)
-        {
-            try
-            {
-                var handle = rm.LoadAssetSync<VisualTreeAsset>(location);
-                return handle.AssetObject as VisualTreeAsset;
-            }
-            catch (Exception e)
-            {
-                Log.Warning($"[GameView] 加载模板失败 {location}：{e.Message}");
-                return null;
-            }
-        }
-
-        /// <inheritdoc />
-        public override void OnDispose()
-        {
-            _regionSwitchVersion++;
-
-            if (ViewModel != null)
-            {
-                ViewModel.Phase.Changed -= OnPhaseChanged;
-            }
-
-            DisposeBattlePanel();
-            _playerStatusView?.Dispose();
-            _playerStatusView = null;
-            _mainRegion?.Clear();
-
-            base.OnDispose();
         }
     }
 }

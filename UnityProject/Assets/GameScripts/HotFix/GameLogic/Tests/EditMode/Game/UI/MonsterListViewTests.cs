@@ -1,143 +1,120 @@
 using System.Collections.Generic;
-using System.Reflection;
-using GameConfig.monster;
+using GameConfig.card;
 using NUnit.Framework;
+using TMPro;
 using UnityEngine;
-using UnityEngine.UIElements;
 
 namespace GameLogic.Tests
 {
     /// <summary>
-    /// MonsterListView 单元测试：通过 FakeMonsterListContext + 手工构造的 VisualTreeAsset
-    /// 验证空列表 / 含死亡怪物过滤 / Items 数量 / Dispose 行为。
-    /// 怪物模板用 ScriptableObject.CreateInstance<VisualTreeAsset>() 创建空模板，
-    /// MonsterItemView 内的查询会找不到子元素，但不会抛异常 —— 测试关注 List 本身的契约。
+    /// UGUI MonsterItemView / MonsterListView 行为测试。
     /// </summary>
     [TestFixture]
-    public class MonsterListViewTests
+    public sealed class MonsterListViewTests
     {
-        private VisualElement _container;
-        private VisualTreeAsset _template;
-        private FakeMonsterListContext _ctx;
+        private GameObject _root;
+        private FakeMonsterListContext _context;
+        private RectTransform _container;
+        private GameObject _monsterTemplate;
+        private GameObject _buffTemplate;
+        private GameObject _intentTemplate;
 
         [SetUp]
         public void SetUp()
         {
-            _container = new VisualElement { name = "monster-container" };
-            _template = ScriptableObject.CreateInstance<VisualTreeAsset>();
-            _ctx = new FakeMonsterListContext();
+            _root = UguiTestFactory.CreateRectObject("MonsterRoot");
+            _context = new FakeMonsterListContext();
+            _container = UguiTestFactory.CreateRectObject("MonsterRect", _root.transform).GetComponent<RectTransform>();
+            _monsterTemplate = UguiTestFactory.CreateMonsterTemplate("MonsterItemTemplate", _container);
+            _buffTemplate = UguiTestFactory.CreateIconTemplate("BuffIconTemplate", _root.transform);
+            _intentTemplate = UguiTestFactory.CreateIconTemplate("IntentIconTemplate", _root.transform);
+            MonsterItemView.EffectResolverOverride = card => new List<CardEffect> { UguiTestFactory.NewEffect(card.Id, EffectKind.Damage, 12) };
         }
 
         [TearDown]
         public void TearDown()
         {
-            if (_template != null) Object.DestroyImmediate(_template);
+            MonsterItemView.EffectResolverOverride = null;
+            Object.DestroyImmediate(_root);
         }
 
-        /// <summary>反射构造一个最小 Monster 配置（仅 Name 字段）。</summary>
-        private static Monster NewMonsterConfig(string name)
+        /// <summary>
+        /// 列表只渲染存活怪物，并保留原始怪物索引。
+        /// </summary>
+        [Test]
+        public void 刷新列表_只渲染存活怪物并保留索引()
         {
-            var cfg = (Monster)System.Runtime.Serialization.FormatterServices.GetUninitializedObject(typeof(Monster));
-            var nameField = typeof(Monster).GetField("Name",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            if (nameField != null) nameField.SetValue(cfg, name);
-            return cfg;
+            var view = new MonsterListView(_container, _context, _monsterTemplate, _buffTemplate, _intentTemplate);
+
+            _context.Monsters.Value = new[]
+            {
+                NewMonster("史莱姆", 10, 20),
+                NewMonster("已死亡", 0, 20),
+                NewMonster("蝙蝠", 8, 10),
+            };
+
+            Assert.AreEqual(2, view.Items.Count);
+            Assert.AreEqual(0, view.Items[0].MonsterIndex);
+            Assert.AreEqual(2, view.Items[1].MonsterIndex);
+            view.Dispose();
         }
 
-        private static MonsterRuntime NewMonster(int hp, int maxHp, string name = "M")
+        /// <summary>
+        /// 怪物项渲染名称、HP、护甲、意图和 Buff。
+        /// </summary>
+        [Test]
+        public void 怪物项_渲染状态意图和Buff()
+        {
+            var dotCard = UguiTestFactory.NewCard(7, "毒击", 1, TargetMode.SplitAcrossAll);
+            MonsterItemView.EffectResolverOverride = _ => new List<CardEffect> { UguiTestFactory.NewEffect(7, EffectKind.DamageDot, 3, 4) };
+            var monster = NewMonster("毒蛛", 15, 30);
+            monster.Armor = 2;
+            monster.PendingCards.Add(dotCard);
+            monster.Buffs.Add(new BuffRuntime { Kind = EffectKind.DamageDot, Value = 2, RemainingTurns = 3 });
+
+            using var item = new MonsterItemView(_monsterTemplate, monster, 1, 4, _buffTemplate, _intentTemplate);
+
+            Assert.AreEqual("毒蛛", FindText(_monsterTemplate, "NameText").text);
+            Assert.That(FindText(_monsterTemplate, "HpText").text, Does.Contain("15/30"));
+            Assert.AreEqual("3×4", FindText(_monsterTemplate.transform.Find("IntentBar").gameObject, "Text").text);
+            Assert.AreEqual("2×3", FindText(_monsterTemplate.transform.Find("BuffBar").gameObject, "Text").text);
+        }
+
+        /// <summary>
+        /// Dispose 后 Monsters 变化不再创建新项。
+        /// </summary>
+        [Test]
+        public void Dispose后_不再刷新()
+        {
+            var view = new MonsterListView(_container, _context, _monsterTemplate, _buffTemplate, _intentTemplate);
+            view.Dispose();
+
+            _context.Monsters.Value = new[] { NewMonster("新怪", 10, 10) };
+
+            Assert.AreEqual(1, _container.childCount, "容器中应只剩模板本体。");
+        }
+
+        private static MonsterRuntime NewMonster(string name, int hp, int maxHp)
         {
             return new MonsterRuntime
             {
+                Config = UguiTestFactory.NewMonsterConfig(1, name),
                 Hp = hp,
                 MaxHp = maxHp,
-                Config = NewMonsterConfig(name),
             };
         }
 
-        [Test]
-        public void 空列表_容器无子元素()
+        private static TextMeshProUGUI FindText(GameObject root, string name)
         {
-            var view = new MonsterListView(_container, _ctx, _template);
-            Assert.AreEqual(0, view.Items.Count);
-            view.Dispose();
-        }
-
-        [Test]
-        public void 含死亡怪物_过滤后仅保留存活项()
-        {
-            var view = new MonsterListView(_container, _ctx, _template);
-            _ctx.Monsters.Value = new[]
+            foreach (TextMeshProUGUI text in root.GetComponentsInChildren<TextMeshProUGUI>(true))
             {
-                NewMonster(10, 10, "A"),
-                NewMonster(0, 10, "B"),  // dead
-                NewMonster(5, 10, "C"),
-            };
+                if (text.gameObject.name == name)
+                {
+                    return text;
+                }
+            }
 
-            Assert.AreEqual(2, view.Items.Count);
-            view.Dispose();
-        }
-
-        [Test]
-        public void Monsters变化_全量重建项()
-        {
-            var view = new MonsterListView(_container, _ctx, _template);
-            _ctx.Monsters.Value = new[] { NewMonster(10, 10), NewMonster(10, 10), NewMonster(10, 10) };
-            Assert.AreEqual(3, view.Items.Count);
-
-            // 重新发布列表（含 1 只死亡）→ 全量重建为 2
-            _ctx.Monsters.Value = new[]
-            {
-                NewMonster(10, 10),
-                NewMonster(10, 10),
-                NewMonster(0, 10),
-            };
-
-            Assert.AreEqual(2, view.Items.Count);
-            view.Dispose();
-        }
-
-        [Test]
-        public void TargetMode_存活项保留原始怪物索引映射()
-        {
-            var view = new MonsterListView(_container, _ctx, _template);
-            _ctx.Monsters.Value = new[]
-            {
-                NewMonster(0, 10, "Dead"),
-                NewMonster(10, 10, "AliveA"),
-                NewMonster(5, 10, "AliveB"),
-            };
-
-            var field = typeof(MonsterListView).GetField(
-                "_itemMonsterIndices",
-                BindingFlags.NonPublic | BindingFlags.Instance);
-            Assert.NotNull(field, "未找到 _itemMonsterIndices");
-            var indices = (List<int>)field.GetValue(view);
-
-            CollectionAssert.AreEqual(new[] { 1, 2 }, indices);
-            view.Dispose();
-        }
-
-        [Test]
-        public void Dispose后_Monsters变化不再触发渲染()
-        {
-            var view = new MonsterListView(_container, _ctx, _template);
-            _ctx.Monsters.Value = new[] { NewMonster(10, 10) };
-            int countBefore = view.Items.Count;
-
-            view.Dispose();
-            _ctx.Monsters.Value = new[] { NewMonster(10, 10), NewMonster(10, 10) };
-
-            // Items 仍是 Dispose 时清空后的状态（0），原有项已被释放
-            Assert.AreEqual(0, view.Items.Count);
-            Assert.AreEqual(0, _container.childCount);
-        }
-
-        [Test]
-        public void 重复Dispose_安全()
-        {
-            var view = new MonsterListView(_container, _ctx, _template);
-            view.Dispose();
-            Assert.DoesNotThrow(() => view.Dispose());
+            return root.GetComponentInChildren<TextMeshProUGUI>(true);
         }
     }
 }

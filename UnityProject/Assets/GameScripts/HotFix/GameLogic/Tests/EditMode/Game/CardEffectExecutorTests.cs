@@ -240,7 +240,9 @@ namespace GameLogic.Tests.EditMode.Game
         [Test]
         public void DamageInstantPlusDot_两条效果都生效()
         {
-            // 法术卡：Damage 8 + DamageDot 2 Duration 3
+            // Executor 在直接收到一条 Damage + 一条 DamageDot 时，都应该被执行（立即扣血 + 登记 Buff）。
+            // 注意：基础法术卡 1003 的主伤害已改为 EnemyTurnStart，由 CardReleaseResolver 负责延迟拆分，
+            // Executor 自身仍然按"已到期效果即时执行"语义工作，这里测试的就是 Executor 的纯执行路径。
             var card = NewCard(1, TargetMode.SingleManual);
             var effects = new List<CardEffect>
             {

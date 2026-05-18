@@ -1,7 +1,6 @@
 using System;
 using Cysharp.Threading.Tasks;
 using EF.Debugger;
-using EF.Event;
 using EF.Procedure;
 using EF.UI;
 using ProcedureOwner = EF.Fsm.IFsm<EF.Procedure.IProcedureManager>;
@@ -9,14 +8,12 @@ using ProcedureOwner = EF.Fsm.IFsm<EF.Procedure.IProcedureManager>;
 namespace GameLogic
 {
     /// <summary>
-    /// 主菜单流程。创建 MainViewModel，从配置表填充数据，
-    /// 通过 Navigator 打开 MainView，订阅 ViewModel 命令意图。
+    /// 主菜单流程。通过 UGUI UIManager 打开 MainView，订阅开始关卡事件。
     /// </summary>
     public class MainMenuProcedure : ProcedureBase
     {
-        private INavigator _navigator;
+        private IUIManager _uiManager;
         private ProcedureOwner _procedureOwner;
-        private MainViewModel _viewModel;
 
         /// <inheritdoc />
         protected internal override void OnInit(ProcedureOwner procedureOwner)
@@ -30,8 +27,8 @@ namespace GameLogic
         {
             base.OnEnter(procedureOwner);
             _procedureOwner = procedureOwner;
-            // 延迟到 OnEnter 才读 Navigator，确保此时 InitializeNavigator 已完成
-            _navigator = GameLogicEntry.Navigator;
+            _uiManager = GameLogicEntry.UI;
+            GameLogicEntry.Event.StartLevelRequestedEvent.Subscribe(OnStartRequested);
             EnterAsync().Forget();
         }
 
@@ -39,19 +36,17 @@ namespace GameLogic
         {
             try
             {
-                if (_navigator == null)
+                if (_uiManager == null)
                 {
-                    Log.Error("[MainMenuProcedure] Navigator 未初始化（GameLogicEntry.Navigator 为 null）。"
-                              + "请检查 Console 中 [GameLogicEntry] 开头的早期日志，"
-                              + "查找 InitializeNavigator 失败原因（可能是缺少 Entry 节点 / ReferenceCollector / Normal/UIDocument）。");
+                    Log.Error("[MainMenuProcedure] UIManager 未初始化（GameLogicEntry.UI 为 null）。");
                     return;
                 }
 
-                _viewModel = new MainViewModel();
-                PopulateFromConfig(_viewModel);
-                _viewModel.StartRequested += OnStartRequested;
-
-                await _navigator.OpenAsync<MainView>(_viewModel);
+                await _uiManager.OpenWindowAsync<MainView, MainController>(
+                    "MainView",
+                    UILayer.Normal,
+                    cacheOnClose: true,
+                    allowMultiple: false);
                 Log.Info("[MainMenuProcedure] 主界面已打开");
             }
             catch (Exception e)
@@ -64,6 +59,7 @@ namespace GameLogic
         protected internal override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
         {
             base.OnLeave(procedureOwner, isShutdown);
+            _uiManager?.CloseWindowAsync(nameof(MainView)).Forget();
             Cleanup();
             Log.Info("[MainMenuProcedure] OnLeave");
         }
@@ -76,51 +72,9 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 从配置表填充 MainViewModel 数据。
-        /// </summary>
-        private void PopulateFromConfig(MainViewModel vm)
-        {
-            vm.StatusText.Value = MainModel.ReadyStatusText;
-            vm.CanStart.Value = true;
-
-            var tables = GameLogicEntry.Config?.Tables;
-            if (tables == null)
-            {
-                vm.LevelName.Value = MainModel.FallbackLevelName;
-                vm.LevelDesc.Value = MainModel.FallbackLevelDescription;
-                return;
-            }
-
-            GameConfig.level.Level defaultLevel = null;
-            foreach (var lvl in tables.TbLevel.DataList)
-            {
-                if (lvl.IsDefault)
-                {
-                    defaultLevel = lvl;
-                    break;
-                }
-            }
-
-            if (defaultLevel != null)
-            {
-                vm.DefaultLevelId = defaultLevel.Id;
-                vm.LevelName.Value = defaultLevel.Name;
-                vm.LevelDesc.Value = defaultLevel.Desc;
-                Log.Info($"[MainMenuProcedure] 从配置表加载默认关卡：{defaultLevel.Id} - {defaultLevel.Name}");
-            }
-            else
-            {
-                Log.Warning("[MainMenuProcedure] TbLevel 中未找到默认关卡，使用占位信息");
-                vm.DefaultLevelId = MainModel.FallbackLevelId;
-                vm.LevelName.Value = MainModel.FallbackLevelName;
-                vm.LevelDesc.Value = MainModel.FallbackLevelDescription;
-            }
-        }
-
-        /// <summary>
         /// 处理开始游戏意图。
         /// </summary>
-        private void OnStartRequested()
+        private void OnStartRequested(StartLevelRequestedEvent evt)
         {
             if (_procedureOwner == null)
             {
@@ -128,7 +82,7 @@ namespace GameLogic
                 return;
             }
 
-            int levelId = _viewModel?.DefaultLevelId ?? MainModel.FallbackLevelId;
+            int levelId = evt.LevelId;
             Log.Info($"[MainMenuProcedure] 请求进入关卡：{levelId}，切换到局内流程");
             GameProcedure.PendingLevelId = levelId;
             ChangeState<GameProcedure>(_procedureOwner);
@@ -139,12 +93,9 @@ namespace GameLogic
         /// </summary>
         private void Cleanup()
         {
-            if (_viewModel != null)
-            {
-                _viewModel.StartRequested -= OnStartRequested;
-                _viewModel = null;
-            }
+            GameLogicEntry.Event?.StartLevelRequestedEvent.Unsubscribe(OnStartRequested);
 
+            _uiManager = null;
             _procedureOwner = null;
         }
     }

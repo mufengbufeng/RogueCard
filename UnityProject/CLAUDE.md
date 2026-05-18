@@ -40,14 +40,14 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 | Entity     | `IEntityManager`     | 实体生命周期与对象池                                |
 | Scene      | `ISceneManager`      | 场景加载/卸载                                       |
 
-### UI 系统（MVVM + UI Toolkit）
+### UI 系统（UGUI MVC）
 
-- **Screen / Popup**（`Screen<TViewModel>` / `Popup<TViewModel>`，VisualElement）：UI 顶层容器。`Screen<>` 派生类被 Navigator 替换到 ScreenLayer，`Popup<>` 派生类入栈到 PopupLayer。
-- **ViewModel**（`ViewModelBase`）：暴露 `ReactiveProperty<T>` 供 Screen 绑定 + 命令意图事件供 Procedure 响应。
+- **UIView / UIController**：运行时 UI 基于 UGUI Prefab、`UIView` 和 `UIController`。View 负责组件绑定与显示刷新，Controller 负责订阅 View 事件并协调 Model / Procedure 命令。
+- **IUIManager**：通过 `UIManager.OpenWindowAsync<TView, TController>()` 打开窗口，支持 Background / Normal / Popup / Overlay 四层、缓存关闭、单实例或多实例窗口。
 - **Model**（`ModelBase<TData>`）：数据存储，全局注册在 `ModelManager` 中。**懒注册**——首次通过 `ModelManager.TryGetModel<T>()` 访问时自动构造，业务代码无需在启动期显式注册。
-- **命名约定（强约束）**：`{Stem}View` / `{Stem}ViewModel` / `{Stem}Uxml` / `{Stem}Uss` 四件套围绕同一个 `{Stem}` 组织。如 `MainView` 类对应 `MainViewModel` + `MainUxml.uxml` + `MainUss.uss`。
-- **打开界面**：`Navigator.OpenAsync<MainView>(viewModel)`（按类型，首选）或 `Navigator.OpenAsync("MainView", viewModel)`（按字符串，供配置表数据驱动）。**新增 Screen 不再需要回 `GameLogicEntry` 注册**——Navigator 按命名约定加载 UXML/USS、按基类分流到 ScreenLayer/PopupLayer。
-- **特殊资源名**：罕见情况可在 Screen 子类 override `UxmlLocation` / `UssLocation` 属性指向自定义 addressable。USS 资源缺失不报错，DEBUG 警告一次。
+- **命名约定（强约束）**：`{Stem}View` / `{Stem}Controller` / `{Stem}` Prefab 围绕同一个 `{Stem}` 组织。如 `MainView` 类对应 `MainController` + `MainView.prefab`。
+- **打开界面**：优先使用 `GameLogicEntry.UI.OpenWindowAsync<MainView, MainController>("MainView", UILayer.Normal, ...)`。资源地址应指向 UGUI Prefab，Prefab 通过 `ReferenceCollector` 与 UHub 绑定按钮、文本、面板等组件。
+- **入口场景**：`GameLogicEntry.InitializeUI()` 从 Entry 的 `ReferenceCollector` 读取 `UIRoot`、`UICamera` 和四层根节点；当只配置 `UIRoot` 时会补齐 Canvas、GraphicRaycaster 与 Background / Normal / Popup / Overlay 子层级。
 
 ### 流程（Procedure）
 

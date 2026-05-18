@@ -1,7 +1,7 @@
 namespace GameLogic
 {
     /// <summary>
-    /// 拖拽控制器 → 上层（HandFanView / BattlePanelView）的回调接口。
+    /// 拖拽控制器 → 上层 UI 适配器的回调接口。
     /// 三个事件覆盖单击 / 拖到 drop-zone / 取消三种结局，上层据此决定后续动作（出牌、SelectingTarget、回弹等）。
     /// </summary>
     public interface IDragHostCallbacks

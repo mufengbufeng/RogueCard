@@ -1,94 +1,186 @@
 using System;
-using UnityEngine.UIElements;
+using TMPro;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace GameLogic
 {
     /// <summary>
-    /// 单张手牌视图：从 CardItem.uxml CloneTree 出 .card-item 内层 VisualElement，
-    /// 设置 card-name / card-cost 文本，注册 PointerDown / Enter / Leave 转发到上层 HandFanView。
-    /// HandIndex 闭包语义：构造时传入，reorder 后保持不变（用于 UseCard）。
+    /// UGUI 单张手牌视图，负责文本渲染和指针事件转发。
     /// </summary>
     public sealed class CardItemView : IDisposable
     {
-        private VisualElement _root;
-        private EventCallback<PointerDownEvent> _onPointerDown;
-        private EventCallback<PointerEnterEvent> _onPointerEnter;
-        private EventCallback<PointerLeaveEvent> _onPointerLeave;
+        private readonly CardPointerRelay _pointerRelay;
+        private readonly CanvasGroup _canvasGroup;
+        private readonly Graphic _rootGraphic;
         private bool _disposed;
 
-        /// <summary>卡牌根 VisualElement（含 .card-item 类）。HandFanView 添加到 hand-fan 容器。</summary>
-        public VisualElement Root => _root;
+        /// <summary>
+        /// 卡牌根对象。
+        /// </summary>
+        public GameObject Root { get; }
 
-        /// <summary>卡牌在 ViewModel.Hand 中的索引（构造时捕获，reorder 后不变）。</summary>
+        /// <summary>
+        /// 卡牌 RectTransform。
+        /// </summary>
+        public RectTransform RectTransform { get; }
+
+        /// <summary>
+        /// 构造时捕获的手牌索引，拖拽重排后不变。
+        /// </summary>
         public int HandIndex { get; }
 
-        /// <summary>本卡的 CardRuntime 数据快照，供上层查 TargetMode 等配置。</summary>
+        /// <summary>
+        /// 卡牌运行时数据。
+        /// </summary>
         public CardRuntime Card { get; }
 
-        /// <summary>PointerDown 事件，参数 (sender, evt)。</summary>
-        public event Action<CardItemView, PointerDownEvent> PointerDown;
+        /// <summary>
+        /// 指针按下事件。
+        /// </summary>
+        public event Action<CardItemView, PointerEventData> PointerDown;
 
-        /// <summary>PointerEnter 事件，参数 sender。</summary>
+        /// <summary>
+        /// 指针拖动事件。
+        /// </summary>
+        public event Action<CardItemView, PointerEventData> PointerMove;
+
+        /// <summary>
+        /// 指针抬起事件。
+        /// </summary>
+        public event Action<CardItemView, PointerEventData> PointerUp;
+
+        /// <summary>
+        /// 指针移入事件。
+        /// </summary>
         public event Action<CardItemView> PointerEnter;
 
-        /// <summary>PointerLeave 事件，参数 sender。</summary>
-        public event Action<CardItemView> PointerLeave;
+        /// <summary>
+        /// 指针移出事件。
+        /// </summary>
+        public event Action<CardItemView> PointerExit;
 
-        /// <summary>构造单卡视图。</summary>
-        /// <param name="clonedRoot">已 CloneTree 的根元素（带 .card-item 类的内层节点）。</param>
-        /// <param name="handIndex">在 ViewModel.Hand 中的索引（闭包捕获）。</param>
-        /// <param name="card">卡牌运行时数据。</param>
-        public CardItemView(VisualElement clonedRoot, int handIndex, CardRuntime card)
+        /// <summary>
+        /// 创建卡牌视图并刷新文本。
+        /// </summary>
+        public CardItemView(GameObject root, int handIndex, CardRuntime card)
         {
-            _root = clonedRoot ?? throw new ArgumentNullException(nameof(clonedRoot));
+            Root = root ?? throw new ArgumentNullException(nameof(root));
+            RectTransform = root.GetComponent<RectTransform>() ?? root.AddComponent<RectTransform>();
             HandIndex = handIndex;
             Card = card;
+            _canvasGroup = root.GetComponent<CanvasGroup>() ?? root.AddComponent<CanvasGroup>();
+            _rootGraphic = root.GetComponent<Graphic>();
+            _pointerRelay = root.GetComponent<CardPointerRelay>() ?? root.AddComponent<CardPointerRelay>();
+            _pointerRelay.Initialize(this);
 
-            // 设置文本
-            var nameLabel = _root.Q<Label>("card-name");
-            if (nameLabel != null && card?.Config != null) nameLabel.text = card.Config.Name;
-
-            var costLabel = _root.Q<Label>("card-cost");
-            if (costLabel != null && card?.Config != null) costLabel.text = card.Config.Cost.ToString();
-
-            // 注册事件转发（缓存委托引用便于对称解绑）
-            _onPointerDown = evt => PointerDown?.Invoke(this, evt);
-            _onPointerEnter = _ => PointerEnter?.Invoke(this);
-            _onPointerLeave = _ => PointerLeave?.Invoke(this);
-
-            _root.RegisterCallback(_onPointerDown);
-            _root.RegisterCallback(_onPointerEnter);
-            _root.RegisterCallback(_onPointerLeave);
+            UguiViewUtil.SetText(UguiViewUtil.FindText(root, "CardNameText") ?? UguiViewUtil.FindText(root, "NameText"), card?.Config?.Name ?? string.Empty);
+            UguiViewUtil.SetText(UguiViewUtil.FindText(root, "CardCostText") ?? UguiViewUtil.FindText(root, "CostText"), card?.Config != null ? card.Config.Cost.ToString() : string.Empty);
         }
 
-        /// <summary>切换 card-item--hovering CSS 类（仅 Idle 态下由 HandFanView 调用）。</summary>
-        public void SetHovering(bool hovering)
+        /// <summary>
+        /// 设置透明度。
+        /// </summary>
+        public void SetOpacity(float opacity)
         {
-            if (_root == null) return;
-            if (hovering) _root.AddToClassList("card-item--hovering");
-            else _root.RemoveFromClassList("card-item--hovering");
+            _canvasGroup.alpha = opacity;
+        }
+
+        /// <summary>
+        /// 设置是否接收射线。
+        /// </summary>
+        public void SetPicking(bool pickable)
+        {
+            _canvasGroup.blocksRaycasts = pickable;
+            foreach (Graphic graphic in Root.GetComponentsInChildren<Graphic>(true))
+            {
+                graphic.raycastTarget = pickable;
+            }
+        }
+
+        /// <summary>
+        /// 设置 hover 视觉，预览前统一清掉。
+        /// </summary>
+        public void SetHover(bool hovered)
+        {
+            if (_rootGraphic == null)
+            {
+                return;
+            }
+
+            Color color = _rootGraphic.color;
+            color.a = hovered ? 0.92f : 1f;
+            _rootGraphic.color = color;
+        }
+
+        /// <summary>
+        /// 释放事件。
+        /// </summary>
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            if (_pointerRelay != null)
+            {
+                _pointerRelay.Initialize(null);
+            }
+
+            PointerDown = null;
+            PointerMove = null;
+            PointerUp = null;
+            PointerEnter = null;
+            PointerExit = null;
+        }
+
+        internal void NotifyPointerDown(PointerEventData eventData) => PointerDown?.Invoke(this, eventData);
+        internal void NotifyPointerMove(PointerEventData eventData) => PointerMove?.Invoke(this, eventData);
+        internal void NotifyPointerUp(PointerEventData eventData) => PointerUp?.Invoke(this, eventData);
+        internal void NotifyPointerEnter()
+        {
+            SetHover(true);
+            PointerEnter?.Invoke(this);
+        }
+
+        internal void NotifyPointerExit()
+        {
+            SetHover(false);
+            PointerExit?.Invoke(this);
+        }
+    }
+
+    /// <summary>
+    /// UGUI 指针事件桥，挂在卡牌项根对象上。
+    /// </summary>
+    public sealed class CardPointerRelay : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler, IPointerEnterHandler, IPointerExitHandler
+    {
+        private CardItemView _owner;
+
+        /// <summary>
+        /// 初始化所属卡牌项。
+        /// </summary>
+        public void Initialize(CardItemView owner)
+        {
+            _owner = owner;
         }
 
         /// <inheritdoc />
-        public void Dispose()
-        {
-            if (_disposed) return;
-            _disposed = true;
+        public void OnPointerDown(PointerEventData eventData) => _owner?.NotifyPointerDown(eventData);
 
-            if (_root != null)
-            {
-                if (_onPointerDown != null) _root.UnregisterCallback(_onPointerDown);
-                if (_onPointerEnter != null) _root.UnregisterCallback(_onPointerEnter);
-                if (_onPointerLeave != null) _root.UnregisterCallback(_onPointerLeave);
-            }
+        /// <inheritdoc />
+        public void OnDrag(PointerEventData eventData) => _owner?.NotifyPointerMove(eventData);
 
-            _onPointerDown = null;
-            _onPointerEnter = null;
-            _onPointerLeave = null;
-            PointerDown = null;
-            PointerEnter = null;
-            PointerLeave = null;
-            _root = null;
-        }
+        /// <inheritdoc />
+        public void OnPointerUp(PointerEventData eventData) => _owner?.NotifyPointerUp(eventData);
+
+        /// <inheritdoc />
+        public void OnPointerEnter(PointerEventData eventData) => _owner?.NotifyPointerEnter();
+
+        /// <inheritdoc />
+        public void OnPointerExit(PointerEventData eventData) => _owner?.NotifyPointerExit();
     }
 }

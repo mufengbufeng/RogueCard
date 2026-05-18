@@ -21,7 +21,7 @@ Tests/
 
 ## EditMode 测试
 
-针对纯逻辑模块（FSM / Model / ObjectPool / ReactiveProperty / EventChannel / Save / Region / Screen 生命周期等）编写。`asmdef` 配置：`includePlatforms=["Editor"]` + `defineConstraints=["UNITY_INCLUDE_TESTS"]`，全部使用 mock，不进行任何 IO / 资源加载，运行极快。
+针对纯逻辑模块（FSM / Model / ObjectPool / ReactiveProperty / EventChannel / Save / UIManager 生命周期等）编写。`asmdef` 配置：`includePlatforms=["Editor"]` + `defineConstraints=["UNITY_INCLUDE_TESTS"]`，全部使用 mock，不进行任何 IO / 资源加载，运行极快。
 
 触发方式：
 
@@ -105,7 +105,7 @@ python .claude/skills/unity-compile-check/scripts/unity_compile_check.py
 
 ### 已知限制 / 不在范围内
 
-- **不覆盖 UI Toolkit Navigator/Screen**：UI 系统已迁移到 `Navigator` + `Shell` + `Screen<TViewModel>` + `ReactiveProperty`，需要在测试 assembly 里定义最小 `TestScreen + TestViewModel + .uxml` fixture。剥离为后续 `add-uitoolkit-playmode-tests` 变更。
+- **UGUI 端到端验证仍需编辑器参与**：`UIManagerLifecycleTests` 覆盖窗口生命周期，实际 Prefab、Canvas、GraphicRaycaster 与输入系统交互需在 Unity Test Runner 或手动启动流程中确认。
 - **不覆盖 SoundManager**：项目内当前不存在 `.wav/.mp3/.ogg` 资源；待资源补齐后另开变更覆盖。
 - **不在 CI 跑**：本期只支持本地手动跑；CI batchmode 接入留作单独变更。
 - **不覆盖 HybridCLR / Procedure / 端到端流程**：依赖热更元数据状态，过于脆弱。

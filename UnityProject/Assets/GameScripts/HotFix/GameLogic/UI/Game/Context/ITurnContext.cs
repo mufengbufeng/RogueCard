@@ -5,7 +5,7 @@ namespace GameLogic
 {
     /// <summary>
     /// 回合控制视图所需的 ViewModel 切片接口。
-    /// 仅暴露 TurnControlView 所需的 Phase 字段、EndTurn 命令、CardPlayFailed 事件，
+    /// 仅暴露回合控制 UI 所需的 Phase 字段、EndTurn 命令、CardPlayFailed 事件，
     /// 避免子模块越界访问 Hand / Monsters 等其它字段。
     /// 由 GameViewModel 显式实现；测试时可由 FakeTurnContext 实现替代。
     /// </summary>
