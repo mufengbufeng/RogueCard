@@ -5,25 +5,25 @@ TBD - created by archiving change gameview-extract-battle-coordinator. Update Pu
 ## Requirements
 ### Requirement: BattlePanelView 必须装配战斗子模块
 
-`BattlePanelView` SHALL 在构造时接收 `(VisualElement content, IBattleContext context, VisualTreeAsset monsterItemTpl, VisualTreeAsset cardItemTpl)`，从 `content` 内查询 `monster-container`、`hand-fan`、`drop-zone`、`preview-layer`、`end-turn-btn`、`fail-toast` 共 6 个共享元素，并实例化以下子模块（按顺序）：
+`BattlePanelView` SHALL 在构造时接收 UGUI 绑定集合、`IBattleContext`、怪物项模板、手牌卡模板、Buff/意图图标模板和 `HandFanLayoutOptions`。BattlePanelView SHALL 从绑定集合获取 `monsterContainer`、`handFanContainer`、`dropZone`、`previewLayer`、`endTurnButton`、`failToast` 等共享组件，并实例化以下子模块（按顺序）：
 
-1. `MonsterListView` (绑定 `monster-container`)
-2. `HandFanView` (绑定 `hand-fan` / `drop-zone` / `preview-layer`)
-3. `TurnControlView` (绑定 `end-turn-btn` / `fail-toast`)
+1. `MonsterListView` (绑定怪物容器)
+2. `HandFanView` (绑定手牌容器 / drop-zone / preview-layer)
+3. `TurnControlView` (绑定 end-turn button / fail toast)
 4. `TargetSelector` (持有 `MonsterListView` 与 `HandFanView` 引用)
 
 #### Scenario: 构造完成后子模块全部就绪
 
-- **WHEN** `new BattlePanelView(content, ctx, ...)`
+- **WHEN** `new BattlePanelView(bindings, ctx, ...)`
 - **THEN** `MonsterListView` / `HandFanView` / `TurnControlView` / `TargetSelector` SHALL 全部已构造
-- **AND** 怪物列表与手牌 SHALL 完成首次刷新（继承 change 1/2 的首次刷新行为）
+- **AND** 怪物列表与手牌 SHALL 完成首次刷新
 - **AND** `TargetSelector` SHALL 处于 `Idle` 状态
 
-#### Scenario: 缺失关键元素时报错
+#### Scenario: 缺失关键组件时报错
 
-- **WHEN** `content` 缺少 `hand-fan` 元素
-- **THEN** SHALL 通过 `Log.Error` 记录错误（沿用现有 GameView 错误处理风格）
-- **AND** SHALL NOT 抛出异常导致 BattlePanel 加载流程中断（保持容错）
+- **WHEN** UGUI 绑定集合缺少 hand fan 容器
+- **THEN** SHALL 通过 `Log.Error` 记录错误
+- **AND** SHALL NOT 抛出异常导致 GameView 打开流程中断
 
 ### Requirement: BattlePanelView 必须订阅 HandFanView 事件并按需路由
 
@@ -68,8 +68,8 @@ TBD - created by archiving change gameview-extract-battle-coordinator. Update Pu
 7. 清空字段引用
 8. 幂等
 
-#### Scenario: Region 切到 RewardPanel 时按序释放
+#### Scenario: 切到 RewardPanel 时按序释放
 
-- **WHEN** `BattlePanelView.Dispose()` 被调用（如 `Region` 切到 `RewardPanel`）
+- **WHEN** `BattlePanelView.Dispose()` 被调用（如 GameView 切到 RewardPanel）
 - **THEN** `_targetSelector.Dispose` SHALL 早于 `_handFanView.Dispose` 调用
 - **AND** Dispose 后再触发 `IBattleContext.Hand.Value` 变化 SHALL NOT 引起任何 UI 操作或异常

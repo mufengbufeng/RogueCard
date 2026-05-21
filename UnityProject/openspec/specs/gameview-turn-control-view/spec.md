@@ -5,17 +5,17 @@ TBD - created by archiving change gameview-extract-battle-coordinator. Update Pu
 ## Requirements
 ### Requirement: TurnControlView 必须按 Phase 启用 / 禁用结束回合按钮
 
-`TurnControlView` SHALL 通过构造函数接收 `(Button endTurnBtn, Label failToast, ITurnContext context)`。SHALL 注册 `endTurnBtn` 的 `ClickEvent` 转发到 `context.EndTurn()`。SHALL 订阅 `context.Phase.Changed`，当 `Phase.Value == BattlePhase.PlayerTurn` 时 `endTurnBtn.SetEnabled(true)`，否则 `SetEnabled(false)`。
+`TurnControlView` SHALL 通过构造函数接收 `(Button endTurnBtn, TextMeshProUGUI failToastText, CanvasGroup failToastGroup, ITurnContext context)` 或等价 UGUI 绑定集合。SHALL 注册 `endTurnBtn.onClick` 转发到 `context.EndTurn()`。SHALL 订阅 `context.Phase.Changed`，当 `Phase.Value == BattlePhase.PlayerTurn` 时 `endTurnBtn.interactable = true`，否则 `interactable = false`。
 
 #### Scenario: 玩家回合启用按钮
 
 - **WHEN** `Phase.Value == BattlePhase.PlayerTurn`
-- **THEN** `endTurnBtn.enabledSelf` SHALL 为 `true`
+- **THEN** `endTurnBtn.interactable` SHALL 为 `true`
 
 #### Scenario: 怪物回合禁用按钮
 
 - **WHEN** `Phase.Value == BattlePhase.MonsterTurn`
-- **THEN** `endTurnBtn.enabledSelf` SHALL 为 `false`
+- **THEN** `endTurnBtn.interactable` SHALL 为 `false`
 
 #### Scenario: 点击按钮转发 EndTurn
 
@@ -32,55 +32,55 @@ TBD - created by archiving change gameview-extract-battle-coordinator. Update Pu
 - `"InvalidHandIndex"` → `"卡牌索引错误"`
 - 其他 → `"出牌失败"`
 
-设置 `failToast.text` 为映射后的文本，添加 CSS 类 `fail-toast--visible`。
+设置 `failToastText.text` 为映射后的文本，并通过 `CanvasGroup.alpha`、active 状态或等价 UGUI 方式显示 toast。
 
 #### Scenario: 能量不足映射
 
 - **WHEN** `CardPlayFailed("InsufficientEnergy")` 触发
-- **THEN** `failToast.text` SHALL 为 `"能量不足"`
-- **AND** `failToast.classList` SHALL 包含 `fail-toast--visible`
+- **THEN** `failToastText.text` SHALL 为 `"能量不足"`
+- **AND** fail toast SHALL 可见
 
 #### Scenario: 未知 reason 默认映射
 
 - **WHEN** `CardPlayFailed("SomeUnknownReason")` 触发
-- **THEN** `failToast.text` SHALL 为 `"出牌失败"`
+- **THEN** `failToastText.text` SHALL 为 `"出牌失败"`
 
 ### Requirement: TurnControlView 必须在 1.2 秒后自动隐藏 fail toast 并支持新失败覆盖
 
-`TurnControlView` SHALL 维护一个内部版本号 `_toastVersion`，每次显示 toast 时自增并捕获当前值。1200ms 后通过 `failToast.schedule.Execute(...).StartingIn(1200)` 检查版本号是否一致：一致 SHALL `RemoveFromClassList("fail-toast--visible")`；不一致 SHALL 不操作（说明已被新失败覆盖）。
+`TurnControlView` SHALL 维护一个内部版本号 `_toastVersion`，每次显示 toast 时自增并捕获当前值。1200ms 后检查版本号是否一致：一致 SHALL 隐藏 toast；不一致 SHALL 不操作（说明已被新失败覆盖）。UGUI 实现可使用 TimerManager、UniTask 延迟或 View 调度。
 
 #### Scenario: 1.2 秒后自动隐藏
 
 - **WHEN** `CardPlayFailed("InsufficientEnergy")` 触发后等 1.5 秒（无新失败）
-- **THEN** `failToast.classList` SHALL NOT 包含 `fail-toast--visible`
+- **THEN** fail toast SHALL 不可见
 
 #### Scenario: 新失败覆盖旧失败
 
 - **WHEN** 在 t=0 触发 `CardPlayFailed("A")`，在 t=500ms 触发 `CardPlayFailed("B")`，等到 t=1300ms（旧失败的 1.2s 已到，但新失败的 1.2s 未到）
-- **THEN** `failToast.text` SHALL 为 `"B" 的中文映射`
-- **AND** `failToast.classList` SHALL 仍包含 `fail-toast--visible`（新失败的版本号未到期）
+- **THEN** `failToastText.text` SHALL 为 `"B" 的中文映射`
+- **AND** fail toast SHALL 仍可见
 
 #### Scenario: 新失败的 1.2 秒到时正常隐藏
 
 - **WHEN** 同上，等到 t=1800ms（新失败的 1.2s 已到）
-- **THEN** `failToast.classList` SHALL NOT 包含 `fail-toast--visible`
+- **THEN** fail toast SHALL 不可见
 
 ### Requirement: TurnControlView 必须支持 Dispose
 
 `TurnControlView` SHALL 实现 `IDisposable`，`Dispose()` SHALL：
 
-- 解绑 `endTurnBtn` 的 `ClickEvent` 回调
+- 解绑 `endTurnBtn.onClick` 回调
 - 解绑 `Phase.Changed` 与 `CardPlayFailed`
-- 自增 `_toastVersion`（让任何已调度的 schedule 检查不通过）
+- 自增 `_toastVersion`（让任何已调度的隐藏检查不通过）
 - 字段置空
 - 幂等
 
 #### Scenario: Dispose 后 Phase 变化不再操作按钮
 
 - **WHEN** `_turnControlView.Dispose()` 后 `Phase.Value` 变化
-- **THEN** `endTurnBtn` 的 enabled 状态 SHALL NOT 被改动
+- **THEN** `endTurnBtn.interactable` SHALL NOT 被改动
 
 #### Scenario: Dispose 后 fail 事件不再显示 toast
 
 - **WHEN** `_turnControlView.Dispose()` 后 `CardPlayFailed` 触发
-- **THEN** `failToast` SHALL NOT 被修改
+- **THEN** fail toast SHALL NOT 被修改

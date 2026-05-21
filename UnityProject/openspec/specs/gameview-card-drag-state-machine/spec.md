@@ -5,7 +5,7 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 ## Requirements
 ### Requirement: CardDragController 必须通过 IDragSurface 间接操作 UI
 
-`CardDragController` SHALL 通过 `IDragSurface` 接口执行所有 UI 副作用（创建 ghost、应用 transform、设置 opacity / pickingMode、捕获指针、调度延迟、查询 worldBound 等）。SHALL NOT 直接持有任何 `VisualElement` 引用。SHALL NOT 直接调用 `UQuery`。
+`CardDragController` SHALL 通过 `IDragSurface` 接口执行所有 UI 副作用（创建 ghost、应用 transform、设置 opacity / picking、捕获指针、调度延迟、查询 worldBound 等）。SHALL NOT 直接持有任何 `VisualElement` 或 UGUI 组件引用。生产 `IDragSurface` SHALL 由 UGUI 适配层实现。
 
 #### Scenario: 测试用 mock IDragSurface
 
@@ -23,7 +23,7 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 - `Dragging` + `OnPointerUp`（中间地带）→ `StartReboundAnimation`（ghost 立即销毁、其他卡 transition 0.15s 回到 N 张）+ 上层回调 `CardDragCancelled` + 延迟 `options.ReboundDurationMs` 后 `ExitDragging`，转 `Idle`
 - `Idle/Hovering` + `OnPointerUp`（位移 ≤ `DragThreshold`）→ 上层回调 `CardClicked(handIdx)`，停留在 `Idle`（预览由 `CardPreviewController` 处理）
 - 任何态 + `OnPointerCaptureOut` → 强制 `ExitDragging`（若在 `Dragging`）+ 转 `Idle`
-- `SelectingTarget` 不由本控制器进入；由 `BattlePanelView`（change 3）或当前 `GameView` 通过 `IDragHostCallbacks.CardDroppedOnZone(needsManualTarget=true)` 接管
+- `SelectingTarget` 不由本控制器进入；由 UGUI `BattlePanelView` 通过 `IDragHostCallbacks.CardDroppedOnZone(needsManualTarget=true)` 接管
 
 #### Scenario: PointerDown 阈值内 PointerUp 触发 CardClicked
 
@@ -43,7 +43,7 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 
 - **WHEN** `Dragging` 态在 `drop-zone` worldBound 内 PointerUp 且 `Hand[idx].Config.TargetMode != SingleManual`
 - **THEN** `IDragSurface.DestroyGhost()` SHALL 被调用
-- **AND** `IDragSurface.SetCardOpacity(idx, opacity 恢复)` SHALL 被调用
+- **AND** `IDragSurface.ResetCardOpacity(idx)` 或等价恢复 SHALL 被调用
 - **AND** `IDragHostCallbacks.CardDroppedOnZone(handIdx, false)` SHALL 被调用
 - **AND** 状态 SHALL 转回 `Idle`
 
@@ -52,14 +52,14 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 - **WHEN** `Dragging` 态在 `drop-zone` 内 PointerUp 且 `Hand[idx].Config.TargetMode == SingleManual`
 - **THEN** `IDragSurface.DestroyGhost()` SHALL NOT 被调用
 - **AND** `IDragHostCallbacks.CardDroppedOnZone(handIdx, true)` SHALL 被调用
-- **AND** ghost 所有权转移到上层（由 `TargetSelector` 在 change 3 处理）
+- **AND** ghost 所有权转移到上层 `TargetSelector`
 
 #### Scenario: PointerCaptureOut 中途丢失强制重置
 
 - **WHEN** `Dragging` 态收到 `PointerCaptureOut`（如系统抢走指针）
 - **THEN** `IDragSurface.DestroyGhost()` SHALL 被调用
 - **AND** `IDragSurface.DestroyInsertSlot()` SHALL 被调用（若存在）
-- **AND** 所有卡 SHALL 还原 `opacity` / `pickingMode` / inline transitionDuration
+- **AND** 所有卡 SHALL 还原 `opacity` / picking / transitionDuration
 - **AND** 状态 SHALL 转回 `Idle`
 - **AND** `IDragHostCallbacks.CardDragCancelled(handIdx)` SHALL 被调用
 
@@ -104,9 +104,9 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 - **WHEN** `Dragging.InsertSlot` 态在 `hand-fan` 内松手
 - **THEN** `IDragSurface.ReorderCardItem(activeVisualIdx, insertSlotIdx)` SHALL 被调用
 - **AND** `CardDragController` SHALL 在换位提交后按新的视觉顺序对全部 N 张卡应用最终扇形布局
-- **AND** 每张可见卡 SHALL 占用唯一的最终槽位，SHALL NOT 与相邻卡共享同一 `left/top/translate/rotate` 结果
+- **AND** 每张可见卡 SHALL 占用唯一的最终槽位，SHALL NOT 与相邻卡共享同一布局结果
 - **AND** ghost 与占位卡 SHALL 销毁
-- **AND** 所有卡 SHALL 还原 `opacity` / `pickingMode` / inline transitionDuration
+- **AND** 所有卡 SHALL 还原 `opacity` / picking / transitionDuration
 - **AND** 状态 SHALL 转回 `Idle`
 
 #### Scenario: 在原槽位松手仍然应用最终布局
@@ -127,7 +127,7 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 `CardDragController` SHALL 同时维护两个索引：
 
 - `_activeHandIndex` —— 闭包语义，`Hand[idx]` 中的位置，`reorder` 后不变；用于 `UseCard(handIdx)` 与 `Hand[idx].Config.TargetMode` 查询
-- `_activeVisualIndex` —— 视觉位置，`_cardItems.IndexOf(activeView)`，`reorder` 后会变；用于 `ApplyFanTransform`、`InsertSlot` 计算等 UI 操作
+- `_activeVisualIndex` —— 视觉位置，UGUI 卡牌项列表中的索引，`reorder` 后会变；用于 `ApplyFanTransform`、`InsertSlot` 计算等 UI 操作
 
 #### Scenario: reorder 后 handIndex 不变
 
@@ -141,15 +141,15 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 - **THEN** 回调参数 `handIdx` SHALL 取自 `_activeHandIndex`
 - **AND** SHALL NOT 取自 `_activeVisualIndex`
 
-### Requirement: CardDragController 必须使用 inline transitionDuration 控制动画
+### Requirement: CardDragController 必须使用 transitionDuration 控制动画
 
-`CardDragController`（通过 `IDragSurface.SetCardTransitionDuration`）SHALL 用 inline `transitionDuration` 控制其他卡的过渡动画，SHALL NOT 切换 USS 类（如 `card-item--no-transition`）来达到同样效果。原因：USS 类切换 + inline style 同帧写入会让 transition baseline 失效，导致回弹动画首帧 rotate 错乱。
+`CardDragController`（通过 `IDragSurface.SetCardTransitionDuration`）SHALL 用适配层过渡时长控制其他卡的过渡动画。UGUI 生产实现可使用协程、计时器或插值器执行该时长，SHALL NOT 依赖 USS 类。
 
 #### Scenario: 进入 Dragging 时其他卡 transitionDuration=0
 
 - **WHEN** 状态从 `Idle` 转为 `Dragging`
 - **THEN** SHALL 对所有卡调 `IDragSurface.SetCardTransitionDuration(idx, 0f)`
-- **AND** SHALL NOT 调用任何 USS 类切换 API（如 `AddToClassList("card-item--no-transition")`）
+- **AND** SHALL NOT 调用任何 USS 类切换 API
 
 #### Scenario: 中间地带松手回弹时 transitionDuration=0.15s
 
@@ -157,18 +157,31 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 - **THEN** SHALL 对所有卡调 `IDragSurface.SetCardTransitionDuration(idx, 0.15f)`
 - **AND** 在 `options.ReboundDurationMs` 后调 `ExitDragging`
 
-### Requirement: CardDragController 必须使用 opacity 0 而非 visibility Hidden 隐藏被拖卡
+### Requirement: CardDragController 必须使用 opacity 0 而非隐藏布局节点
 
-被拖卡 SHALL 通过 `IDragSurface.SetCardOpacity(idx, 0)` + `IDragSurface.SetCardPickingMode(idx, false)` 隐藏，SHALL NOT 通过 `style.visibility = Hidden`。原因：`visibility` 切换会触发 layout 重算，`opacity` 不会，回弹时被拖卡 fade-in 与 ghost 销毁可同步。
+被拖卡 SHALL 通过 `IDragSurface.SetCardOpacity(idx, 0)` + `IDragSurface.SetCardPickingMode(idx, false)` 隐藏，SHALL NOT 通过禁用 GameObject 或改变布局结构隐藏。原因：禁用节点会影响布局和列表命中，opacity 不会。
 
 #### Scenario: 进入 Dragging 时被拖卡 opacity=0
 
 - **WHEN** `EnterDragging`
 - **THEN** SHALL 对被拖卡调 `IDragSurface.SetCardOpacity(idx, 0)`
-- **AND** SHALL NOT 调用任何 visibility 相关 API
+- **AND** SHALL NOT 禁用被拖卡 GameObject
 
 #### Scenario: 退出 Dragging 时被拖卡 opacity 恢复
 
 - **WHEN** `ExitDragging`（任意路径）
-- **THEN** SHALL 对所有卡调 `IDragSurface.SetCardOpacity(idx, ResetToUssDefault)`（实现层可用 `StyleKeyword.Null`）
+- **THEN** SHALL 对所有卡调 `IDragSurface.ResetCardOpacity(idx)` 或等价恢复
 
+### Requirement: UGUI DragSurface 必须提供 RectTransform 命中与坐标转换
+
+UGUI `IDragSurface` 生产实现 SHALL 使用 `RectTransformUtility` 或等价方法，把屏幕指针坐标转换为 hand-fan、drop-zone 和 preview-layer 的局部坐标。`DropZoneWorldBound` 与 `HandFanWorldBound` SHALL 表示可用于状态机命中的矩形。
+
+#### Scenario: 指针在 drop-zone 内
+
+- **WHEN** 指针屏幕坐标落在 `DropZone` RectTransform 内
+- **THEN** `DropZoneWorldBound.Contains(pointerPos)` 或等价适配结果 SHALL 让状态机进入 `OverDropZone`
+
+#### Scenario: 指针在 hand-fan 内
+
+- **WHEN** 指针屏幕坐标落在 `CardSc` RectTransform 内且未落在 drop-zone
+- **THEN** 状态机 SHALL 进入 `InsertSlot`

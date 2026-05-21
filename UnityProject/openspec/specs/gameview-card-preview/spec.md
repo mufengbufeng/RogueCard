@@ -5,7 +5,7 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 ## Requirements
 ### Requirement: CardPreviewController 必须通过 IPreviewSurface 间接操作 UI
 
-`CardPreviewController` SHALL 通过 `IPreviewSurface` 接口执行所有预览相关 UI 副作用：克隆模板、计算定位坐标（`hand-fan` → `preview-layer` 局部坐标转换）、添加/移除克隆元素到 `preview-layer`。SHALL NOT 直接持有 `VisualElement` 引用。
+`CardPreviewController` SHALL 通过 `IPreviewSurface` 接口执行所有预览相关 UI 副作用：克隆或实例化卡牌预览对象、计算定位坐标（手牌卡 → preview-layer 局部坐标转换）、添加/移除预览对象到 UGUI preview-layer。SHALL NOT 直接依赖 `VisualElement`。
 
 #### Scenario: 测试用 mock IPreviewSurface
 
@@ -36,11 +36,12 @@ TBD - created by archiving change gameview-extract-hand-fan-subsystem. Update Pu
 #### Scenario: reorder 后仍能识别同卡
 
 - **WHEN** 预览卡 A，A 的视觉索引在 reorder 后从 2 变为 0，再次 `TogglePreview(handA, sourceA)`
-- **THEN** SHALL 识别为同卡 `_previewSource == sourceA`，SHALL `ExitPreview()`
+- **THEN** SHALL 识别为同卡 `_previewSource == sourceA`
+- **AND** SHALL `ExitPreview()`
 
 ### Requirement: Active card preview must dismiss on non-card battle panel clicks
 
-When a card preview is active, the hand fan UI SHALL allow the player to dismiss it by clicking any non-card area in the battle panel. Non-card dismissal SHALL call `CardPreviewController.ExitPreview()` and SHALL consume the pointer event so the same gesture does not activate another non-card control.
+When a card preview is active, the UGUI hand fan UI SHALL allow the player to dismiss it by clicking any non-card area in the battle panel. Non-card dismissal SHALL call `CardPreviewController.ExitPreview()` and SHALL consume the pointer event so the same gesture does not activate another non-card control.
 
 Card roots and their descendants SHALL be excluded from non-card dismissal. Clicking a card while preview is active SHALL continue to use `TogglePreview(handIdx, source)` semantics: the same card closes the preview, and a different card replaces the preview.
 
@@ -70,9 +71,9 @@ Card roots and their descendants SHALL be excluded from non-card dismissal. Clic
 
 ### Requirement: Active card preview must dismiss when hand card drag starts
 
-When a card preview is active and the player starts dragging any hand card, the hand fan UI SHALL dismiss the active preview during the same pointer move that transitions the hand interaction into `Dragging`.
+When a card preview is active and the player starts dragging any hand card, the UGUI hand fan UI SHALL dismiss the active preview during the same pointer move that transitions the hand interaction into `Dragging`.
 
-The preview SHALL NOT dismiss merely because a hand card received `PointerDown`. A hand card gesture that remains within `HandFanLayoutOptions.DragThreshold` and resolves as a click SHALL continue to use existing `TogglePreview(handIdx, source)` semantics.
+The preview SHALL NOT dismiss merely because a hand card received PointerDown. A hand card gesture that remains within `HandFanLayoutOptions.DragThreshold` and resolves as a click SHALL continue to use existing `TogglePreview(handIdx, source)` semantics.
 
 #### Scenario: Pointer move crossing drag threshold closes active preview
 
@@ -92,41 +93,38 @@ The preview SHALL NOT dismiss merely because a hand card received `PointerDown`.
 - **THEN** the gesture SHALL be handled as a card click
 - **AND** preview behavior SHALL be determined by `TogglePreview(handIdx, source)`
 
-### Requirement: CardPreviewController 必须按 hand-fan 局部坐标定位预览克隆
+### Requirement: CardPreviewController 必须按 UGUI 坐标定位预览克隆
 
 `CardPreviewController.EnterPreview` SHALL 通过 `IPreviewSurface` 完成以下定位：
 
-1. 取源卡未旋转 layout 顶部中心（`source.layout.center.x`、`source.layout.yMin`）
-2. `hand-fan.LocalToWorld` 转世界坐标
-3. `preview-layer.WorldToLocal` 转 preview-layer 局部坐标
-4. 设置克隆卡 `style.left = localX - CardWidth/2`、`style.top = localY - CardHeight`
+1. 取源卡 `RectTransform` 的顶部中心或等价锚点
+2. 将源卡坐标转换到 preview-layer 的局部坐标
+3. 设置预览克隆 `RectTransform.anchoredPosition`
+4. 设置预览克隆缩放、层级和 raycast ignore 状态
 
-克隆卡 SHALL 应用 CSS 类 `card-item--preview`（USS 已定义 `transform-origin: 50% 100%` + `scale: 1.6`），SHALL `pickingMode = Ignore`。
+#### Scenario: 克隆卡锚点位于源卡上方
 
-#### Scenario: 克隆卡的左上锚点
-
-- **WHEN** 源卡在 `hand-fan` 内 layout 顶部中心 = `(150, 50)`
-- **THEN** 克隆卡 `style.left` SHALL 为 `localX - CardWidth/2`
-- **AND** `style.top` SHALL 为 `localY - CardHeight`
+- **WHEN** 源卡顶部中心转换到 preview-layer 局部坐标为 `(150, 50)`
+- **THEN** 克隆卡 SHALL 以该点为参考定位在源卡上方
 
 #### Scenario: 克隆卡不抢点击
 
 - **WHEN** 克隆卡显示在 preview-layer
-- **THEN** `clone.pickingMode` SHALL 为 `PickingMode.Ignore`
+- **THEN** 克隆卡 SHALL 不参与 UGUI raycast
 
 #### Scenario: 克隆卡 UI 文本与源卡一致
 
-- **WHEN** 源卡 `card-name="火球"`、`card-cost="2"`
-- **THEN** 克隆卡 `card-name` Label `text` SHALL 为 `"火球"`
-- **AND** `card-cost` Label `text` SHALL 为 `"2"`
+- **WHEN** 源卡卡名为 `"火球"`、费用为 `"2"`
+- **THEN** 克隆卡卡名文本 SHALL 为 `"火球"`
+- **AND** 费用文本 SHALL 为 `"2"`
 
 ### Requirement: CardPreviewController 必须支持 ClearAllHoverState
 
-`CardPreviewController.EnterPreview` SHALL 在创建克隆前清掉所有卡的 `card-item--hovering` 类（通过上层回调 `IPreviewSurface.ClearAllHoverState()`），避免预览时 hover 类残留。
+`CardPreviewController.EnterPreview` SHALL 在创建克隆前清掉所有卡的悬停视觉（通过上层回调 `IPreviewSurface.ClearAllHoverState()`），避免预览时 hover 状态残留。
 
-#### Scenario: 进入预览清掉 hover 类
+#### Scenario: 进入预览清掉 hover 视觉
 
-- **WHEN** 当前某卡有 `card-item--hovering` 类，玩家单击该卡进入预览
+- **WHEN** 当前某卡处于悬停状态，玩家单击该卡进入预览
 - **THEN** `IPreviewSurface.ClearAllHoverState()` SHALL 被调用
 
 ### Requirement: CardPreviewController 必须支持 Dispose
