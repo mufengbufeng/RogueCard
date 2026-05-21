@@ -77,7 +77,8 @@ namespace GameLogic
 
             if (_state != CardInteractionState.Dragging)
             {
-                if (Vector2.Distance(pos, _pointerStartPos) > _options.DragThreshold)
+                float dist = Vector2.Distance(pos, _pointerStartPos);
+                if (dist > _options.DragThreshold)
                 {
                     EnterDragging(pos);
                 }

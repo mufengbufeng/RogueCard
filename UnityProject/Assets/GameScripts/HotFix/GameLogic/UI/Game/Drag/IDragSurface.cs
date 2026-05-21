@@ -15,7 +15,11 @@ namespace GameLogic
         /// <summary>当前手牌视觉项数。</summary>
         int CardCount { get; }
 
-        /// <summary>取第 cardIdx 张卡的 worldBound（命中检测、insertSlot 计算用）。</summary>
+        /// <summary>
+        /// 取第 cardIdx 张卡的 hit-test 矩形（命中检测、insertSlot 计算用）。
+        /// 返回矩形 MUST 与 <see cref="CardDragController"/>.OnPointerMove 入参 `pos` 同坐标空间；
+        /// UGUI 实现层为屏幕像素，不可直接使用 <c>RectTransform.GetWorldCorners</c>。
+        /// </summary>
         Rect GetCardWorldBound(int cardIdx);
 
         /// <summary>把扇形布局结果应用到第 cardIdx 张卡的视觉变换。</summary>
@@ -47,10 +51,18 @@ namespace GameLogic
 
         // ── Drop zone & hand fan 几何 ──
 
-        /// <summary>drop-zone 的 worldBound（命中检测）。</summary>
+        /// <summary>
+        /// drop-zone 的 hit-test 矩形。
+        /// 返回矩形 MUST 与 <see cref="CardDragController"/>.OnPointerMove 入参 `pos` 同坐标空间；
+        /// UGUI 实现层为屏幕像素，不可直接使用 <c>RectTransform.GetWorldCorners</c>。
+        /// </summary>
         Rect DropZoneWorldBound { get; }
 
-        /// <summary>hand-fan 的 worldBound（命中检测）。</summary>
+        /// <summary>
+        /// hand-fan 的 hit-test 矩形。
+        /// 返回矩形 MUST 与 <see cref="CardDragController"/>.OnPointerMove 入参 `pos` 同坐标空间；
+        /// UGUI 实现层为屏幕像素，不可直接使用 <c>RectTransform.GetWorldCorners</c>。
+        /// </summary>
         Rect HandFanWorldBound { get; }
 
         /// <summary>drop-zone 是否就绪（null 时为 false，即不进入 OverDropZone 子态）。</summary>

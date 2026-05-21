@@ -18,6 +18,7 @@ namespace GameLogic
         private readonly HandFanLayoutOptions _options;
         private readonly IDragHostCallbacks _callbacks;
         private readonly Action<Action, long> _scheduleAction;
+        private readonly Canvas _canvas;
 
         private GameObject _ghost;
         private GameObject _insertSlot;
@@ -55,16 +56,17 @@ namespace GameLogic
             _options = options ?? new HandFanLayoutOptions();
             _callbacks = callbacks;
             _scheduleAction = scheduleAction ?? ScheduleAsync;
+            _canvas = _dropZone != null ? _dropZone.GetComponentInParent<Canvas>() : null;
         }
 
         /// <inheritdoc />
         public int CardCount => _cardItems.Count;
 
         /// <inheritdoc />
-        public Rect DropZoneWorldBound => ToWorldRect(_dropZone);
+        public Rect DropZoneWorldBound => ToScreenRect(_dropZone);
 
         /// <inheritdoc />
-        public Rect HandFanWorldBound => ToWorldRect(_handFan);
+        public Rect HandFanWorldBound => ToScreenRect(_handFan);
 
         /// <inheritdoc />
         public bool DropZoneAvailable => _dropZone != null && _dropZone.gameObject.activeInHierarchy;
@@ -81,7 +83,7 @@ namespace GameLogic
         /// <inheritdoc />
         public Rect GetCardWorldBound(int cardIdx)
         {
-            return cardIdx >= 0 && cardIdx < _cardItems.Count ? ToWorldRect(_cardItems[cardIdx].RectTransform) : Rect.zero;
+            return cardIdx >= 0 && cardIdx < _cardItems.Count ? ToScreenRect(_cardItems[cardIdx].RectTransform) : Rect.zero;
         }
 
         /// <inheritdoc />
@@ -192,6 +194,15 @@ namespace GameLogic
 
             _ghost = UnityEngine.Object.Instantiate(source.Root, _previewLayer, false);
             _ghost.name = "CardGhost";
+
+            // ghost 视觉以指针为中心：覆盖源卡从 ApplyFanTransform 继承的 anchor=(0,1)/pivot=(0,1)，
+            // 否则 UpdateGhostPosition 的局部坐标会落到卡牌左上角而非中心，呈现"偏移跟随"。
+            var rect = _ghost.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.localRotation = Quaternion.identity;
+
             SetRaycast(_ghost, false);
             EnsureCanvasGroup(_ghost).alpha = 0.72f;
             UpdateGhostPosition(pos);
@@ -208,7 +219,13 @@ namespace GameLogic
             var rect = _ghost.GetComponent<RectTransform>();
             rect.SetParent(_previewLayer, false);
             rect.sizeDelta = new Vector2(_options.CardWidth, _options.CardHeight);
-            rect.position = pos;
+            Camera cam = _canvas != null ? _canvas.worldCamera : null;
+            // 用 localPosition（直接在父级局部坐标系定位 pivot）而非 anchoredPosition，
+            // 后者依赖 anchor 反推、parent.pivot 非 (0.5,0.5) 时会引入额外偏移。
+            if (_previewLayer != null && RectTransformUtility.ScreenPointToLocalPointInRectangle(_previewLayer, pos, cam, out Vector2 local))
+            {
+                rect.localPosition = new Vector3(local.x, local.y, rect.localPosition.z);
+            }
         }
 
         /// <inheritdoc />
@@ -285,7 +302,7 @@ namespace GameLogic
             return false;
         }
 
-        private static Rect ToWorldRect(RectTransform rectTransform)
+        private Rect ToScreenRect(RectTransform rectTransform)
         {
             if (rectTransform == null)
             {
@@ -294,8 +311,9 @@ namespace GameLogic
 
             var corners = new Vector3[4];
             rectTransform.GetWorldCorners(corners);
-            Vector3 bottomLeft = corners[0];
-            Vector3 topRight = corners[2];
+            Camera cam = _canvas != null ? _canvas.worldCamera : null;
+            Vector2 bottomLeft = RectTransformUtility.WorldToScreenPoint(cam, corners[0]);
+            Vector2 topRight = RectTransformUtility.WorldToScreenPoint(cam, corners[2]);
             return new Rect(bottomLeft.x, bottomLeft.y, topRight.x - bottomLeft.x, topRight.y - bottomLeft.y);
         }
 

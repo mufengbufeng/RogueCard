@@ -11,7 +11,6 @@ namespace GameLogic
     /// </summary>
     public class GameView : UIView
     {
-#pragma warning disable 0649
         [UHubBind("BattlePanel")]
         private GameObject _battlePanel;
 
@@ -74,7 +73,6 @@ namespace GameLogic
 
         [UHubBind("IntentIconTemplate")]
         private GameObject _intentIconTemplate;
-#pragma warning restore 0649
 
         private PlayerStatusView _playerStatusView;
         private BattlePanelView _battlePanelView;
