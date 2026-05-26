@@ -82,20 +82,25 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 
 | 想做的事 | 用什么工具 |
 | -------- | ---------- |
-| 查看文件符号结构 | Serena `get_symbols_overview` |
-| 按名称查找符号（类/方法/接口） | Serena `find_symbol` |
-| 读文件 / 列目录 / 找文件 | Serena `read_file` / `list_dir` / `find_file` |
-| 概念/自然语言搜索 | Semble `search` |
-| 找几个关键词例子（top-K） | Semble `search`（mode=bm25） |
-| 找语义相似代码 | Semble `find_related` |
-| 全量字面/正则匹配（审计、批量改） | Serena `search_for_pattern` |
-| 查询符号被谁引用 | Serena `find_referencing_symbols` |
+| 概念/自然语言搜索 | codedb `codedb_search`（默认语义 + BM25 混合排序） |
+| 关键词 top-K 例子 | codedb `codedb_search`（默认 lexical + vector） |
+| 找语义相似代码 | codedb `codedb_search`（贴上参考 chunk 关键文字）或 `codedb_explain` |
+| 全量字面/正则匹配（审计、批量改） | codedb `codedb_search`（`regex=true`） |
+| 查看文件符号结构 | codedb `codedb_outline` |
+| 按名称查找符号定义 | codedb `codedb_symbol`（`body=true` 拿源码） |
+| 查询符号被谁引用 | codedb `codedb_callers` |
+| 找文件（路径模糊） | codedb `codedb_find` / `codedb_glob` |
+| 列目录 / 看子节点 | codedb `codedb_ls` / `codedb_tree` |
+| 读文件片段 | codedb `codedb_read`（小段优先，全文用内置 Read） |
+| 看最近修改的文件 | codedb `codedb_hot` / `codedb_changes` |
+| 查文件依赖/反向依赖 | codedb `codedb_deps`（C# namespace 精度最高） |
+| C# LSP 级语义查询（兜底） | Serena `find_symbol` / `find_referencing_symbols` |
 
 ### 改代码
 
 | 想做的事 | 用什么工具 |
 | -------- | ---------- |
-| 修改公共 API 前检查影响范围 | Serena `find_referencing_symbols` |
+| 修改公共 API 前检查影响范围 | 先 codedb `codedb_callers` 看影响，必要时用 Serena `find_referencing_symbols` 复核 |
 | 替换方法体 | Serena `replace_symbol_body` |
 | 在符号前后插入代码 | Serena `insert_after_symbol` / `insert_before_symbol` |
 | 项目级重命名 | Serena `rename_symbol` |
@@ -104,14 +109,16 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 
 ### 工具使用规则
 
-- 想用 `grep` → 改用 Serena `search_for_pattern` 或 Semble `search`
-- 文件已完整读过 → 不要再用 Serena 重复分析
-- 需要全量匹配/复杂正则 → 用 Serena，不要用 Semble
-- 处理 Semble 结果 → 自行筛除 `Library/PackageCache/` 第三方包
-- 符号级编辑/重构 → 必须 Serena，Semble 不能改
+- 想用 `grep` → 改用 codedb `codedb_search`（`regex=true`）
+- 自然语言/概念/语义搜索 → 用 codedb `codedb_search`
+- 文件已完整读过 → 不要再用 codedb / Serena 重复分析
+- 过滤范围 → codedb 工具均支持 `path` 参数；遇到第三方噪音可显式排除 `Library/PackageCache/`
+- 符号级编辑/重构 → 必须 Serena，codedb 只读（`codedb_edit` 是 stub）
+- 写操作前 → 先 `codedb_callers` 查影响面，再用 Serena 改
 - 会话开始 → `mcp__mcp-router__activate_project(project: "UnityProject")` + `mcp__mcp-router__initial_instructions()`（每会话各一次）
-- 使用范围 → 始终带 `relative_path` 缩小搜索；用 `depth: 1` 列类成员而不读方法体
-- C# 支持依赖 → `UnityProject.slnx` 必须存在
+- 使用范围 → codedb 始终带 `path` 过滤；Serena 始终带 `relative_path`，列类成员用 `depth: 1` 避免读方法体
+- C# LSP 支持依赖 → `UnityProject.slnx` 必须存在
+- codedb 索引依赖 → `.codedb-mcp/codedb-mcp.toml`，文件保存自动增量索引；批量重命名/拉大量代码后手动 `codebase-mcp.exe ... index <repo>` 兜底
 
 ## 构建与测试
 
@@ -160,35 +167,49 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 
 ## 工具链
 
-### Serena（C# 符号智能 / MCP）
+### codedb-mcp（语义 / 词法 / 正则统一索引，MCP）
+
+代码搜索、符号查询、引用查找、依赖图——读操作首选。
+
+| 想做的事 | 怎么做 |
+| -------- | ------ |
+| 注册 MCP（首次） | `claude mcp add --transport stdio --scope local codedb-mcp -- "C:\Users\mfbf\.claude\skills\codedb-mcp\assets\codebase-mcp.exe" --config "<repo>\.codedb-mcp\codedb-mcp.toml" mcp "<repo>"` |
+| 构建/重建索引（兜底） | `"C:\Users\mfbf\.claude\skills\codedb-mcp\assets\codebase-mcp.exe" --config "<repo>\.codedb-mcp\codedb-mcp.toml" index "<repo>"` |
+| 健康检查 | `codedb_status` |
+| 语义/关键词搜索 | `codedb_search(query, path)` |
+| 正则搜索 | `codedb_search(query, regex=true)` |
+| 文件符号 outline | `codedb_outline(path)` |
+| 找定义 | `codedb_symbol(name, body=true)` |
+| 查引用（LSP-like） | `codedb_callers(target: { path, line })` |
+| 找文件（模糊/glob） | `codedb_find(query)` / `codedb_glob(pattern)` |
+| 列目录 / 看树 | `codedb_ls(path)` / `codedb_tree` |
+| 文件依赖 / 反向依赖 | `codedb_deps(path, direction, transitive)` |
+| 最近改动 | `codedb_hot` / `codedb_changes(since_sequence)` |
+| 一次发多个查询 | `codedb_bundle([...])`（最多 100 个，禁套娃） |
+
+- 配置 → `<repo>\.codedb-mcp\codedb-mcp.toml`（C# 扩展、Unity skip_dirs、`Library/PackageCache` include）
+- 索引位置 → `<repo>\.codedb-mcp\index.bin`（已 gitignore）
+- 文件监听 → `[watch] enabled = true`，C# 文件保存后 debounce 自动重建对应 chunk
+- 自动更新失效场景 → MCP 进程未运行 / 改的扩展不在 `["cs"]` / 文件在 `skip_dirs` / 文件 > 50 MB → 需手动 reindex
+- 不能用于 → 符号级写操作（用 Serena）、LSP 诊断（用 Serena）、Unity Editor 操作（用 Unity Skills）
+
+### Serena（C# 符号写操作 + LSP 诊断，MCP）
+
+仅用于符号级修改与编译诊断；读操作（outline / 查找符号 / 查引用 / 模式搜索）一律改走 codedb-mcp。
 
 | 想做的事 | 怎么做 |
 | -------- | ------ |
 | 会话开始激活项目 | `mcp__mcp-router__activate_project(project: "UnityProject")` |
 | 读取初始化指令（每会话一次） | `mcp__mcp-router__initial_instructions()` |
-| 浏览文件符号 | `mcp__mcp-router__get_symbols_overview(relative_path: "...", depth: 1)` |
-| 查找符号 | `mcp__mcp-router__find_symbol(name_path_pattern: "...", include_body: true, depth: 1)` |
-| 查找引用 | `mcp__mcp-router__find_referencing_symbols(name_path: "...", relative_path: "...")` |
 | 替换方法体 | `mcp__mcp-router__replace_symbol_body(name_path: "...", relative_path: "...", body: "...")` |
 | 插入新方法 | `mcp__mcp-router__insert_after_symbol(name_path: "...", relative_path: "...", body: "...")` |
 | 项目级重命名 | `mcp__mcp-router__rename_symbol(name_path: "...", relative_path: "...", new_name: "...")` |
-| 模式搜索 | `mcp__mcp-router__search_for_pattern(substring_pattern: "...", restrict_search_to_code_files: true)` |
 | 安全删除 | `mcp__mcp-router__safe_delete_symbol(name_path_pattern: "...", relative_path: "...")` |
 | 编译诊断 | `mcp__mcp-router__get_diagnostics_for_file(relative_path: "...")` |
+| LSP 兜底查符号/引用（codedb 不命中时） | `mcp__mcp-router__find_symbol` / `find_referencing_symbols` |
 
 - 配置 → `.serena/project.yml`（`csharp`）
 - 依赖 → `UnityProject.slnx`
-
-### Semble（语义/概念搜索）
-
-| 想做的事 | 怎么做 |
-| -------- | ------ |
-| 自然语言/概念搜索 | `search` |
-| 关键词 top-K 例子 | `search`（mode=bm25） |
-| 找语义相似代码 | `find_related` |
-| 过滤第三方包 | 自行筛除 `Library/PackageCache/` |
-
-- 不能用于 → 全量字面/正则匹配（用 Serena）、符号级编辑（用 Serena）
 
 ### Unity Skills（编辑器自动化）
 
