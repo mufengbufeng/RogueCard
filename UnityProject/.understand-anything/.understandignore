@@ -1,0 +1,155 @@
+# .understandignore — patterns for files/dirs to exclude from analysis
+# Syntax: same as .gitignore (globs, # comments, ! negation, trailing / for dirs)
+
+# --- Unity-generated caches and build outputs ---
+/[Ll]ibrary/
+/[Tt]emp/
+/[Oo]bj/
+/[Bb]uild/
+/[Bb]uilds/
+/[Bb]undles/
+/[Ll]ogs/
+/[Uu]ser[Ss]ettings/
+/.vs/
+/.gradle/
+
+# --- Unity-generated project files (Visual Studio / Rider) ---
+*.csproj
+*.csproj.Backup.tmp
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.opendb
+*.VC.db
+*.DotSettings.user
+*.unityproj
+
+# --- Unity .meta files (binary import metadata, no semantic value) ---
+*.meta
+
+# --- Visual scripting & addressables generated content ---
+/[Aa]ssets/Unity.VisualScripting.Generated/
+/[Aa]ssets/AddressableAssetsData/link.xml*
+/[Aa]ssets/Addressables_Temp*
+/[Aa]ssets/AddressableAssetsData/*/*.bin*
+
+# --- Third-party asset folders (not project source) ---
+/[Aa]ssets/TextMesh Pro/
+/[Aa]ssets/Plugins/Demigiant/
+/[Aa]ssets/_[Rr]ecovery/
+
+# --- Recovery & in-progress artifacts ---
+/[Aa]ssets/[Ii]nit[Tt]est[Ss]cene*.unity*
+InitTestScene*.unity*
+
+# --- Raw asset folders (textures, audio, animations — not code) ---
+/[Aa]ssets/AssetRaw/Audios/
+/[Aa]ssets/AssetRaw/Images/
+/[Aa]ssets/AssetRaw/Textures/
+/[Aa]ssets/AssetRaw/Atlas/
+/[Aa]ssets/AssetRaw/Animations/
+/[Aa]ssets/AssetRaw/Materials/
+/[Aa]ssets/AssetRaw/Fonts/
+
+# --- Unity asset binary files (no semantic value for code understanding) ---
+*.anim
+*.controller
+*.mat
+*.physicsMaterial
+*.physicsMaterial2D
+*.physicMaterial
+*.physicMaterial2D
+*.fontsettings
+*.guiskin
+*.flare
+*.cubemap
+*.terrainlayer
+*.spriteatlas
+*.spriteatlasv2
+*.lighting
+*.shadergraph
+*.shadersubgraph
+*.uss
+*.uxml
+*.unity
+*.fbx
+*.obj.meta
+*.blend
+*.blend1
+*.tga
+*.tif
+*.tiff
+*.psd
+*.exr
+*.hdr
+*.aseprite
+*.ase
+*.wav
+*.ogg
+*.aac
+*.flac
+*.aif
+
+# --- Build/CDN/Server outputs ---
+/ServerData/
+/[Aa]ssets/StreamingAssets/aa*
+
+# --- Mempalace / harness artifacts ---
+/.mcp_data/
+/.mempalace/
+/.mempalace_local/
+/mempalace-data/
+/mempalace-palace/
+/__pycache__/
+**/__pycache__/
+*.pyc
+
+# --- Tooling caches ---
+.utmp/
+ExportedObj/
+.consulo/
+
+# --- AI / IDE tooling skills and prompts (not project code) ---
+.codex/
+.github/
+.claude/
+.serena/
+.vscode/
+.understand-anything/
+
+# --- OpenSpec archived (historical, merged) changes ---
+openspec/changes/archive/
+
+# --- Plugin/third-party UPM mirrors checked into Packages/ (keep manifest.json) ---
+/Packages/com.singularitygroup.hotreload/
+
+# --- Crash and IDE/scratch artifacts ---
+mono_crash.*
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.unitypackage.meta
+*.app
+crashlytics-build.properties
+ComputeCommandBuffer.cs
+IBaseCommandBuffer.cs
+IComputeCommandBuffer.cs
+IRasterCommandBuffer.cs
+IUnsafeCommandBuffer.cs
+RasterCommandBuffer.cs
+UnsafeCommandBuffer.cs
+testlog.txt
+TestResults/
+harness-workspace/
+.env
+*.pdb
+*.mdb
+*.pdb.meta
+*.mdb.meta
+*.svd
