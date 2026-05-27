@@ -15,6 +15,10 @@ namespace GameLogic
         private MonsterCardSystem _cardSystem;
         private bool _isDisposed;
 
+        // 怪物 InstanceId 计数器：每场战斗开始时由 ResetForNewBattle 复位为 1，
+        // SpawnBatch 中每生成一只怪物后自增，保证当场战斗内全局唯一。
+        private int _nextInstanceId = 1;
+
         /// <summary>
         /// 初始化怪物系统。
         /// </summary>
@@ -30,6 +34,24 @@ namespace GameLogic
         public void Initialize(MonsterCardSystem cardSystem)
         {
             _cardSystem = cardSystem ?? throw new ArgumentNullException(nameof(cardSystem));
+        }
+
+        /// <summary>
+        /// 每场战斗开始时调用，复位 InstanceId 计数器为 1。
+        /// 由 BattleSystem.EnterBattle 在 SpawnBatch 之前驱动，保证每场战斗的怪物 InstanceId 从 1 起。
+        /// </summary>
+        public void ResetForNewBattle()
+        {
+            _nextInstanceId = 1;
+        }
+
+        /// <summary>
+        /// 分配下一个 InstanceId 并自增计数器。internal 仅为方便 EditMode 测试直接验证序列；
+        /// 生产路径只有 SpawnBatch 在对象初始化器中调用。
+        /// </summary>
+        internal int AssignNextInstanceId()
+        {
+            return _nextInstanceId++;
         }
 
         /// <summary>
@@ -117,6 +139,7 @@ namespace GameLogic
 
                 var monster = new MonsterRuntime
                 {
+                    InstanceId = AssignNextInstanceId(),
                     Config = monsterConfig,
                     MaxHp = monsterConfig.MaxHp,
                     Hp = monsterConfig.MaxHp,

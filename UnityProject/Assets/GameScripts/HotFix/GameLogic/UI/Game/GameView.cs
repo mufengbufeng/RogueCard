@@ -1,8 +1,11 @@
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using EF.Debugger;
 using EF.UI;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using YooAsset;
 
 namespace GameLogic
 {
@@ -11,68 +14,41 @@ namespace GameLogic
     /// </summary>
     public class GameView : UIView
     {
-        [UHubBind("BattlePanel")]
+        #region 自动生成
+        [UHubBind("BgImage")] private Image _bgImage;
+        [UHubBind("CardCostText")] private TextMeshProUGUI _cardCostText;
+        [UHubBind("CardNameText")] private TextMeshProUGUI _cardNameText;
+        [UHubBind("DropZoneText")] private TextMeshProUGUI _dropZoneText;
+        [UHubBind("EndBtn")] private Button _endBtn;
+        [UHubBind("InfoText")] private TextMeshProUGUI _infoText;
+        [UHubBind("MonsterRect")] private RectTransform _monsterRect;
+        [UHubBind("PlayerArmorText")] private TextMeshProUGUI _playerArmorText;
+        [UHubBind("PlayerEnergyText")] private TextMeshProUGUI _playerEnergyText;
+        [UHubBind("PlayerHpText")] private TextMeshProUGUI _playerHpText;
+        [UHubBind("RewardConfirmBtn")] private Button _rewardConfirmBtn;
+        [UHubBind("RewardTitleText")] private TextMeshProUGUI _rewardTitleText;
+        [UHubBind("Text")] private TextMeshProUGUI _text;
+        #endregion
+
+        // 未在 ReferenceCollector 中登记的节点，通过 transform.Find 解析。
         private GameObject _battlePanel;
-
-        [UHubBind("RewardPanel")]
         private GameObject _rewardPanel;
-
-        [UHubBind("PlayerStatusPanel")]
-        private RectTransform _playerStatusPanel;
-
-        [UHubBind("InfoText")]
-        private TextMeshProUGUI _infoText;
-
-        [UHubBind("PlayerHpFill")]
         private Image _playerHpFill;
-
-        [UHubBind("PlayerHpText")]
-        private TextMeshProUGUI _playerHpText;
-
-        [UHubBind("PlayerArmorText")]
-        private TextMeshProUGUI _playerArmorText;
-
-        [UHubBind("PlayerEnergyFill")]
         private Image _playerEnergyFill;
-
-        [UHubBind("PlayerEnergyText")]
-        private TextMeshProUGUI _playerEnergyText;
-
-        [UHubBind("PlayerBuffBar")]
         private RectTransform _playerBuffBar;
-
-        [UHubBind("MonsterRect")]
-        private RectTransform _monsterContainer;
-
-        [UHubBind("CardSc")]
-        private RectTransform _handContainer;
-
-        [UHubBind("DropZone")]
-        private RectTransform _dropZone;
-
-        [UHubBind("PreviewLayer")]
-        private RectTransform _previewLayer;
-
-        [UHubBind("EndBtn")]
-        private Button _endTurnButton;
-
-        [UHubBind("FailToast")]
-        private TextMeshProUGUI _failToastText;
-
-        [UHubBind("RewardConfirmBtn")]
-        private Button _rewardConfirmButton;
-
-        [UHubBind("HandCardTemplate")]
-        private GameObject _handCardTemplate;
-
-        [UHubBind("MonsterItemTemplate")]
-        private GameObject _monsterItemTemplate;
-
-        [UHubBind("BuffIconTemplate")]
         private GameObject _buffIconTemplate;
-
-        [UHubBind("IntentIconTemplate")]
         private GameObject _intentIconTemplate;
+        private RectTransform _handContainer;
+        private GameObject _handCardTemplate;
+        private RectTransform _dropZone;
+        private RectTransform _previewLayer;
+        private TextMeshProUGUI _failToastText;
+        private CanvasGroup _failToastGroup;
+
+        // 怪物条目模板独立 Prefab，通过 ResourceManager 异步加载。
+        private const string MonsterItemTemplateLocation = "GameMonsterItemTemplate";
+        private AssetHandle _monsterItemTemplateHandle;
+        private GameObject _monsterItemTemplate;
 
         private PlayerStatusView _playerStatusView;
         private BattlePanelView _battlePanelView;
@@ -99,24 +75,38 @@ namespace GameLogic
         public event System.Action<int, int> MonsterTargetSelected;
 
         /// <summary>
-        /// 初始化 UHub 组件绑定。
+        /// 初始化 UHub 组件绑定，并解析未在 ReferenceCollector 中登记的子节点。
         /// </summary>
         protected override void OnInitialize()
         {
             base.OnInitialize();
             UHub.Initialize();
+            ResolveTransformBindings();
         }
 
         /// <summary>
-        /// 绑定奖励确认按钮。
+        /// 绑定按钮点击事件到对外暴露的事件。
         /// </summary>
         protected override void OnBindings()
         {
             base.OnBindings();
-            if (_rewardConfirmButton != null)
+            if (_rewardConfirmBtn != null)
             {
-                BindEvent(_rewardConfirmButton.onClick, () => RewardConfirmClicked?.Invoke());
+                BindEvent(_rewardConfirmBtn.onClick, () => RewardConfirmClicked?.Invoke());
             }
+            if (_endBtn != null)
+            {
+                BindEvent(_endBtn.onClick, () => EndTurnClicked?.Invoke());
+            }
+        }
+
+        /// <summary>
+        /// 异步加载局内所需的独立 Prefab（如怪物条目模板）。
+        /// </summary>
+        protected override async UniTask OnPrepareAsync(object userData, CancellationToken cancellationToken)
+        {
+            await base.OnPrepareAsync(userData, cancellationToken);
+            await LoadMonsterItemTemplateAsync(cancellationToken);
         }
 
         /// <summary>
@@ -167,11 +157,12 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 释放子视图和事件。
+        /// 释放子视图、外部资源句柄和事件。
         /// </summary>
         protected override void OnRelease()
         {
             DisposeBattleViews();
+            ReleaseMonsterItemTemplate();
             RewardConfirmClicked = null;
             EndTurnClicked = null;
             HandCardClicked = null;
@@ -227,8 +218,8 @@ namespace GameLogic
 
         private BattlePanelBindings BuildBattlePanelBindings()
         {
-            CanvasGroup failToastGroup = null;
-            if (_failToastText != null)
+            CanvasGroup failToastGroup = _failToastGroup;
+            if (failToastGroup == null && _failToastText != null)
             {
                 failToastGroup = _failToastText.GetComponent<CanvasGroup>();
                 if (failToastGroup == null)
@@ -237,15 +228,21 @@ namespace GameLogic
                 }
             }
 
+            Button cancelTargetButton = null;
+            if (_dropZone != null)
+            {
+                cancelTargetButton = _dropZone.GetComponent<Button>();
+            }
+
             return new BattlePanelBindings
             {
-                MonsterContainer = _monsterContainer,
+                MonsterContainer = _monsterRect,
                 HandContainer = _handContainer,
                 DropZone = _dropZone,
                 PreviewLayer = _previewLayer,
-                EndTurnButton = _endTurnButton,
+                EndTurnButton = _endBtn,
                 FailToast = new TextMeshProUGUIProxy { Text = _failToastText, Group = failToastGroup },
-                CancelTargetButton = _dropZone != null ? _dropZone.GetComponent<Button>() : null,
+                CancelTargetButton = cancelTargetButton,
                 HandCardTemplate = _handCardTemplate,
                 MonsterItemTemplate = _monsterItemTemplate,
                 BuffIconTemplate = _buffIconTemplate,
@@ -265,6 +262,88 @@ namespace GameLogic
         {
             _battlePanelView?.Dispose();
             _battlePanelView = null;
+        }
+
+        private async UniTask LoadMonsterItemTemplateAsync(CancellationToken cancellationToken)
+        {
+            if (_monsterItemTemplate != null)
+            {
+                return;
+            }
+
+            var resource = GameLogicEntry.Resource;
+            if (resource == null)
+            {
+                Log.Warning("[GameView] ResourceManager 不可用，跳过怪物模板加载");
+                return;
+            }
+
+            try
+            {
+                _monsterItemTemplateHandle = await resource.LoadAssetAsync<GameObject>(MonsterItemTemplateLocation)
+                    .AttachExternalCancellation(cancellationToken);
+            }
+            catch (System.OperationCanceledException)
+            {
+                throw;
+            }
+            catch (System.Exception ex)
+            {
+                Log.Error($"[GameView] 加载怪物条目模板失败：{ex.Message}");
+                return;
+            }
+
+            if (_monsterItemTemplateHandle == null || _monsterItemTemplateHandle.AssetObject == null)
+            {
+                Log.Warning($"[GameView] 怪物条目模板资源缺失：{MonsterItemTemplateLocation}");
+                return;
+            }
+
+            _monsterItemTemplate = _monsterItemTemplateHandle.AssetObject as GameObject;
+        }
+
+        private void ReleaseMonsterItemTemplate()
+        {
+            if (_monsterItemTemplateHandle != null)
+            {
+                GameLogicEntry.Resource?.Release(_monsterItemTemplateHandle);
+                _monsterItemTemplateHandle = null;
+            }
+            _monsterItemTemplate = null;
+        }
+
+        private void ResolveTransformBindings()
+        {
+            _battlePanel = FindChildGameObject("BattlePanel");
+            _rewardPanel = FindChildGameObject("RewardPanel");
+            _playerHpFill = FindChildComponent<Image>("BattlePanel/PlayerStatusPanel/PlayerHpBar/PlayerHpFill");
+            _playerEnergyFill = FindChildComponent<Image>("BattlePanel/PlayerStatusPanel/PlayerEnergyBar/PlayerEnergyFill");
+            _playerBuffBar = FindChildComponent<RectTransform>("BattlePanel/PlayerStatusPanel/PlayerBuffBar");
+            _buffIconTemplate = FindChildGameObject("BattlePanel/PlayerStatusPanel/BuffIconTemplate");
+            _intentIconTemplate = FindChildGameObject("BattlePanel/PlayerStatusPanel/IntentIconTemplate");
+            _handContainer = FindChildComponent<RectTransform>("BattlePanel/CardSc");
+            _handCardTemplate = FindChildGameObject("BattlePanel/CardSc/HandCardTemplate");
+            _dropZone = FindChildComponent<RectTransform>("BattlePanel/DropZone");
+            _previewLayer = FindChildComponent<RectTransform>("BattlePanel/PreviewLayer");
+
+            var failToastGo = FindChildGameObject("BattlePanel/FailToast");
+            if (failToastGo != null)
+            {
+                _failToastText = failToastGo.GetComponent<TextMeshProUGUI>();
+                _failToastGroup = failToastGo.GetComponent<CanvasGroup>();
+            }
+        }
+
+        private GameObject FindChildGameObject(string path)
+        {
+            var child = transform.Find(path);
+            return child != null ? child.gameObject : null;
+        }
+
+        private T FindChildComponent<T>(string path) where T : Component
+        {
+            var child = transform.Find(path);
+            return child != null ? child.GetComponent<T>() : null;
         }
 
         private static void SetPanelActive(GameObject panel, bool active)

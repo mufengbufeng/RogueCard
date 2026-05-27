@@ -8,6 +8,8 @@
   <Project Path="SingularityGroup.HotReload.Runtime.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="Assembly-CSharp-firstpass.csproj" />
+  <Project Path="EF.Editor.UiScriptBinder.TextRewriter.csproj" />
   <Project Path="SingularityGroup.HotReload.Runtime.Public.csproj" />
   <Project Path="GameLogic.Tests.PlayMode.csproj" />
+  <Project Path="EF.Editor.UiScriptBinder.TextRewriter.Tests.csproj" />
 </Solution>

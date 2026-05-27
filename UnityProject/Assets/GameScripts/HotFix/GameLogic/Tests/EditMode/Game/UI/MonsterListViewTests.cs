@@ -94,6 +94,95 @@ namespace GameLogic.Tests
             Assert.AreEqual(1, _container.childCount, "容器中应只剩模板本体。");
         }
 
+        /// <summary>
+        /// 出牌后 Monsters.Value 被赋值为新数组（元素引用稳定）但 InstanceId 不变 → 位置必须保持稳定。
+        /// 这是修 bug "每次出牌怪物位置都变" 的核心回归用例。
+        /// </summary>
+        [Test]
+        public void Positions_StayStable_AfterMonstersValueReassigned()
+        {
+            var view = new MonsterListView(_container, _context, _monsterTemplate, _buffTemplate, _intentTemplate);
+            var a = NewMonsterWithId(1, "A", 20, 20);
+            var b = NewMonsterWithId(2, "B", 20, 20);
+            var c = NewMonsterWithId(3, "C", 20, 20);
+
+            var source1 = new[] { a, b, c };
+            _context.Monsters.Value = source1;
+            var firstPositions = SnapshotPositionsByInstanceId(view, source1);
+
+            // 模拟出牌：怪物字段变化 + GameViewModel.SnapshotMonsters 新建数组（元素引用相同）
+            a.Hp = 18;
+            var source2 = new[] { a, b, c };
+            _context.Monsters.Value = source2;
+
+            var secondPositions = SnapshotPositionsByInstanceId(view, source2);
+            Assert.AreEqual(firstPositions[1], secondPositions[1], "A 位置应稳定");
+            Assert.AreEqual(firstPositions[2], secondPositions[2], "B 位置应稳定");
+            Assert.AreEqual(firstPositions[3], secondPositions[3], "C 位置应稳定");
+            view.Dispose();
+        }
+
+        /// <summary>
+        /// 怪物死亡后该位置被回收，剩余存活怪物位置不变。
+        /// </summary>
+        [Test]
+        public void Positions_DroppedForDeadMonsters_OthersUnchanged()
+        {
+            var view = new MonsterListView(_container, _context, _monsterTemplate, _buffTemplate, _intentTemplate);
+            var a = NewMonsterWithId(1, "A", 20, 20);
+            var b = NewMonsterWithId(2, "B", 20, 20);
+            var c = NewMonsterWithId(3, "C", 20, 20);
+
+            var source1 = new[] { a, b, c };
+            _context.Monsters.Value = source1;
+            var firstPositions = SnapshotPositionsByInstanceId(view, source1);
+
+            b.Hp = 0; // 标记 B 死亡
+            var source2 = new[] { a, b, c };
+            _context.Monsters.Value = source2;
+
+            Assert.AreEqual(2, view.Items.Count, "存活怪物渲染数应为 2");
+            var secondPositions = SnapshotPositionsByInstanceId(view, source2);
+            Assert.IsFalse(secondPositions.ContainsKey(2), "死亡的 B 不应再渲染");
+            Assert.AreEqual(firstPositions[1], secondPositions[1], "A 位置应稳定");
+            Assert.AreEqual(firstPositions[3], secondPositions[3], "C 位置应稳定");
+            view.Dispose();
+        }
+
+        /// <summary>
+        /// 切到下一波时 InstanceId 集合完全更换 → 新怪物获得新位置，旧 InstanceId 不再占空间冲突判定。
+        /// </summary>
+        [Test]
+        public void Positions_AssignedFresh_OnNewWave()
+        {
+            var view = new MonsterListView(_container, _context, _monsterTemplate, _buffTemplate, _intentTemplate);
+            var source1 = new[]
+            {
+                NewMonsterWithId(1, "Wave1A", 20, 20),
+                NewMonsterWithId(2, "Wave1B", 20, 20),
+            };
+            _context.Monsters.Value = source1;
+            var firstPositions = SnapshotPositionsByInstanceId(view, source1);
+            Assert.IsTrue(firstPositions.ContainsKey(1));
+            Assert.IsTrue(firstPositions.ContainsKey(2));
+
+            // 换波
+            var source2 = new[]
+            {
+                NewMonsterWithId(4, "Wave2A", 20, 20),
+                NewMonsterWithId(5, "Wave2B", 20, 20),
+            };
+            _context.Monsters.Value = source2;
+
+            var secondPositions = SnapshotPositionsByInstanceId(view, source2);
+            Assert.AreEqual(2, secondPositions.Count);
+            Assert.IsTrue(secondPositions.ContainsKey(4), "新波 InstanceId=4 应有位置");
+            Assert.IsTrue(secondPositions.ContainsKey(5), "新波 InstanceId=5 应有位置");
+            Assert.IsFalse(secondPositions.ContainsKey(1), "旧 InstanceId=1 不应残留");
+            Assert.IsFalse(secondPositions.ContainsKey(2), "旧 InstanceId=2 不应残留");
+            view.Dispose();
+        }
+
         private static MonsterRuntime NewMonster(string name, int hp, int maxHp)
         {
             return new MonsterRuntime
@@ -102,6 +191,37 @@ namespace GameLogic.Tests
                 Hp = hp,
                 MaxHp = maxHp,
             };
+        }
+
+        /// <summary>
+        /// 构造带显式 InstanceId 的怪物，用于位置稳定性测试。
+        /// </summary>
+        private static MonsterRuntime NewMonsterWithId(int instanceId, string name, int hp, int maxHp)
+        {
+            return new MonsterRuntime
+            {
+                InstanceId = instanceId,
+                Config = UguiTestFactory.NewMonsterConfig(1, name),
+                Hp = hp,
+                MaxHp = maxHp,
+            };
+        }
+
+        /// <summary>
+        /// 读取 MonsterListView 当前所有 item 的 anchoredPosition，以 InstanceId 为 key。
+        /// 通过 item.MonsterIndex 反查 source 数组取得 InstanceId。
+        /// </summary>
+        private static Dictionary<int, Vector2> SnapshotPositionsByInstanceId(MonsterListView view, IReadOnlyList<MonsterRuntime> source)
+        {
+            var result = new Dictionary<int, Vector2>();
+            foreach (var item in view.Items)
+            {
+                var rt = item.Root.GetComponent<RectTransform>();
+                int idx = item.MonsterIndex;
+                if (idx < 0 || idx >= source.Count) continue;
+                result[source[idx].InstanceId] = rt.anchoredPosition;
+            }
+            return result;
         }
 
         private static TextMeshProUGUI FindText(GameObject root, string name)

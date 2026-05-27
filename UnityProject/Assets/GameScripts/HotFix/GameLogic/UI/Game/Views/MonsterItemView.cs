@@ -206,10 +206,15 @@ namespace GameLogic
         public GameObject IntentIconTemplate;
 
         /// <summary>
-        /// 从根对象按约定名称解析绑定。
+        /// 从根对象按约定名称解析绑定；模板若未提供 HP/名称等子节点则按默认布局自动补齐。
         /// </summary>
         public static MonsterItemBindings From(GameObject root, GameObject buffTemplate, GameObject intentTemplate)
         {
+            if (root != null)
+            {
+                MonsterItemDefaultLayout.EnsureChildren(root);
+            }
+
             return new MonsterItemBindings
             {
                 NameText = UguiViewUtil.FindText(root, "NameText") ?? UguiViewUtil.FindText(root, "MonsterNameText"),
@@ -242,6 +247,216 @@ namespace GameLogic
                 if (string.Equals(transform.gameObject.name, name, StringComparison.Ordinal))
                 {
                     return transform.gameObject;
+                }
+            }
+
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 怪物条目模板默认布局补齐工具。
+    /// 当美术 Prefab 只提供根 Image 时，运行时按统一布局补齐名称、血量、意图、Buff 与目标高亮。
+    /// 已存在同名子节点会被保留。
+    /// </summary>
+    internal static class MonsterItemDefaultLayout
+    {
+        public static void EnsureChildren(GameObject root)
+        {
+            if (root == null)
+            {
+                return;
+            }
+
+            var rootRect = root.GetComponent<RectTransform>();
+            if (rootRect == null)
+            {
+                return;
+            }
+
+            EnsureRootClickable(root);
+            EnsureTargetHighlight(rootRect);
+            EnsureNameText(rootRect);
+            EnsureHpBar(rootRect);
+            EnsureIntentBar(rootRect);
+            EnsureBuffBar(rootRect);
+        }
+
+        private static void EnsureRootClickable(GameObject root)
+        {
+            if (root.GetComponent<Image>() == null)
+            {
+                root.AddComponent<Image>();
+            }
+
+            if (root.GetComponent<Button>() == null)
+            {
+                root.AddComponent<Button>();
+            }
+        }
+
+        private static void EnsureTargetHighlight(RectTransform rootRect)
+        {
+            if (FindChild(rootRect, "TargetHighlight") != null)
+            {
+                return;
+            }
+
+            var go = CreateChild(rootRect, "TargetHighlight");
+            go.transform.SetSiblingIndex(0);
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = Vector2.zero;
+            rt.anchorMax = Vector2.one;
+            rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = Vector2.zero;
+            rt.sizeDelta = Vector2.zero;
+            rt.offsetMin = new Vector2(-8f, -8f);
+            rt.offsetMax = new Vector2(8f, 8f);
+            var img = go.AddComponent<Image>();
+            img.color = new Color(1f, 0.85f, 0.2f, 0.45f);
+            img.raycastTarget = false;
+            go.SetActive(false);
+        }
+
+        private static void EnsureNameText(RectTransform rootRect)
+        {
+            if (FindChild(rootRect, "NameText") != null || FindChild(rootRect, "MonsterNameText") != null)
+            {
+                return;
+            }
+
+            var go = CreateChild(rootRect, "NameText");
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.anchoredPosition = new Vector2(0f, 56f);
+            rt.sizeDelta = new Vector2(-8f, 24f);
+            var tmp = go.AddComponent<TextMeshProUGUI>();
+            tmp.alignment = TextAlignmentOptions.Center;
+            tmp.fontSize = 22f;
+            tmp.color = Color.white;
+            tmp.textWrappingMode = TextWrappingModes.NoWrap;
+            tmp.raycastTarget = false;
+        }
+
+        private static void EnsureHpBar(RectTransform rootRect)
+        {
+            bool hasFill = FindChild(rootRect, "HpFill") != null || FindChild(rootRect, "MonsterHpFill") != null;
+            bool hasText = FindChild(rootRect, "HpText") != null || FindChild(rootRect, "MonsterHpText") != null;
+            if (hasFill && hasText)
+            {
+                return;
+            }
+
+            var bar = CreateChild(rootRect, "HpBar");
+            var barRect = bar.GetComponent<RectTransform>();
+            barRect.anchorMin = new Vector2(0f, 0f);
+            barRect.anchorMax = new Vector2(1f, 0f);
+            barRect.pivot = new Vector2(0.5f, 0f);
+            barRect.anchoredPosition = new Vector2(0f, 28f);
+            barRect.sizeDelta = new Vector2(-16f, 22f);
+            var bg = bar.AddComponent<Image>();
+            bg.color = new Color(0f, 0f, 0f, 0.55f);
+            bg.raycastTarget = false;
+
+            if (!hasFill)
+            {
+                var fillGo = CreateChild(barRect, "HpFill");
+                var fillRect = fillGo.GetComponent<RectTransform>();
+                fillRect.anchorMin = Vector2.zero;
+                fillRect.anchorMax = Vector2.one;
+                fillRect.pivot = new Vector2(0.5f, 0.5f);
+                fillRect.anchoredPosition = Vector2.zero;
+                fillRect.sizeDelta = Vector2.zero;
+                var fill = fillGo.AddComponent<Image>();
+                fill.color = new Color(0.78f, 0.18f, 0.18f, 1f);
+                fill.raycastTarget = false;
+                fill.type = Image.Type.Filled;
+                fill.fillMethod = Image.FillMethod.Horizontal;
+                fill.fillOrigin = (int)Image.OriginHorizontal.Left;
+                fill.fillAmount = 1f;
+            }
+
+            if (!hasText)
+            {
+                var textGo = CreateChild(barRect, "HpText");
+                var textRect = textGo.GetComponent<RectTransform>();
+                textRect.anchorMin = Vector2.zero;
+                textRect.anchorMax = Vector2.one;
+                textRect.pivot = new Vector2(0.5f, 0.5f);
+                textRect.anchoredPosition = Vector2.zero;
+                textRect.sizeDelta = Vector2.zero;
+                var tmp = textGo.AddComponent<TextMeshProUGUI>();
+                tmp.alignment = TextAlignmentOptions.Center;
+                tmp.fontSize = 16f;
+                tmp.color = Color.white;
+                tmp.textWrappingMode = TextWrappingModes.NoWrap;
+                tmp.raycastTarget = false;
+            }
+        }
+
+        private static void EnsureIntentBar(RectTransform rootRect)
+        {
+            if (FindChild(rootRect, "IntentBar") != null)
+            {
+                return;
+            }
+
+            var go = CreateChild(rootRect, "IntentBar");
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(1f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0f, -4f);
+            rt.sizeDelta = new Vector2(-8f, 32f);
+            var layout = go.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4f;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+        }
+
+        private static void EnsureBuffBar(RectTransform rootRect)
+        {
+            if (FindChild(rootRect, "BuffBar") != null)
+            {
+                return;
+            }
+
+            var go = CreateChild(rootRect, "BuffBar");
+            var rt = go.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0f, 0f);
+            rt.anchorMax = new Vector2(1f, 0f);
+            rt.pivot = new Vector2(0.5f, 0f);
+            rt.anchoredPosition = new Vector2(0f, 4f);
+            rt.sizeDelta = new Vector2(-8f, 22f);
+            var layout = go.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4f;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+        }
+
+        private static GameObject CreateChild(RectTransform parent, string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform));
+            go.layer = parent.gameObject.layer;
+            go.transform.SetParent(parent, false);
+            return go;
+        }
+
+        private static Transform FindChild(Transform parent, string name)
+        {
+            foreach (Transform t in parent.GetComponentsInChildren<Transform>(true))
+            {
+                if (t == parent)
+                {
+                    continue;
+                }
+                if (string.Equals(t.gameObject.name, name, StringComparison.Ordinal))
+                {
+                    return t;
                 }
             }
 

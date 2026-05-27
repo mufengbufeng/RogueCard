@@ -43,6 +43,21 @@ ReferenceCollector 新增了基于命名规范的自动收集功能，可以根�
 - 保留手动添加的组件
 - 带有确认对话框防止误操作
 
+### 添加变量到UI代码按钮（UHub 字段生成）
+- 位置：与"自动收集 / 清除自动收集"同一行
+- 行为：根据当前 ReferenceCollector 的 `data` 反向生成 UIView 子类脚本的 `[UHubBind("Key")] private 类型 _字段名;` 声明，并确保 `OnInitialize()` 内调用 `UHub.Initialize();`
+- 目标脚本定位：按 GameObject 名称推导类名，在 `Assets/GameScripts/HotFix/GameLogic/UI/` 下递归搜索同名 `.cs`（区分大小写）。**不**要求脚本已挂载到 GameObject；找不到或多个同名时弹窗提示
+- 字段类型推断优先级：实际组件类型 > `ReferenceCollectorRuleService` 命名规则 > `GameObject`
+- 字段命名：`key` 首字母小写并加 `_` 前缀（如 `EndBtn` → `_endBtn`）
+- region 外字段冲突处理：当 prefab key 推导出的字段名已存在于 region 外（含 `public`、`private`、`[SerializeField]` 等任意访问修饰），系统 SHALL 弹出「覆盖 / 跳过 / 取消」三选一对话框
+  - **覆盖**：删除冲突字段的整行声明（含同行属性），在 region 内重新生成 `[UHubBind("Key")] private Type _name;`
+  - **跳过**：保持冲突字段不变，region 内仅生成未冲突字段（兼容渐进迁移）
+  - **取消**：不写入任何修改
+- 注释豁免：`//` 单行注释与 `/* */` 块注释内的字段声明不会被识别为 region 外字段，便于注释保留旧字段对照
+- 代码包围：使用 `#region 自动生成` / `#endregion` 块，每次点击 SHALL 整块替换 region 内容，不出现重复定义
+- `using` 自动补全：按需补充 `EF.UI`、`UnityEngine.UI`、`TMPro` 等命名空间
+- `OnInitialize` 注入：方法存在 + 缺少 `UHub.Initialize();` 调用 → 在 `base.OnInitialize();` 之后插入；调用已存在 → 跳过；方法不存在 → 仅生成字段并 Console 警告
+
 ### 命名规范说明
 - 在Inspector中显示详细的命名规范帮助信息
 - 便于开发者了解支持的后缀类型

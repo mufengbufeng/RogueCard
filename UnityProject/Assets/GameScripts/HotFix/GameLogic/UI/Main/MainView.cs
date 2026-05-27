@@ -12,11 +12,18 @@ namespace GameLogic
     /// </summary>
     public class MainView : UIView
     {
-        public Button _startGameBtn;
-        public TextMeshProUGUI _statusText;
-        public TextMeshProUGUI _levelNameText;
-        public TextMeshProUGUI _levelDescriptionText;
-        public TextMeshProUGUI _feedbackText;
+                #region 自动生成
+        [UHubBind("FeedbackText")] private TextMeshProUGUI _feedbackText;
+        [UHubBind("LevelDescriptionText")] private TextMeshProUGUI _levelDescriptionText;
+        [UHubBind("LevelNameText")] private TextMeshProUGUI _levelNameText;
+        [UHubBind("StartGameBtn")] private Button _startGameBtn;
+        #endregion
+
+        // public Button _startGameBtn;
+        // public TextMeshProUGUI _statusText;
+        // public TextMeshProUGUI _levelNameText;
+        // public TextMeshProUGUI _levelDescriptionText;
+        // public TextMeshProUGUI _feedbackText;
 
         /// <summary>
         /// 主界面按钮点击事件。
@@ -63,7 +70,7 @@ namespace GameLogic
         public void SetStatusText(string message)
         {
             EnsureRuntimeTextComponents();
-            SetText(_statusText, message);
+            // SetText(_statusText, message);
         }
 
         /// <summary>
@@ -129,7 +136,7 @@ namespace GameLogic
 
             _levelNameText ??= CreateRuntimeText(root, "LevelNameTextRuntime", new Vector2(0f, 170f), new Vector2(720f, 64f), 38, Color.white);
             _levelDescriptionText ??= CreateRuntimeText(root, "LevelDescriptionTextRuntime", new Vector2(0f, 105f), new Vector2(760f, 56f), 26, new Color(0.86f, 0.86f, 0.86f, 1f));
-            _statusText ??= CreateRuntimeText(root, "StatusTextRuntime", new Vector2(0f, 45f), new Vector2(600f, 52f), 28, Color.white);
+            // _statusText ??= CreateRuntimeText(root, "StatusTextRuntime", new Vector2(0f, 45f), new Vector2(600f, 52f), 28, Color.white);
             _feedbackText ??= CreateRuntimeText(root, "FeedbackTextRuntime", new Vector2(0f, 120f), new Vector2(760f, 48f), 26, new Color(0.9f, 0.9f, 0.9f, 1f));
         }
 

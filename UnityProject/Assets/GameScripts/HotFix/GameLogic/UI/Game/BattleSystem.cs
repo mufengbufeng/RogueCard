@@ -67,6 +67,9 @@ namespace GameLogic
 
             InitPlayerAttributes();
 
+            // 每场战斗开始时复位怪物 InstanceId 计数器，保证 InstanceId 从 1 起且日志可读
+            _monsterSystem.ResetForNewBattle();
+
             if (_currentBatches != null && _currentBatches.Count > 0)
             {
                 _monsterSystem.SpawnBatch(_currentBatches[0]);

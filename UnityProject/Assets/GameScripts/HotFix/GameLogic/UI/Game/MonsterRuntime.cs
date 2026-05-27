@@ -12,6 +12,14 @@ namespace GameLogic
     public class MonsterRuntime : IBattleActor
     {
         /// <summary>
+        /// 怪物运行时实例的稳定身份标识。
+        /// 0 表示未分配（仅测试代码或未经 MonsterSystem.SpawnBatch 生成的实例使用）；
+        /// 大于 0 表示由 MonsterSystem 在 SpawnBatch 时分配，在该场战斗内全局唯一，
+        /// 怪物存活到死亡的整个生命周期内保持不变。view 层依赖此 id 维持屏幕位置稳定。
+        /// </summary>
+        public int InstanceId { get; set; }
+
+        /// <summary>
         /// 怪物配置引用。
         /// </summary>
         public Monster Config { get; set; }
