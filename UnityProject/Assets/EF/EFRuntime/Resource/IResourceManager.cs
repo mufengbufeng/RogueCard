@@ -70,7 +70,13 @@ namespace EF.Resource
         /// <summary>
         /// 异步加载场景。
         /// </summary>
-        UniTask<SceneHandle> LoadSceneAsync(string location, LoadSceneMode sceneMode = LoadSceneMode.Single, LocalPhysicsMode physicsMode = LocalPhysicsMode.None, bool suspendLoad = false, uint priority = 0, Action<float> progress = null);
+        /// <param name="location">场景定位地址。</param>
+        /// <param name="sceneMode">场景加载模式。</param>
+        /// <param name="physicsMode">局部物理模式。</param>
+        /// <param name="allowSceneActivation">是否允许场景加载完成后立即激活，语义与 YooAsset 3.0 保持一致。</param>
+        /// <param name="priority">加载优先级。</param>
+        /// <param name="progress">进度回调。</param>
+        UniTask<SceneHandle> LoadSceneAsync(string location, LoadSceneMode sceneMode = LoadSceneMode.Single, LocalPhysicsMode physicsMode = LocalPhysicsMode.None, bool allowSceneActivation = true, uint priority = 0, Action<float> progress = null);
 
         /// <summary>
         /// 卸载场景。

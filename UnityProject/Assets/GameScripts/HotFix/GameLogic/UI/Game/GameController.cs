@@ -60,6 +60,9 @@ namespace GameLogic
             _viewModel.PlayerHp.Changed += OnAnyStateChanged;
             _viewModel.PlayerMaxHp.Changed += OnAnyStateChanged;
             _viewModel.PlayerArmor.Changed += OnAnyStateChanged;
+            _viewModel.IsAwaitingWaveConfirmation.Changed += OnAnyStateChanged;
+            _viewModel.CurrentWaveTitle.Changed += OnAnyStateChanged;
+            _viewModel.CurrentWaveContinueText.Changed += OnAnyStateChanged;
             _viewModel.CardPlayFailed += OnCardPlayFailed;
         }
 

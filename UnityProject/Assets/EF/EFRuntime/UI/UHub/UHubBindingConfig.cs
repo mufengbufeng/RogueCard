@@ -17,13 +17,14 @@ namespace EF.UI
         {
             // 默认规则
             new BindingRule { Suffixes = new[] { "Btn", "Button" }, ComponentTypeName = "UnityEngine.UI.Button" },
-            new BindingRule { Suffixes = new[] { "Text", "Label" }, ComponentTypeName = "UnityEngine.UI.Text" },
-            new BindingRule { Suffixes = new[] { "Img", "Image" }, ComponentTypeName = "UnityEngine.UI.Image" },
+            new BindingRule { Suffixes = new[] { "Text", "Label", "TMP" }, ComponentTypeName = "TMPro.TextMeshProUGUI" },
+            new BindingRule { Suffixes = new[] { "Img", "Image", "Fill" }, ComponentTypeName = "UnityEngine.UI.Image" },
+            new BindingRule { Suffixes = new[] { "Panel", "Template", "Go", "Obj", "GameObject" }, ComponentTypeName = "UnityEngine.GameObject" },
+            new BindingRule { Suffixes = new[] { "Bar", "Layer", "Zone", "Rect", "Sc" }, ComponentTypeName = "UnityEngine.RectTransform" },
             new BindingRule { Suffixes = new[] { "Slider" }, ComponentTypeName = "UnityEngine.UI.Slider" },
             new BindingRule { Suffixes = new[] { "Toggle" }, ComponentTypeName = "UnityEngine.UI.Toggle" },
             new BindingRule { Suffixes = new[] { "Input", "InputField" }, ComponentTypeName = "UnityEngine.UI.InputField" },
-            new BindingRule { Suffixes = new[] { "Dropdown" }, ComponentTypeName = "UnityEngine.UI.Dropdown" },
-            new BindingRule { Suffixes = new[] { "Go", "Obj", "GameObject" }, ComponentTypeName = "UnityEngine.GameObject" }
+            new BindingRule { Suffixes = new[] { "Dropdown" }, ComponentTypeName = "UnityEngine.UI.Dropdown" }
         };
 
         [Header("全局配置")]

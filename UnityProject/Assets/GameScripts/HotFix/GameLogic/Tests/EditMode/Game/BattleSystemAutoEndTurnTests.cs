@@ -54,12 +54,74 @@ namespace GameLogic.Tests.EditMode.Game
                     new MonsterRuntime { Hp = 5, MaxHp = 30 },
                     new MonsterRuntime { Hp = 0, MaxHp = 30 },
                 });
+                // 手牌非空：避免被"手牌打空"分支接管，确保用例继续验证"未清场也未打空"时保持 PlayerTurn
+                model.SetHand(new List<CardRuntime> { new CardRuntime() });
                 model.SetPhase(BattlePhase.PlayerTurn);
 
                 bus.GetChannel<CardPlayedEvent>().Publish(new CardPlayedEvent(1));
 
-                Assert.AreEqual(BattlePhase.PlayerTurn, model.Phase, "尚有存活怪物时应保持在 PlayerTurn");
+                Assert.AreEqual(BattlePhase.PlayerTurn, model.Phase, "尚有存活怪物且手牌未空时应保持在 PlayerTurn");
                 Assert.AreEqual(0, monsterSystem.ExecuteTurnCallCount);
+            }
+            finally
+            {
+                battle.Dispose();
+                bus.Dispose();
+            }
+        }
+
+        [Test]
+        public void CardPlayed_手牌打空且有怪物存活_自动结束玩家回合进入怪物回合并最终回到PlayerTurn()
+        {
+            var (battle, model, bus, _, monsterSystem) = CreateBattleWithSystems();
+            try
+            {
+                model.SetMonsters(new List<MonsterRuntime>
+                {
+                    new MonsterRuntime { Hp = 5, MaxHp = 30 },
+                });
+                // 手牌为空：触发"手牌打空"分支
+                model.SetHand(new List<CardRuntime>());
+                model.SetPhase(BattlePhase.PlayerTurn);
+
+                bool turnEnded = false;
+                bus.GetChannel<TurnEndedEvent>().Subscribe(_ => turnEnded = true);
+
+                bus.GetChannel<CardPlayedEvent>().Publish(new CardPlayedEvent(1));
+
+                Assert.AreEqual(1, monsterSystem.ExecuteTurnCallCount, "手牌打空应触发怪物回合");
+                Assert.IsTrue(turnEnded, "应发布 TurnEndedEvent 让 CardSystem 弃手抽新一轮");
+                // ExecuteCheckPhase → 仍有存活怪物 → SetPhase(Prepare) → ExecutePreparePhase → SetPhase(PlayerTurn)
+                Assert.AreEqual(BattlePhase.PlayerTurn, model.Phase, "完成怪物回合并检查后应回到下一回合的 PlayerTurn");
+            }
+            finally
+            {
+                battle.Dispose();
+                bus.Dispose();
+            }
+        }
+
+        [Test]
+        public void CardPlayed_手牌为空但当前批次怪物全清_优先走清场分支不进入怪物回合()
+        {
+            var (battle, model, bus, _, monsterSystem) = CreateBattleWithSystems();
+            try
+            {
+                model.SetMonsters(new List<MonsterRuntime>
+                {
+                    new MonsterRuntime { Hp = 0, MaxHp = 30 },
+                });
+                model.SetHand(new List<CardRuntime>());
+                model.SetPhase(BattlePhase.PlayerTurn);
+
+                bool turnEnded = false;
+                bus.GetChannel<TurnEndedEvent>().Subscribe(_ => turnEnded = true);
+
+                bus.GetChannel<CardPlayedEvent>().Publish(new CardPlayedEvent(1));
+
+                Assert.AreEqual(BattlePhase.Check, model.Phase, "清场优先级高于手牌打空");
+                Assert.AreEqual(0, monsterSystem.ExecuteTurnCallCount, "清场分支不应执行怪物行动");
+                Assert.IsFalse(turnEnded, "清场分支不发布 TurnEndedEvent");
             }
             finally
             {
@@ -113,6 +175,8 @@ namespace GameLogic.Tests.EditMode.Game
             try
             {
                 model.SetMonsters(new List<MonsterRuntime>());
+                // 手牌非空：单独验证"无怪物列表"守卫不被清场或手牌打空分支接管
+                model.SetHand(new List<CardRuntime> { new CardRuntime() });
                 model.SetPhase(BattlePhase.PlayerTurn);
 
                 bus.GetChannel<CardPlayedEvent>().Publish(new CardPlayedEvent(1));
@@ -202,6 +266,14 @@ namespace GameLogic.Tests.EditMode.Game
             public override void ExecuteTurn()
             {
                 ExecuteTurnCallCount++;
+            }
+
+            /// <summary>
+            /// 覆盖基类的 Prepare 实现：测试场景下不需要 MonsterCardSystem 注入，
+            /// 直接返回，避免链路推进到 Prepare 时因依赖未注入而抛 InvalidOperationException。
+            /// </summary>
+            public override void BeginMonsterPrepare()
+            {
             }
         }
     }

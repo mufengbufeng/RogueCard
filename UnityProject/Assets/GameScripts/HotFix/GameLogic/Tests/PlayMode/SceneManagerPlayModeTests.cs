@@ -77,7 +77,7 @@ namespace GameLogic.Tests.PlayMode
 
         /// <summary>
         /// 连续 3 次"加载 → 卸载"不应在 Unity 侧留下 isLoaded 的残场景，且 CurrentScene 每轮都干净重置。
-        /// 注：当前生产实现 SceneManager.UnloadSceneAsync 直接调 sceneHandle.UnloadAsync()
+        /// 注：当前生产实现 SceneManager.UnloadSceneAsync 直接调 sceneHandle.UnloadSceneAsync()
         /// 而未经过 ResourceManager.UnloadScene 路径，因此 ResourceManager._trackedHandles 内会残留
         /// 已 Unload 的 SceneHandle 引用，要等 Shutdown 时统一 ReleaseAll 清理；
         /// 这是已知的内部账本不一致问题，不在本变更修复范围内。本用例只断言 Unity 侧契约。

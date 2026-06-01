@@ -24,6 +24,20 @@ Start a new change using the experimental artifact-driven approach.
 
    **IMPORTANT**: Do NOT proceed without understanding what the user wants to build.
 
+**Workspace planning homes**
+
+Before creating a change, check whether you are operating from a workspace planning home by looking for `.openspec-workspace/workspace.yaml` in the current directory or an ancestor.
+
+If you are in a workspace planning home:
+- Inspect `.openspec-workspace/workspace.yaml` for registered link names and use linked repos or folders as read-only exploration context during planning.
+- Keep implementation edits out of linked repos and folders until an explicit implementation workflow reports an allowed edit root.
+- Create the change with `openspec new change "<name>" --goal "<concise product goal>"`.
+- Add `--areas <name1,name2>` only for affected areas you can confidently match to registered workspace link names.
+- If affected areas are unclear, omit `--areas` and keep the unresolved area question visible in proposal/specs/tasks.
+- Still write the normal human-readable planning artifacts; `--goal` is metadata, not a replacement for `proposal.md`.
+
+If you are in a repo-local planning home, preserve normal change creation and do not pass workspace-only metadata flags such as `--goal` or `--areas`.
+
 2. **Determine the workflow schema**
 
    Use the default schema (omit `--schema`) unless the user explicitly requests a different workflow.
@@ -39,13 +53,13 @@ Start a new change using the experimental artifact-driven approach.
    openspec new change "<name>"
    ```
    Add `--schema <name>` only if the user requested a specific workflow.
-   This creates a scaffolded change at `openspec/changes/<name>/` with the selected schema.
+   This creates a scaffolded change in the planning home resolved by the CLI.
 
 4. **Show the artifact status**
    ```bash
-   openspec status --change "<name>"
+   openspec status --change "<name>" --json
    ```
-   This shows which artifacts need to be created and which are ready (dependencies satisfied).
+   Use the returned `planningHome`, `changeRoot`, `artifactPaths`, and `nextSteps` instead of assuming repo-local paths.
 
 5. **Get instructions for the first artifact**
    The first artifact depends on the schema (e.g., `proposal` for spec-driven).

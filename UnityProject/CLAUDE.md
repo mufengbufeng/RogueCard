@@ -70,7 +70,7 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 ### 核心依赖
 
 - HybridCLR → C# 热更新（运行时加载 DLL）
-- YooAsset 2.3.x → 资源管理与加载
+- YooAsset 3.0.x → 资源管理与加载（Options + Event 模型）
 - UniTask → Unity 异步方案
 - Luban → 配置/数据生成
 - VContainer → DI 容器

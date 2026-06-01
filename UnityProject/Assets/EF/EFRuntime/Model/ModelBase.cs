@@ -206,6 +206,14 @@ namespace EF.Model
         /// </summary>
         protected TData Data => (TData)GetViewInstance();
 
+        /// <summary>
+        /// 获取只读数据接口实例，供外部访问模型数据。
+        /// </summary>
+        public TData GetData()
+        {
+            return Data;
+        }
+
         /// <inheritdoc />
         protected sealed override void OnInitialize()
         {

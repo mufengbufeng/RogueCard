@@ -40,11 +40,11 @@ namespace EF.Scene
         /// <param name="sceneName">场景名称</param>
         /// <param name="sceneMode">加载模式</param>
         /// <param name="physicsMode">物理模式</param>
-        /// <param name="suspendLoad">是否暂停加载</param>
+        /// <param name="allowSceneActivation">是否允许场景加载完成后立即激活</param>
         /// <param name="priority">加载优先级</param>
         /// <returns>加载是否成功</returns>
         UniTask<bool> LoadSceneAsync(string sceneName, LoadSceneMode sceneMode = LoadSceneMode.Single, 
-            LocalPhysicsMode physicsMode = LocalPhysicsMode.None, bool suspendLoad = false, uint priority = 0);
+            LocalPhysicsMode physicsMode = LocalPhysicsMode.None, bool allowSceneActivation = true, uint priority = 0);
             
         /// <summary>
         /// 异步卸载当前场景

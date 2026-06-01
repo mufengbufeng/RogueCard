@@ -1,7 +1,9 @@
 using System;
 using System.Linq;
 using NUnit.Framework;
+using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace GameLogic.Tests
 {
@@ -103,6 +105,43 @@ namespace GameLogic.Tests
 
             Assert.AreEqual(1, count);
             Assert.AreSame(child, collector.data.Single(item => item.key == "PanelGo").gameObject);
+        }
+
+        /// <summary>
+        /// GameView 规范命名后缀必须能自动收集并推断正确类型。
+        /// </summary>
+        [Test]
+        public void AutoCollect_CollectsGameViewNamingRules()
+        {
+            var collector = CreateCollector();
+            var battlePanel = CreateChild("BattlePanel");
+            var rewardPanel = CreateChild("RewardPanel");
+            var playerHpFill = CreateChild("PlayerHpFill");
+            var playerBuffBar = CreateChild("PlayerBuffBar");
+            var dropZone = CreateChild("DropZone");
+            var previewLayer = CreateChild("PreviewLayer");
+            var cardSc = CreateChild("CardSc");
+            var handCardTemplate = CreateChild("HandCardTemplate");
+            var infoText = CreateChild("InfoText");
+            playerHpFill.AddComponent<Image>();
+            playerBuffBar.AddComponent<RectTransform>();
+            dropZone.AddComponent<RectTransform>();
+            previewLayer.AddComponent<RectTransform>();
+            cardSc.AddComponent<RectTransform>();
+            infoText.AddComponent<TextMeshProUGUI>();
+
+            var count = collector.AutoCollectByNamingRules();
+
+            Assert.AreEqual(9, count);
+            Assert.AreSame(battlePanel, collector.data.Single(item => item.key == "BattlePanel").gameObject);
+            Assert.AreSame(rewardPanel, collector.data.Single(item => item.key == "RewardPanel").gameObject);
+            Assert.AreSame(playerHpFill.GetComponent<Image>(), collector.data.Single(item => item.key == "PlayerHpFill").gameObject);
+            Assert.AreSame(playerBuffBar.GetComponent<RectTransform>(), collector.data.Single(item => item.key == "PlayerBuffBar").gameObject);
+            Assert.AreSame(dropZone.GetComponent<RectTransform>(), collector.data.Single(item => item.key == "DropZone").gameObject);
+            Assert.AreSame(previewLayer.GetComponent<RectTransform>(), collector.data.Single(item => item.key == "PreviewLayer").gameObject);
+            Assert.AreSame(cardSc.GetComponent<RectTransform>(), collector.data.Single(item => item.key == "CardSc").gameObject);
+            Assert.AreSame(handCardTemplate, collector.data.Single(item => item.key == "HandCardTemplate").gameObject);
+            Assert.AreSame(infoText.GetComponent<TextMeshProUGUI>(), collector.data.Single(item => item.key == "InfoText").gameObject);
         }
 
         private ReferenceCollector CreateCollector()

@@ -21,6 +21,7 @@ Enter explore mode. Think deeply. Visualize freely. Follow the conversation wher
 
 - **Curious, not prescriptive** - Ask questions that emerge naturally, don't follow a script
 - **Open threads, not interrogations** - Surface multiple interesting directions and let the user follow what resonates. Don't funnel them through a single path of questions.
+- **Structured at the inflection** - When a vague topic crystallizes into a concrete direction, pause and ask 4-7 targeted questions before wrapping up or creating artifacts.
 - **Visual** - Use ASCII diagrams liberally when they'd help clarify thinking
 - **Adaptive** - Follow interesting threads, pivot when new information emerges
 - **Patient** - Don't rush to conclusions, let the shape of the problem emerge
@@ -50,6 +51,12 @@ Depending on what the user brings, you might:
 - Sketch tradeoffs
 - Recommend a path (if asked)
 
+**Pressure-test the idea**
+- Ask 4-7 direct questions once the direction is concrete
+- Cover exactly four dimensions: hidden assumptions, edge cases, acceptance criteria, and explicit non-scope
+- Include at least one question for each dimension
+- Make each question specific enough to answer directly
+
 **Visualize**
 ```
 ┌─────────────────────────────────────────┐
@@ -72,6 +79,32 @@ Depending on what the user brings, you might:
 - Identify what could go wrong
 - Find gaps in understanding
 - Suggest spikes or investigations
+
+---
+
+## Structured Questions and Grilled Summary
+
+Structured questioning belongs at the inflection point, not at the start. First help the user explore, investigate, compare, and narrow. When the idea becomes concrete enough that a proposal or artifact could plausibly follow, stop and ask 4-7 questions across these four dimensions:
+
+1. **Hidden assumptions** - What are we assuming about users, systems, data, timing, ownership, or constraints?
+2. **Edge cases** - What unusual states, inputs, failures, permissions, environments, or races could break the plan?
+3. **Acceptance criteria** - What observable outcomes prove this is done and working?
+4. **Explicit non-scope** - What tempting adjacent work should stay out for now?
+
+Do not ask generic questions like "what do you think?" or "any edge cases?" Ask pointed questions shaped by the actual conversation and codebase context.
+
+After the user answers, produce a concise paste-ready summary:
+
+```markdown
+## Grilled
+
+- [Assumptions] ...
+- [Edge cases] ...
+- [Acceptance criteria] ...
+- [Non-scope] ...
+```
+
+Keep the summary short enough to paste into `proposal.md`, `design.md`, or a spec without cleanup. Do not write it to disk automatically. Offer to help turn it into `/opsx:propose` input or artifact edits if the user wants.
 
 ---
 
@@ -104,11 +137,10 @@ Think freely. When insights crystallize, you might offer:
 
 If the user mentions a change or you detect one is relevant:
 
-1. **Read existing artifacts for context**
-   - `openspec/changes/<name>/proposal.md`
-   - `openspec/changes/<name>/design.md`
-   - `openspec/changes/<name>/tasks.md`
-   - etc.
+1. **Resolve and read existing artifacts for context**
+   - Run `openspec status --change "<name>" --json`.
+   - Use `changeRoot`, `artifactPaths`, and `actionContext` from the status JSON.
+   - Read existing files from `artifactPaths.<artifact>.existingOutputPaths`.
 
 2. **Reference them naturally in conversation**
    - "Your design mentions using Redis, but we just realized SQLite fits better..."

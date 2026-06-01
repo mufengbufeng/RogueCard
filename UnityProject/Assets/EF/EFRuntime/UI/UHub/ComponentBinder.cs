@@ -389,8 +389,8 @@ namespace EF.UI
                 return false;
             }
 
-            // 检查类型兼容性
-            if (componentType != null && !componentType.IsInstanceOfType(component))
+            object targetComponent = ResolveCollectedObject(component, componentType);
+            if (targetComponent == null)
             {
                 LogMessage($"组件 '{componentName}' 的类型 {component.GetType().Name} 与期望类型 {componentType.Name} 不兼容 (字段: {field.Name})",
                           _config?.FailureMode ?? BindingFailureMode.Warning);
@@ -399,7 +399,7 @@ namespace EF.UI
 
             try
             {
-                field.SetValue(view, component);
+                field.SetValue(view, targetComponent);
                 return true;
             }
             catch (Exception ex)
@@ -430,8 +430,8 @@ namespace EF.UI
                 return false;
             }
 
-            // 检查类型兼容性
-            if (componentType != null && !componentType.IsInstanceOfType(component))
+            object targetComponent = ResolveCollectedObject(component, componentType);
+            if (targetComponent == null)
             {
                 LogMessage($"组件 '{componentName}' 的类型 {component.GetType().Name} 与期望类型 {componentType.Name} 不兼容 (属性: {property.Name})",
                           _config?.FailureMode ?? BindingFailureMode.Warning);
@@ -440,7 +440,7 @@ namespace EF.UI
 
             try
             {
-                property.SetValue(view, component);
+                property.SetValue(view, targetComponent);
                 return true;
             }
             catch (Exception ex)
@@ -448,6 +448,26 @@ namespace EF.UI
                 LogError($"设置属性 {property.Name} 值失败: {ex.Message}");
                 return false;
             }
+        }
+
+        private object ResolveCollectedObject(UnityEngine.Object component, Type componentType)
+        {
+            if (component == null)
+            {
+                return null;
+            }
+
+            if (componentType == null || componentType.IsInstanceOfType(component))
+            {
+                return component;
+            }
+
+            if (component is GameObject gameObject && typeof(Component).IsAssignableFrom(componentType))
+            {
+                return gameObject.GetComponent(componentType);
+            }
+
+            return null;
         }
 
         /// <summary>
@@ -575,14 +595,15 @@ namespace EF.UI
             if (bindAttr?.ComponentType != null)
                 return bindAttr.ComponentType;
 
-            // 检查运行时覆盖规则
+            if (memberType != null)
+                return memberType;
+
             foreach (var kvp in _runtimeOverrides)
             {
                 if (IsMatchSuffix(memberName, kvp.Key))
                     return kvp.Value;
             }
 
-            // 使用配置文件的类型推断
             if (_config != null)
             {
                 var inferredType = _config.GetComponentType(memberName);
@@ -590,8 +611,7 @@ namespace EF.UI
                     return inferredType;
             }
 
-            // 使用成员声明的类型
-            return memberType;
+            return null;
         }
 
         /// <summary>

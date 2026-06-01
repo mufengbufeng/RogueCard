@@ -44,8 +44,8 @@ namespace GameLogic.Tests.PlayMode
             AssetHandle handle = await Resource.LoadAssetAsync<GameObject>(PrefabFixtureLocation);
 
             Assert.IsNotNull(handle, "AssetHandle 不应为 null");
-            Assert.AreEqual(EOperationStatus.Succeed, handle.Status,
-                $"加载操作未成功：{handle.LastError}");
+            Assert.AreEqual(EOperationStatus.Succeeded, handle.Status,
+                $"加载操作未成功：{handle.Error}");
             Assert.IsNotNull(handle.AssetObject, "AssetHandle.AssetObject 不应为 null");
 
             GameObject prefab = handle.AssetObject as GameObject;
@@ -63,7 +63,7 @@ namespace GameLogic.Tests.PlayMode
         public IEnumerator Release_HandleIsRemovedFromTrackingAfterRelease() => UniTask.ToCoroutine(async () =>
         {
             AssetHandle handle = await Resource.LoadAssetAsync<GameObject>(PrefabFixtureLocation);
-            Assert.AreEqual(EOperationStatus.Succeed, handle.Status);
+            Assert.AreEqual(EOperationStatus.Succeeded, handle.Status);
 
             Resource.Release(handle);
             AssertNoLeakedHandles();
@@ -115,15 +115,15 @@ namespace GameLogic.Tests.PlayMode
 
             (AssetHandle handleA, AssetHandle handleB) = await UniTask.WhenAll(taskA, taskB);
 
-            Assert.AreEqual(EOperationStatus.Succeed, handleA.Status, "并发请求 A 应当成功");
-            Assert.AreEqual(EOperationStatus.Succeed, handleB.Status, "并发请求 B 应当成功");
+            Assert.AreEqual(EOperationStatus.Succeeded, handleA.Status, "并发请求 A 应当成功");
+            Assert.AreEqual(EOperationStatus.Succeeded, handleB.Status, "并发请求 B 应当成功");
             Assert.IsNotNull(handleA.AssetObject);
             Assert.IsNotNull(handleB.AssetObject);
 
             // 释放其一不应影响另一个继续可用。
             Resource.Release(handleA);
-            Assert.AreEqual(EOperationStatus.Succeed, handleB.Status,
-                "释放 A 后 B 仍应保持 Succeed 状态");
+            Assert.AreEqual(EOperationStatus.Succeeded, handleB.Status,
+                "释放 A 后 B 仍应保持 Succeeded 状态");
             Assert.IsNotNull(handleB.AssetObject, "释放 A 后 B 仍应能访问 AssetObject");
 
             Resource.Release(handleB);

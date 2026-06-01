@@ -30,7 +30,7 @@ When ready to implement, run /opsx:apply
    ```bash
    openspec new change "<name>"
    ```
-   This creates a scaffolded change at `openspec/changes/<name>/` with `.openspec.yaml`.
+   This creates a scaffolded change in the planning home resolved by the CLI with `.openspec.yaml`.
 
 3. **Get the artifact build order**
    ```bash
@@ -39,6 +39,7 @@ When ready to implement, run /opsx:apply
    Parse the JSON to get:
    - `applyRequires`: array of artifact IDs needed before implementation (e.g., `["tasks"]`)
    - `artifacts`: list of all artifacts with their status and dependencies
+   - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context. Use these instead of assuming repo-local paths.
 
 4. **Create artifacts in sequence until apply-ready**
 
@@ -56,10 +57,10 @@ When ready to implement, run /opsx:apply
         - `rules`: Artifact-specific rules (constraints for you - do NOT include in output)
         - `template`: The structure to use for your output file
         - `instruction`: Schema-specific guidance for this artifact type
-        - `outputPath`: Where to write the artifact
+        - `resolvedOutputPath`: Resolved path or pattern to write the artifact
         - `dependencies`: Completed artifacts to read for context
       - Read any completed dependency files for context
-      - Create the artifact file using `template` as the structure
+      - Create the artifact file using `template` as the structure and write it to `resolvedOutputPath`
       - Apply `context` and `rules` as constraints - but do NOT copy them into the file
       - Show brief progress: "Created <artifact-id>"
 
@@ -94,6 +95,19 @@ After completing all artifacts, summarize:
 - **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
   - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into the artifact
   - These guide what you write, but should never appear in the output
+
+**Tasks artifact — feedback-type annotation (required)**
+
+When you create the `tasks` artifact, every task row MUST carry a feedback-type annotation:
+`- [ ] [<type>] X.Y description`. Valid types are: `tdd`, `repl`, `static`, `doc`, `manual`.
+
+- `tdd` — task adds or changes observable behavior in code (red → green test loop)
+- `repl` — task is verified by running a command and checking output
+- `static` — refactor / typing / no behavior change (tsc + lint + tests as signal)
+- `doc` — documentation / comments / README (human review)
+- `manual` — UI / copy / anything needing human eyeball
+
+**Classification rule:** if the task adds or changes observable behavior, choose `tdd` unless writing a test is genuinely impractical. The `openspec instructions tasks` output contains the full taxonomy plus a worked example — read it carefully before drafting tasks.md.
 
 **Guardrails**
 - Create ALL artifacts needed for implementation (as defined by schema's `apply.requires`)

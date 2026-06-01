@@ -75,6 +75,26 @@ namespace GameLogic
         public ReactiveProperty<IReadOnlyList<BuffRuntime>> PlayerBuffs { get; private set; }
 
         /// <summary>
+        /// 是否正在等待事件波次确认（Chest / Shop 波次已展示，等待玩家点击继续）。
+        /// </summary>
+        public ReactiveProperty<bool> IsAwaitingWaveConfirmation { get; private set; }
+
+        /// <summary>
+        /// 当前事件波次展示标题。
+        /// </summary>
+        public ReactiveProperty<string> CurrentWaveTitle { get; private set; }
+
+        /// <summary>
+        /// 当前事件波次展示描述。
+        /// </summary>
+        public ReactiveProperty<string> CurrentWaveDesc { get; private set; }
+
+        /// <summary>
+        /// 当前事件波次继续按钮文案。
+        /// </summary>
+        public ReactiveProperty<string> CurrentWaveContinueText { get; private set; }
+
+        /// <summary>
         /// 创建局内 ViewModel。
         /// </summary>
         public GameViewModel()
@@ -90,6 +110,10 @@ namespace GameLogic
             IsLevelComplete = new ReactiveProperty<bool>(false);
             IsPlayerDead = new ReactiveProperty<bool>(false);
             PlayerBuffs = new ReactiveProperty<IReadOnlyList<BuffRuntime>>(Array.Empty<BuffRuntime>());
+            IsAwaitingWaveConfirmation = new ReactiveProperty<bool>(false);
+            CurrentWaveTitle = new ReactiveProperty<string>(string.Empty);
+            CurrentWaveDesc = new ReactiveProperty<string>(string.Empty);
+            CurrentWaveContinueText = new ReactiveProperty<string>(string.Empty);
         }
 
         // ── 命令意图事件 ──
@@ -150,6 +174,10 @@ namespace GameLogic
             IsLevelComplete.ClearListeners();
             IsPlayerDead.ClearListeners();
             PlayerBuffs.ClearListeners();
+            IsAwaitingWaveConfirmation.ClearListeners();
+            CurrentWaveTitle.ClearListeners();
+            CurrentWaveDesc.ClearListeners();
+            CurrentWaveContinueText.ClearListeners();
         }
 
         /// <summary>
@@ -214,6 +242,18 @@ namespace GameLogic
                 case nameof(GameModel.PlayerBuffs):
                     PlayerBuffs.Value = SnapshotPlayerBuffs();
                     break;
+                case nameof(GameModel.IsAwaitingWaveConfirmation):
+                    IsAwaitingWaveConfirmation.Value = _model.IsAwaitingWaveConfirmation;
+                    break;
+                case nameof(GameModel.CurrentWaveTitle):
+                    CurrentWaveTitle.Value = _model.CurrentWaveTitle ?? string.Empty;
+                    break;
+                case nameof(GameModel.CurrentWaveDesc):
+                    CurrentWaveDesc.Value = _model.CurrentWaveDesc ?? string.Empty;
+                    break;
+                case nameof(GameModel.CurrentWaveContinueText):
+                    CurrentWaveContinueText.Value = _model.CurrentWaveContinueText ?? string.Empty;
+                    break;
             }
         }
 
@@ -255,6 +295,10 @@ namespace GameLogic
             Monsters.Value = SnapshotMonsters();
             Hand.Value = _model.Hand;
             PlayerBuffs.Value = SnapshotPlayerBuffs();
+            IsAwaitingWaveConfirmation.Value = _model.IsAwaitingWaveConfirmation;
+            CurrentWaveTitle.Value = _model.CurrentWaveTitle ?? string.Empty;
+            CurrentWaveDesc.Value = _model.CurrentWaveDesc ?? string.Empty;
+            CurrentWaveContinueText.Value = _model.CurrentWaveContinueText ?? string.Empty;
         }
     }
 }

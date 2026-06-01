@@ -1,11 +1,12 @@
+using System.Collections.Generic;
 using YooAsset;
 
 namespace EF.Resource
 {
     /// <summary>
-    /// 默认的远程资源地址查询服务，实现 YooAssets 所需的 IRemoteServices 接口。
+    /// 默认的远程资源地址查询服务，实现 YooAssets 所需的 IRemoteService 接口。
     /// </summary>
-    internal sealed class DefaultResourceRemoteServices : IRemoteServices
+    internal sealed class DefaultResourceRemoteServices : IRemoteService
     {
         private readonly string _mainServer;
         private readonly string _fallbackServer;
@@ -17,25 +18,30 @@ namespace EF.Resource
         }
 
         /// <inheritdoc />
-        public string GetRemoteMainURL(string fileName)
+        public IReadOnlyList<string> GetRemoteUrls(string fileName)
         {
-            if (string.IsNullOrEmpty(_mainServer))
+            var urls = new List<string>(2);
+
+            if (!string.IsNullOrEmpty(_mainServer))
             {
-                return string.Empty;
+                urls.Add(_mainServer + fileName);
             }
 
-            return _mainServer + fileName;
-        }
-
-        /// <inheritdoc />
-        public string GetRemoteFallbackURL(string fileName)
-        {
-            if (string.IsNullOrEmpty(_fallbackServer))
+            if (!string.IsNullOrEmpty(_fallbackServer))
             {
-                return GetRemoteMainURL(fileName);
+                string fallbackUrl = _fallbackServer + fileName;
+                if (!urls.Contains(fallbackUrl))
+                {
+                    urls.Add(fallbackUrl);
+                }
             }
 
-            return _fallbackServer + fileName;
+            if (urls.Count == 0)
+            {
+                urls.Add(fileName);
+            }
+
+            return urls;
         }
 
         private static string Normalize(string host)

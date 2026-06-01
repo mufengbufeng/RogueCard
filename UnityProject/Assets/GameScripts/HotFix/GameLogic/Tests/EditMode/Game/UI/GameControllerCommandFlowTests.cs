@@ -218,7 +218,7 @@ namespace GameLogic.Tests
             public YooAsset.ResourcePackage GetDefaultPackage() => throw new System.NotSupportedException();
             public Cysharp.Threading.Tasks.UniTask<YooAsset.AssetHandle> LoadAssetAsync<T>(string location, System.Action<float> progress = null, uint priority = 0) where T : Object => throw new System.NotSupportedException();
             public YooAsset.AssetHandle LoadAssetSync<T>(string location, uint priority = 0) where T : Object => throw new System.NotSupportedException();
-            public Cysharp.Threading.Tasks.UniTask<YooAsset.SceneHandle> LoadSceneAsync(string location, UnityEngine.SceneManagement.LoadSceneMode sceneMode = UnityEngine.SceneManagement.LoadSceneMode.Single, UnityEngine.SceneManagement.LocalPhysicsMode physicsMode = UnityEngine.SceneManagement.LocalPhysicsMode.None, bool suspendLoad = false, uint priority = 0, System.Action<float> progress = null) => throw new System.NotSupportedException();
+            public Cysharp.Threading.Tasks.UniTask<YooAsset.SceneHandle> LoadSceneAsync(string location, UnityEngine.SceneManagement.LoadSceneMode sceneMode = UnityEngine.SceneManagement.LoadSceneMode.Single, UnityEngine.SceneManagement.LocalPhysicsMode physicsMode = UnityEngine.SceneManagement.LocalPhysicsMode.None, bool allowSceneActivation = true, uint priority = 0, System.Action<float> progress = null) => throw new System.NotSupportedException();
             public void UnloadScene(YooAsset.SceneHandle handle) { }
             public void Release(YooAsset.HandleBase handle) { }
             public void ReleaseAll() { }
