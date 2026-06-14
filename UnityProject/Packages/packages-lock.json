@@ -1,14 +1,16 @@
 {
   "dependencies": {
-    "com.besty.unity-skills": {
-      "version": "https://github.com/Besty0728/Unity-Skills.git?path=/SkillsForUnity",
+    "cn.lys.aibridge": {
+      "version": "https://github.com/liyingsong99/AIBridge.git",
       "depth": 0,
       "source": "git",
       "dependencies": {
-        "com.unity.nuget.newtonsoft-json": "3.0.2",
-        "com.unity.timeline": "1.7.7"
+        "com.unity.ugui": "1.0.0",
+        "com.unity.test-framework": "1.1.31",
+        "com.unity.modules.imageconversion": "1.0.0",
+        "com.unity.modules.screencapture": "1.0.0"
       },
-      "hash": "cfa14585b621936d5f05eabb1173164fc4c94240"
+      "hash": "deb00bb545696e4081b1efbbf0bcebbf21a21ed8"
     },
     "com.code-philosophy.hybridclr": {
       "version": "https://github.com/focus-creative-games/hybridclr_unity.git",
@@ -497,6 +499,15 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       },
       "url": "https://packages.unity.com"
+    },
+    "me.xw.image-to-ui": {
+      "version": "file:me.xw.image-to-ui",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.ugui": "2.0.0",
+        "com.unity.nuget.newtonsoft-json": "3.2.1"
+      }
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",

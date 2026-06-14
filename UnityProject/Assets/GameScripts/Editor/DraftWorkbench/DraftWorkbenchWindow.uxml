@@ -1,0 +1,148 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements">
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <!--  根容器                                                 -->
+    <!-- ═══════════════════════════════════════════════════════════ -->
+    <ui:VisualElement name="root-container" class="root">
+
+        <!-- ══════ 左侧/上方：工作流区域 ══════ -->
+        <ui:ScrollView name="workflow-scroll" class="workflow-area">
+
+            <!-- ────── 1. AI 服务设置 ────── -->
+            <ui:Foldout name="settings-foldout" text="AI 服务设置" value="true">
+                <ui:TextField name="endpoint-field" label="API URL (含完整路径)" />
+                <ui:TextField name="api-key-field" label="API Key" is-password-field="true" />
+                <ui:TextField name="model-field" label="Model" />
+                <ui:Toggle name="use-json-mode-toggle" label="Use JSON Mode" />
+                <ui:Toggle name="use-responses-api-toggle" label="Responses API 格式" />
+                <ui:IntegerField name="timeout-field" label="Timeout Seconds" value="30" />
+                <ui:VisualElement name="settings-buttons" class="button-row">
+                    <ui:Button name="test-connection-btn" text="Test Connection" />
+                    <ui:Button name="save-config-btn" text="Save Config" />
+                </ui:VisualElement>
+                <ui:VisualElement name="connection-result-container" />
+            </ui:Foldout>
+
+            <!-- ────── 2. 输入 ────── -->
+            <ui:Foldout name="input-foldout" text="输入" value="true">
+                <ui:VisualElement name="design-image-container" />
+                <ui:VisualElement name="target-prefab-container" />
+                <ui:VisualElement name="canvas-size-row" class="input-row">
+                    <ui:Label text="Canvas Size" />
+                    <ui:IntegerField name="canvas-width-field" value="1920" />
+                    <ui:Label text="x" />
+                    <ui:IntegerField name="canvas-height-field" value="1080" />
+                </ui:VisualElement>
+                <ui:Button name="generate-btn" text="[Generate]" class="primary-button" />
+                <ui:VisualElement name="generate-error-container" />
+
+                <!-- 叠加层控制 -->
+                <ui:Label text="叠加层" class="section-label" />
+                <ui:Slider name="overlay-opacity-slider" label="不透明度" low-value="0" high-value="1" value="0.5" />
+                <ui:VisualElement name="fit-mode-popup-container" />
+                <ui:VisualElement name="overlay-buttons" class="button-row">
+                    <ui:Button name="show-overlay-btn" text="显示叠加层" />
+                    <ui:Button name="hide-overlay-btn" text="隐藏叠加层" />
+                </ui:VisualElement>
+            </ui:Foldout>
+
+            <!-- ────── 3. AI 结果 ────── -->
+            <ui:Foldout name="ai-result-foldout" text="AI 结果" value="true">
+                <ui:Label text="AI 响应 JSON（可编辑）" />
+                <ui:ScrollView name="ai-result-scroll" class="ai-result-scroll">
+                    <ui:TextField name="ai-response-field" multiline="true" class="ai-response-textarea" />
+                </ui:ScrollView>
+                <ui:Button name="parse-preview-btn" text="[Parse &amp; Preview]" class="primary-button" />
+            </ui:Foldout>
+
+            <!-- ────── 4. JSON 驱动切图 ────── -->
+            <ui:Foldout name="auto-slice-foldout" text="JSON 驱动切图" value="false">
+                <ui:VisualElement name="auto-slice-status-card" class="auto-slice-status-card">
+                    <ui:Label name="auto-slice-stage-label" text="阶段：待开始" class="bold-label" />
+                    <ui:Label name="auto-slice-primary-action-label" text="主操作：根据 JSON 生成原始切图" class="summary-label" />
+                    <ui:Label name="auto-slice-output-label" text="输出：raw PNG / refined PNG / Sprite 路径会在这里显示" class="mini-label" />
+                    <ui:Label name="auto-slice-status-label" text="状态：选择 Design Image 后开始" class="mini-label" />
+                </ui:VisualElement>
+                <ui:Foldout name="auto-slice-advanced-foldout" text="ComfyUI / SAM3 高级设置（非默认）" value="false">
+                    <ui:TextField name="comfy-base-url-field" label="ComfyUI URL" />
+                    <ui:VisualElement name="comfy-workflow-container" />
+                    <ui:IntegerField name="slice-expand-pixels-field" label="扩张像素" value="4" />
+                    <ui:Slider name="slice-expand-percent-slider" label="扩张比例" low-value="0" high-value="0.2" value="0.04" />
+                </ui:Foldout>
+                <ui:VisualElement name="auto-slice-buttons" class="button-row auto-slice-buttons">
+                    <ui:Button name="test-comfy-btn" text="测试 ComfyUI 连接" />
+                    <ui:Button name="generate-regions-btn" text="根据 JSON 生成原始切图" class="primary-button" />
+                </ui:VisualElement>
+                <ui:VisualElement name="auto-slice-asset-buttons" class="button-row auto-slice-buttons">
+                    <ui:Button name="import-sprites-btn" text="使用 ComfyUI 生成可用切图" />
+                    <ui:Button name="match-sprites-btn" text="匹配 Prefab 节点" />
+                    <ui:Button name="apply-sprites-btn" text="应用选中修改" class="primary-button" />
+                </ui:VisualElement>
+                <ui:VisualElement name="auto-slice-help-container" />
+                <ui:Label text="原始切图 Regions（可勾选 / 改名 / 复核）" class="bold-label" />
+                <ui:VisualElement name="region-list-container" class="region-list" />
+                <ui:Label text="可用切图 Assignments（匹配 Prefab）" class="bold-label" />
+                <ui:VisualElement name="assignment-list-container" class="assignment-list" />
+            </ui:Foldout>
+
+            <!-- ────── 5. 预览审查 ────── -->
+            <ui:Foldout name="preview-foldout" text="预览审查" value="true">
+                <!-- 节点摘要 -->
+                <ui:Label name="node-summary-label" class="summary-label" />
+                <ui:VisualElement name="preview-empty-container" />
+
+                <!-- 内嵌结构框预览（仅窄布局显示） -->
+                <ui:VisualElement name="inline-preview-container" class="inline-preview-pane">
+                    <ui:Label name="inline-preview-header" text="结构框预览" class="bold-label" />
+                    <!-- 预览工具栏 -->
+                    <ui:VisualElement name="inline-color-mode-popup-container" />
+                    <ui:Toggle name="inline-manual-zoom-toggle" label="手动缩放检查" />
+                    <ui:VisualElement name="inline-zoom-controls" class="zoom-controls">
+                        <ui:Slider name="inline-zoom-slider" label="缩放倍率" low-value="0.25" high-value="2" value="1" />
+                        <ui:Label name="inline-zoom-percent-label" text="100%" />
+                        <ui:Button name="inline-fit-btn" text="Fit" />
+                    </ui:VisualElement>
+                    <ui:Label name="inline-stats-label" class="mini-label" />
+                    <!-- 结构框预览滚动区域 -->
+                    <ui:ScrollView name="inline-preview-scroll" class="structure-preview-scroll" />
+                </ui:VisualElement>
+
+                <!-- 节点列表容器 -->
+                <ui:Label text="节点列表" class="bold-label" />
+                <ui:VisualElement name="node-list-container" class="node-list" />
+
+                <!-- Action 按钮 -->
+                <ui:VisualElement name="preview-action-buttons" class="button-row">
+                    <ui:Button name="apply-btn" text="[Apply to Prefab]" class="primary-button" />
+                    <ui:Button name="revert-btn" text="[Revert Last]" />
+                </ui:VisualElement>
+            </ui:Foldout>
+
+            <!-- ────── 6. 报告 ────── -->
+            <ui:Foldout name="report-foldout" text="报告" value="false">
+                <ui:ScrollView name="report-scroll" class="report-scroll">
+                    <ui:Label name="conversion-warnings-label" class="report-section" />
+                    <ui:Label name="apply-report-label" class="report-section" />
+                    <ui:Label name="binding-report-label" class="report-section" />
+                    <ui:VisualElement name="report-empty-container" />
+                </ui:ScrollView>
+            </ui:Foldout>
+        </ui:ScrollView>
+
+        <!-- ══════ 右侧：结构框预览面板（仅宽布局显示） ══════ -->
+        <ui:VisualElement name="preview-panel" class="preview-panel">
+            <ui:Label name="preview-panel-header" text="结构框预览" class="bold-label" />
+            <!-- 预览工具栏 -->
+            <ui:VisualElement name="color-mode-popup-container" />
+            <ui:Toggle name="manual-zoom-toggle" label="手动缩放检查" />
+            <ui:VisualElement name="zoom-controls" class="zoom-controls">
+                <ui:Slider name="zoom-slider" label="缩放倍率" low-value="0.25" high-value="2" value="1" />
+                <ui:Label name="zoom-percent-label" text="100%" />
+                <ui:Button name="fit-btn" text="Fit" />
+            </ui:VisualElement>
+            <ui:Label name="stats-label" class="mini-label" />
+            <!-- 结构框预览滚动区域 -->
+            <ui:ScrollView name="structure-preview-scroll" class="structure-preview-scroll" />
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

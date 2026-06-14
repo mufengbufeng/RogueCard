@@ -85,7 +85,7 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 | 概念/自然语言搜索 | codedb `codedb_search`（默认语义 + BM25 混合排序） |
 | 关键词 top-K 例子 | codedb `codedb_search`（默认 lexical + vector） |
 | 找语义相似代码 | codedb `codedb_search`（贴上参考 chunk 关键文字）或 `codedb_explain` |
-| 全量字面/正则匹配（审计、批量改） | codedb `codedb_search`（`regex=true`） |
+| 全量字面/正则匹配（审计、批量改） | 优先 codedb `codedb_search`（`regex=true`），`rg` 仅作备选 |
 | 查看文件符号结构 | codedb `codedb_outline` |
 | 按名称查找符号定义 | codedb `codedb_symbol`（`body=true` 拿源码） |
 | 查询符号被谁引用 | codedb `codedb_callers` |
@@ -94,29 +94,21 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 | 读文件片段 | codedb `codedb_read`（小段优先，全文用内置 Read） |
 | 看最近修改的文件 | codedb `codedb_hot` / `codedb_changes` |
 | 查文件依赖/反向依赖 | codedb `codedb_deps`（C# namespace 精度最高） |
-| C# LSP 级语义查询（兜底） | Serena `find_symbol` / `find_referencing_symbols` |
 
-### 改代码
 
-| 想做的事 | 用什么工具 |
-| -------- | ---------- |
-| 修改公共 API 前检查影响范围 | 先 codedb `codedb_callers` 看影响，必要时用 Serena `find_referencing_symbols` 复核 |
-| 替换方法体 | Serena `replace_symbol_body` |
-| 在符号前后插入代码 | Serena `insert_after_symbol` / `insert_before_symbol` |
-| 项目级重命名 | Serena `rename_symbol` |
-| 安全删除符号 | Serena `safe_delete_symbol` |
-| 改完代码获取报错 | Serena `get_diagnostics_for_file` |
 
 ### 工具使用规则
 
-- 想用 `grep` → 改用 codedb `codedb_search`（`regex=true`）
+- 代码搜索默认优先 codedb-mcp；只有非 C# / 未索引文件、codedb 不命中、或必须扫资产/文档/配置时，才用 `rg` 作为备选
+- 想用 `rg` / `grep` / `findstr` → 先尝试 codedb `codedb_search`（必要时 `regex=true`），再按需回退到 `rg`
 - 自然语言/概念/语义搜索 → 用 codedb `codedb_search`
-- 文件已完整读过 → 不要再用 codedb / Serena 重复分析
+- 文件已完整读过 → 不要再用 codedb  重复分析
 - 过滤范围 → codedb 工具均支持 `path` 参数；遇到第三方噪音可显式排除 `Library/PackageCache/`
-- 符号级编辑/重构 → 必须 Serena，codedb 只读（`codedb_edit` 是 stub）
-- 写操作前 → 先 `codedb_callers` 查影响面，再用 Serena 改
-- 会话开始 → `mcp__mcp-router__activate_project(project: "UnityProject")` + `mcp__mcp-router__initial_instructions()`（每会话各一次）
-- 使用范围 → codedb 始终带 `path` 过滤；Serena 始终带 `relative_path`，列类成员用 `depth: 1` 避免读方法体
+- 符号级编辑/重构 → 必须 codedb 只读（`codedb_edit` 是 stub）
+- 写操作前 → 先 `codedb_callers` 查影响面
+- 会话开始 → 先 `mcp__mcp-router__activate_project(project: "D:/UnityGame/Self/RogueCard/UnityProject")`，再调用 `mcp__mcp-router__initial_instructions()`（每会话各一次）
+- 项目激活注意 → 本机存在多个同名 `UnityProject`，`mcp-router` 不能用项目名激活，必须传当前仓库绝对路径 `D:/UnityGame/Self/RogueCard/UnityProject`
+- 使用范围 → codedb 始终带 `path` 过滤；
 - C# LSP 支持依赖 → `UnityProject.slnx` 必须存在
 - codedb 索引依赖 → `.codedb-mcp/codedb-mcp.toml`，文件保存自动增量索引；批量重命名/拉大量代码后手动 `codebase-mcp.exe ... index <repo>` 兜底
 
@@ -134,10 +126,10 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 | -------- | ------ |
 | 默认编译检查（新增/修改/删除 C# 脚本、`.asmdef`、`Packages/manifest.json` 后必须执行） | `python .claude/skills/unity-compile-check/scripts/unity_compile_check.py` |
 | 回退编译命令（Unity 已打开时） | `dotnet build UnityProject.slnx --no-restore` |
-| Unity 已打开时验证（编译 / Console / EditMode 测试 / 场景 Prefab 检查） | 启动 Unity Skills（`Window > UnitySkills > Start Server`）→ 用 `/unity-skills` 操作 |
-| 切换 Unity Skills 模式 | 默认半自动；要 AI 改场景/GameObject/组件/材质 → 输入"全自动模式" |
+| Unity 已打开时验证（编译 / Console / EditMode 测试 / 场景 Prefab 检查） | 使用 AIBridge CLI（`.aibridge/cli/AIBridgeCLI.exe`）→ `compile unity` / `get_logs` / `test run --mode EditMode` |
+| 首次配置 AIBridge | Unity 编辑器 → `AIBridge/Workflows` 窗口 → Skills 标签 → 勾选 Claude → "Install Selected Integrations" |
 | Unity 未打开时跑 EditMode 测试 | `"D:\DocApp\UnityEditor\6000.3.12f1\Editor\Unity.exe" -batchmode -quit -runTests -testPlatform EditMode -testResults results.xml -projectPath .` |
-| PlayMode 测试（仅本地） | `Window > General > Test Runner > PlayMode` 标签 → Run；或 Unity Skills `POST /skill/test_run` 入参 `{"testMode":"PlayMode","filter":"<类名>"}` |
+| PlayMode 测试（仅本地） | `Window > General > Test Runner > PlayMode` 标签 → Run；或 AIBridge CLI `test run --mode PlayMode` |
 
 - Unity 编辑器路径 → `D:\DocApp\UnityEditor\6000.3.12f1\Editor\Unity.exe`
 - Unity 版本 → 6000.3.12f1（Unity 6）
@@ -191,33 +183,14 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 - 索引位置 → `<repo>\.codedb-mcp\index.bin`（已 gitignore）
 - 文件监听 → `[watch] enabled = true`，C# 文件保存后 debounce 自动重建对应 chunk
 - 自动更新失效场景 → MCP 进程未运行 / 改的扩展不在 `["cs"]` / 文件在 `skip_dirs` / 文件 > 50 MB → 需手动 reindex
-- 不能用于 → 符号级写操作（用 Serena）、LSP 诊断（用 Serena）、Unity Editor 操作（用 Unity Skills）
 
-### Serena（C# 符号写操作 + LSP 诊断，MCP）
+### AIBridge（编辑器自动化）
 
-仅用于符号级修改与编译诊断；读操作（outline / 查找符号 / 查引用 / 模式搜索）一律改走 codedb-mcp。
-
-| 想做的事 | 怎么做 |
-| -------- | ------ |
-| 会话开始激活项目 | `mcp__mcp-router__activate_project(project: "UnityProject")` |
-| 读取初始化指令（每会话一次） | `mcp__mcp-router__initial_instructions()` |
-| 替换方法体 | `mcp__mcp-router__replace_symbol_body(name_path: "...", relative_path: "...", body: "...")` |
-| 插入新方法 | `mcp__mcp-router__insert_after_symbol(name_path: "...", relative_path: "...", body: "...")` |
-| 项目级重命名 | `mcp__mcp-router__rename_symbol(name_path: "...", relative_path: "...", new_name: "...")` |
-| 安全删除 | `mcp__mcp-router__safe_delete_symbol(name_path_pattern: "...", relative_path: "...")` |
-| 编译诊断 | `mcp__mcp-router__get_diagnostics_for_file(relative_path: "...")` |
-| LSP 兜底查符号/引用（codedb 不命中时） | `mcp__mcp-router__find_symbol` / `find_referencing_symbols` |
-
-- 配置 → `.serena/project.yml`（`csharp`）
-- 依赖 → `UnityProject.slnx`
-
-### Unity Skills（编辑器自动化）
-
-- 启用 → Package Manager 导入 `com.besty.unity-skills` → `Window > UnitySkills > Start Server`
-- 调用 → `/unity-skills` 斜杠命令
-- 默认模式 → 半自动（脚本创建、场景感知、资源基础操作、编译/Console/Test Runner 验证）
-- 切换全自动 → 输入"全自动模式"（可操作 GameObject/组件/材质）
-- 优先级 → Unity 已打开时，编译/Console/EditMode 测试/场景检查走 Unity Skills
+- 安装 → Package Manager 导入 `cn.lys.aibridge`（`https://github.com/liyingsong99/AIBridge.git`）
+- 配置 → Unity 编辑器 `AIBridge/Workflows` 窗口 → Skills 标签 → 勾选 Claude → "Install Selected Integrations"
+- CLI 路径 → `.aibridge/cli/AIBridgeCLI.exe`（Unity 导入包后自动生成）
+- 常用 CLI 命令 → `compile unity` / `get_logs --logType Error` / `test run --mode EditMode` / `screenshot game` / `scene get_hierarchy`
+- 优先级 → Unity 已打开时，编译/Console/EditMode 测试/场景检查走 AIBridge CLI
 
 ### OpenSpec（变更管理）
 

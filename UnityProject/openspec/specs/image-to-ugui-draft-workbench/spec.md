@@ -8,33 +8,41 @@
 
 ### Requirement: Editor-only draft workbench
 
-The project SHALL provide a Unity Editor-only workbench for using a static UI draft image as a GameView UGUI construction reference.
+The project SHALL provide a Unity Editor-only workbench for converting a UI design image into UGUI node hierarchy on any Prefab, powered by AI vision analysis.
 
-#### Scenario: Workbench opens for GameView prefab
+#### Scenario: Workbench opens for any Prefab
 
-- **WHEN** a user opens the draft workbench for the GameView prefab
-- **THEN** the workbench SHALL let the user select a local image asset or imported Texture2D as the draft reference
-- **AND** the workbench SHALL associate the draft with the target GameView prefab
+- **WHEN** a user opens the draft workbench
+- **THEN** the workbench SHALL let the user select any Prefab asset as the target
+- **AND** the workbench SHALL let the user select a local image as the design reference
+- **AND** the workbench SHALL read the target Prefab's Canvas reference resolution for coordinate normalization
+
+#### Scenario: Workbench provides AI generation workflow
+
+- **WHEN** a user has configured AI settings and selected a design image
+- **THEN** the workbench SHALL provide a button to send the image to the AI Vision API
+- **AND** the workbench SHALL display the returned ui_structure.json for review and editing
+- **AND** the workbench SHALL provide a button to convert the JSON to UGUI nodes and preview the result
 
 #### Scenario: Workbench has no runtime dependency
 
 - **WHEN** the player build or HotFix runtime assemblies are compiled
 - **THEN** the draft workbench code SHALL NOT be included in runtime assemblies
-- **AND** runtime GameView code SHALL NOT depend on draft workbench types
+- **AND** runtime code SHALL NOT depend on draft workbench types
 
 ### Requirement: Draft metadata persistence
 
-The draft workbench SHALL persist editor-only metadata needed to reproduce a draft preview session.
+The draft workbench SHALL persist editor-only metadata needed to reproduce a draft session, including AI generation results.
 
-#### Scenario: Draft metadata is saved
+#### Scenario: Draft metadata includes AI generation result
 
-- **WHEN** a user creates or updates a draft preview for GameView
-- **THEN** the workbench SHALL save the source image reference, target prefab reference, source image size, canvas reference resolution, overlay opacity, fit mode, and last apply record reference
+- **WHEN** a user completes an AI generation
+- **THEN** the workbench SHALL save the source image reference, target prefab reference, canvas reference resolution, the raw AI response JSON, and the converted UguiNodeDescriptor list
 
 #### Scenario: Draft metadata is reloaded
 
-- **WHEN** a user reopens the draft workbench for a GameView prefab that has saved draft metadata
-- **THEN** the workbench SHALL restore the draft image and preview settings from the saved metadata
+- **WHEN** a user reopens the draft workbench for a Prefab that has saved draft metadata
+- **THEN** the workbench SHALL restore the design image, AI response JSON, and preview settings
 
 #### Scenario: Runtime asset pollution is avoided
 
@@ -64,12 +72,18 @@ The draft workbench SHALL provide a preview overlay that helps align UGUI elemen
 
 ### Requirement: Apply report
 
-The draft workbench SHALL report the GameView prefab and binding changes it applies.
+The draft workbench SHALL report the Prefab and binding changes it applies.
 
-#### Scenario: Report lists generated UI changes
+#### Scenario: Report lists generated UI changes for any Prefab
 
-- **WHEN** a user applies draft workbench changes
+- **WHEN** a user applies draft workbench changes to any Prefab
 - **THEN** the workbench SHALL produce a report listing created GameObject paths, modified RectTransform properties, added components, and skipped conflicts
+- **AND** the report SHALL work identically for new Prefabs and existing Prefabs with existing content
+
+#### Scenario: Report lists AI conversion warnings
+
+- **WHEN** the converter skipped elements or renamed duplicates during conversion
+- **THEN** the report SHALL include a conversion warnings section listing skipped elements and rename operations
 
 #### Scenario: Report lists binding changes
 
@@ -83,11 +97,11 @@ The draft workbench SHALL report the GameView prefab and binding changes it appl
 
 ### Requirement: Scoped revert
 
-The draft workbench SHALL support reverting changes made by a recorded apply operation without rebuilding the entire GameView prefab.
+The draft workbench SHALL support reverting changes made by a recorded apply operation without rebuilding the entire Prefab.
 
-#### Scenario: Recorded apply is reverted
+#### Scenario: Recorded apply is reverted on any Prefab
 
-- **WHEN** a user reverts the latest recorded apply operation
+- **WHEN** a user reverts the latest recorded apply operation on any Prefab
 - **THEN** the workbench SHALL remove or restore only the GameObjects, RectTransform values, ReferenceCollector entries, and script fields recorded in that apply operation
 
 #### Scenario: Manual changes are protected
@@ -101,3 +115,36 @@ The draft workbench SHALL support reverting changes made by a recorded apply ope
 - **WHEN** a user requests revert before any apply record exists for the draft
 - **THEN** the workbench SHALL make no prefab changes
 - **AND** the workbench SHALL report that there is no recorded apply to revert
+
+### Requirement: Persistent structure preview review layout
+
+The draft workbench SHALL provide a persistent design-image review area for inspecting generated structure bounds before the user applies prefab changes.
+
+#### Scenario: Wide window keeps a large adjacent preview
+
+- **WHEN** a user opens the draft workbench in a window wide enough for split review
+- **THEN** the workbench SHALL keep workflow controls in one pane
+- **AND** it SHALL display the design image and generated structure boxes in a larger adjacent pane
+- **AND** the preview pane SHALL remain visible while the user reviews JSON, node summaries, warnings, or apply actions
+
+#### Scenario: Narrow window falls back to a readable stacked layout
+
+- **WHEN** the draft workbench window is too narrow for a practical split view
+- **THEN** the workbench SHALL fall back to a stacked layout that preserves access to the preview, workflow controls, and apply actions in one window
+- **AND** the fallback SHALL NOT require opening a second EditorWindow to inspect the preview
+
+### Requirement: Adaptive structure preview sizing
+
+The draft workbench SHALL size the structure preview from the available preview pane bounds instead of a fixed maximum preview height.
+
+#### Scenario: Portrait and landscape drafts scale from available space
+
+- **WHEN** the selected design image or source canvas is significantly taller or wider than the workbench window
+- **THEN** the preview SHALL scale to fit the available review pane while preserving image aspect ratio by default
+- **AND** the workbench SHALL support an optional manual zoom inspection mode in addition to automatic fit
+
+#### Scenario: Empty preview state is explicit
+
+- **WHEN** no design image is selected or the current preview data has no drawable source bounds
+- **THEN** the preview pane SHALL show an explicit empty state instead of stale or misleading structure graphics
+- **AND** the empty state SHALL leave the rest of the workbench usable for configuration or parsing work

@@ -10,7 +10,7 @@ namespace RogueCard.Editor.DraftWorkbench.Tests
 {
     /// <summary>
     /// DraftWorkbench 各模块的 EditMode 单元测试，覆盖模型默认值、
-    /// 叠加层创建/销毁、GameView 节点预览/应用以及绑定计划构建。
+    /// 叠加层创建/销毁、Prefab 节点预览/应用以及绑定计划构建。
     /// </summary>
     [TestFixture]
     public class DraftWorkbenchTests
@@ -237,13 +237,13 @@ namespace RogueCard.Editor.DraftWorkbench.Tests
             Assert.AreEqual(Vector2.zero, rt.sizeDelta, "Stretch sizeDelta 应为 (0, 0)");
         }
 
-        // ──────────────────────── GameViewDraftBuilder ────────────────────────
+        // ──────────────────────── PrefabDraftBuilder ────────────────────────
 
         /// <summary>
         /// BuildPreview 传入 prefabRoot 中不存在的节点名时，返回的 change.IsNew 应为 true。
         /// </summary>
         [Test]
-        public void GameViewDraftBuilder_Preview_检测新节点()
+        public void PrefabDraftBuilder_Preview_检测新节点()
         {
             _prefabRoot = new GameObject("PrefabRoot");
 
@@ -260,7 +260,7 @@ namespace RogueCard.Editor.DraftWorkbench.Tests
                 },
             };
 
-            var changes = GameViewDraftBuilder.BuildPreview(_prefabRoot, descriptors);
+            var changes = PrefabDraftBuilder.BuildPreview(_prefabRoot, descriptors);
 
             Assert.AreEqual(1, changes.Count, "应返回 1 条变更");
             Assert.IsTrue(changes[0].IsNew, "不存在的节点应标记为 IsNew=true");
@@ -271,7 +271,7 @@ namespace RogueCard.Editor.DraftWorkbench.Tests
         /// ApplyChanges 创建新节点后，prefabRoot 下应存在对应子对象且 RectTransform 参数正确。
         /// </summary>
         [Test]
-        public void GameViewDraftBuilder_Apply_创建节点()
+        public void PrefabDraftBuilder_Apply_创建节点()
         {
             _prefabRoot = new GameObject("PrefabRoot");
 
@@ -286,9 +286,10 @@ namespace RogueCard.Editor.DraftWorkbench.Tests
             };
 
             var change = new UguiNodeChange { Descriptor = desc, IsNew = true, HasConflict = false };
-            var appliedPaths = GameViewDraftBuilder.ApplyChanges(_prefabRoot, new[] { change });
+            var appliedPaths = PrefabDraftBuilder.ApplyChanges(_prefabRoot, new[] { change });
 
             Assert.AreEqual(1, appliedPaths.Count, "应应用 1 条变更");
+            Assert.AreEqual("TestChild", appliedPaths[0], "创建路径应相对 prefabRoot");
 
             var child = _prefabRoot.transform.Find("TestChild");
             Assert.IsNotNull(child, "prefabRoot 下应存在 TestChild 子节点");
@@ -299,6 +300,170 @@ namespace RogueCard.Editor.DraftWorkbench.Tests
             Assert.AreEqual(new Vector2(1f, 1f), rect.anchorMax, "anchorMax 应匹配描述符");
             Assert.AreEqual(new Vector2(10f, 20f), rect.anchoredPosition, "anchoredPosition 应匹配描述符");
             Assert.AreEqual(new Vector2(100f, 200f), rect.sizeDelta, "sizeDelta 应匹配描述符");
+        }
+
+        /// <summary>
+        /// BuildPreview 遇到 Unity 默认中心锚点 + 100x100 的旧节点时，应允许覆盖而不是标记为冲突。
+        /// </summary>
+        [Test]
+        public void PrefabDraftBuilder_Preview_默认100尺寸节点允许覆盖()
+        {
+            _prefabRoot = new GameObject("PrefabRoot");
+            var child = new GameObject("LevelPreviewMenu", typeof(RectTransform));
+            child.transform.SetParent(_prefabRoot.transform, false);
+            var rect = child.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(100f, 100f);
+
+            var desc = new UguiNodeDescriptor
+            {
+                Name = "LevelPreviewMenu",
+                ParentPath = "",
+                AnchorMin = new Vector2(0f, 1f),
+                AnchorMax = new Vector2(0f, 1f),
+                AnchoredPosition = new Vector2(384f, -688f),
+                SizeDelta = new Vector2(768f, 1376f),
+            };
+
+            var changes = PrefabDraftBuilder.BuildPreview(_prefabRoot, new[] { desc });
+
+            Assert.AreEqual(1, changes.Count, "应返回 1 条变更");
+            Assert.IsFalse(changes[0].IsNew, "已有节点应标记为更新");
+            Assert.IsFalse(changes[0].HasConflict, "默认 100x100 旧节点应允许覆盖");
+        }
+
+        /// <summary>
+        /// ApplyChanges 更新已有默认 100x100 节点时，应覆盖为描述符中的布局值并补齐组件。
+        /// </summary>
+        [Test]
+        public void PrefabDraftBuilder_Apply_覆盖默认100尺寸节点()
+        {
+            _prefabRoot = new GameObject("PrefabRoot");
+            var child = new GameObject("StartGameButtonText", typeof(RectTransform));
+            child.transform.SetParent(_prefabRoot.transform, false);
+            var rect = child.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(100f, 100f);
+
+            var desc = new UguiNodeDescriptor
+            {
+                Name = "StartGameButtonText",
+                ParentPath = "",
+                AnchorMin = new Vector2(0f, 1f),
+                AnchorMax = new Vector2(0f, 1f),
+                AnchoredPosition = new Vector2(180.5f, -88f),
+                SizeDelta = new Vector2(213f, 58f),
+                ComponentTypeNames = new List<string> { "TMPro.TextMeshProUGUI" },
+                Visuals = new UiNodeVisuals
+                {
+                    TextContent = "开始游戏",
+                    FontSize = 48,
+                    HasTextAlignment = true,
+                    TextAlignment = TextAnchor.MiddleCenter,
+                }
+            };
+
+            var appliedPaths = PrefabDraftBuilder.ApplyChanges(_prefabRoot, new[]
+            {
+                new UguiNodeChange { Descriptor = desc, IsNew = false, HasConflict = false }
+            });
+
+            Assert.AreEqual(1, appliedPaths.Count, "应更新 1 个节点");
+            Assert.AreEqual(desc.AnchorMin, rect.anchorMin, "anchorMin 应被描述符覆盖");
+            Assert.AreEqual(desc.AnchorMax, rect.anchorMax, "anchorMax 应被描述符覆盖");
+            Assert.AreEqual(desc.AnchoredPosition, rect.anchoredPosition, "anchoredPosition 应被描述符覆盖");
+            Assert.AreEqual(desc.SizeDelta, rect.sizeDelta, "sizeDelta 应被描述符覆盖");
+            var text = child.GetComponent<TMPro.TextMeshProUGUI>();
+            Assert.IsNotNull(text, "应补齐 TextMeshProUGUI 组件");
+            Assert.AreEqual("开始游戏", text.text, "文本内容应被写入");
+            Assert.AreEqual(48f, text.fontSize, "字号应被写入");
+        }
+
+        /// <summary>
+        /// prefabRoot 位于更大场景层级下时，应用记录应使用 prefabRoot 相对路径，RevertChanges 应能恢复旧布局并删除新建节点。
+        /// </summary>
+        [Test]
+        public void PrefabDraftBuilder_Revert_嵌套PrefabRoot使用相对路径恢复()
+        {
+            _canvasRoot = new GameObject("SceneRoot");
+            _prefabRoot = new GameObject("PrefabRoot");
+            _prefabRoot.transform.SetParent(_canvasRoot.transform, false);
+
+            var panel = new GameObject("Panel", typeof(RectTransform));
+            panel.transform.SetParent(_prefabRoot.transform, false);
+
+            var title = new GameObject("Title", typeof(RectTransform));
+            title.transform.SetParent(panel.transform, false);
+            var titleRect = title.GetComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(0f, 1f);
+            titleRect.anchoredPosition = new Vector2(12f, -20f);
+            titleRect.sizeDelta = new Vector2(240f, 48f);
+
+            var updateDesc = new UguiNodeDescriptor
+            {
+                Name = "Title",
+                ParentPath = "Panel",
+                AnchorMin = new Vector2(0.5f, 0.5f),
+                AnchorMax = new Vector2(0.5f, 0.5f),
+                AnchoredPosition = new Vector2(30f, -16f),
+                SizeDelta = new Vector2(300f, 64f),
+            };
+            var createDesc = new UguiNodeDescriptor
+            {
+                Name = "StartButton",
+                ParentPath = "Panel",
+                AnchorMin = new Vector2(1f, 0f),
+                AnchorMax = new Vector2(1f, 0f),
+                AnchoredPosition = new Vector2(-80f, 40f),
+                SizeDelta = new Vector2(160f, 56f),
+            };
+
+            string objectPath = PrefabDraftBuilder.GetResolvedDescriptorPath(_prefabRoot, updateDesc);
+            Assert.AreEqual("Panel/Title", objectPath, "修改记录路径应相对 prefabRoot，不应包含场景父节点或 prefabRoot 名称");
+
+            var record = new DraftApplyRecord
+            {
+                ModifiedRects = new List<RectChangeRecord>
+                {
+                    new RectChangeRecord
+                    {
+                        ObjectPath = objectPath,
+                        OldAnchoredPosition = titleRect.anchoredPosition,
+                        NewAnchoredPosition = updateDesc.AnchoredPosition,
+                        OldSizeDelta = titleRect.sizeDelta,
+                        NewSizeDelta = updateDesc.SizeDelta,
+                        OldAnchorMin = titleRect.anchorMin,
+                        NewAnchorMin = updateDesc.AnchorMin,
+                        OldAnchorMax = titleRect.anchorMax,
+                        NewAnchorMax = updateDesc.AnchorMax,
+                    }
+                }
+            };
+
+            var appliedPaths = PrefabDraftBuilder.ApplyChanges(_prefabRoot, new[]
+            {
+                new UguiNodeChange { Descriptor = updateDesc, IsNew = false, HasConflict = false },
+                new UguiNodeChange { Descriptor = createDesc, IsNew = true, HasConflict = false },
+            });
+            record.CreatedObjectPaths = appliedPaths.Where(path => path == "Panel/StartButton").ToList();
+
+            CollectionAssert.Contains(appliedPaths, "Panel/Title", "更新路径应相对 prefabRoot");
+            CollectionAssert.Contains(appliedPaths, "Panel/StartButton", "创建路径应相对 prefabRoot");
+            CollectionAssert.DoesNotContain(appliedPaths, "PrefabRoot/Panel/Title", "路径不应包含 prefabRoot 自身");
+            Assert.AreEqual(updateDesc.AnchoredPosition, titleRect.anchoredPosition, "应用后应写入新布局");
+            Assert.IsNotNull(_prefabRoot.transform.Find("Panel/StartButton"), "应用后应存在新建节点");
+
+            Assert.IsTrue(PrefabDraftBuilder.RevertChanges(_prefabRoot, record), "使用 apply 记录应可成功回滚");
+            Assert.AreEqual(new Vector2(12f, -20f), titleRect.anchoredPosition, "回滚后 anchoredPosition 应恢复旧值");
+            Assert.AreEqual(new Vector2(240f, 48f), titleRect.sizeDelta, "回滚后 sizeDelta 应恢复旧值");
+            Assert.AreEqual(new Vector2(0f, 1f), titleRect.anchorMin, "回滚后 anchorMin 应恢复旧值");
+            Assert.AreEqual(new Vector2(0f, 1f), titleRect.anchorMax, "回滚后 anchorMax 应恢复旧值");
+            Assert.IsNull(_prefabRoot.transform.Find("Panel/StartButton"), "回滚后应删除本次新建节点");
         }
 
         // ──────────────────────── DraftBindingService ────────────────────────
@@ -326,6 +491,210 @@ namespace RogueCard.Editor.DraftWorkbench.Tests
             Assert.AreEqual(0, report.AddedEntries.Count, "重复 key 不应出现在 AddedEntries");
             Assert.AreEqual(1, report.ConflictEntries.Count, "重复 key 应出现在 ConflictEntries");
             Assert.AreEqual("PanelGo", report.ConflictEntries[0].Key, "Conflict key 应为 PanelGo");
+        }
+
+        // ──────────────────────── StructurePreviewColorUtility ────────────────────────
+
+        /// <summary>
+        /// 结构框按控件类型着色时，应根据 ComponentTypeNames 选择颜色；冲突节点仍优先显示冲突色。
+        /// </summary>
+        [Test]
+        public void StructurePreviewColorUtility_结构框颜色_控件类型模式优先控件类型并保留冲突色()
+        {
+            var change = new UguiNodeChange
+            {
+                Descriptor = new UguiNodeDescriptor
+                {
+                    ComponentTypeNames = new List<string>
+                    {
+                        "UnityEngine.UI.Image",
+                        "UnityEngine.UI.Button"
+                    }
+                },
+                IsNew = true,
+                HasConflict = false
+            };
+
+            Color normalColor = StructurePreviewColorUtility.GetStructurePreviewColor(
+                StructurePreviewColorMode.ComponentType, change);
+
+            Assert.AreEqual(StructurePreviewColorUtility.ButtonColor, normalColor,
+                "Button 节点在控件类型模式下应使用 Button 颜色");
+
+            change.HasConflict = true;
+            Color conflictColor = StructurePreviewColorUtility.GetStructurePreviewColor(
+                StructurePreviewColorMode.ComponentType, change);
+
+            Assert.AreEqual(StructurePreviewColorUtility.ConflictColor, conflictColor,
+                "冲突节点应优先使用冲突色");
+        }
+
+        /// <summary>
+        /// 结构框按变更状态着色时，应按 IsNew 切换新建/已存在颜色，而非控件类型颜色。
+        /// </summary>
+        [Test]
+        public void StructurePreviewColorUtility_结构框颜色_变更状态模式按新建状态着色()
+        {
+            var change = new UguiNodeChange
+            {
+                Descriptor = new UguiNodeDescriptor
+                {
+                    ComponentTypeNames = new List<string> { "UnityEngine.UI.Button" }
+                },
+                IsNew = true,
+                HasConflict = false
+            };
+
+            Color newColor = StructurePreviewColorUtility.GetStructurePreviewColor(
+                StructurePreviewColorMode.ChangeStatus, change);
+
+            Assert.AreEqual(StructurePreviewColorUtility.NewColor, newColor,
+                "新建节点在变更状态模式下应使用新建色");
+
+            change.IsNew = false;
+            Color existingColor = StructurePreviewColorUtility.GetStructurePreviewColor(
+                StructurePreviewColorMode.ChangeStatus, change);
+
+            Assert.AreEqual(StructurePreviewColorUtility.ExistingColor, existingColor,
+                "已存在节点在变更状态模式下应使用更新色");
+        }
+
+        /// <summary>
+        /// 横屏 source 在横向 pane 中应按可用宽度优先自动适配，并保留 pane 高度作为滚动内容高度。
+        /// </summary>
+        [Test]
+        public void StructurePreviewLayoutUtility_横屏自动适配()
+        {
+            StructurePreviewLayoutResult result = StructurePreviewLayoutUtility.CalculateLayout(
+                new Vector2(480f, 360f),
+                new Vector2(1920f, 1080f),
+                1f);
+
+            Assert.IsTrue(result.IsValid, "有效输入应返回有效布局结果");
+            Assert.That(result.Scale, Is.EqualTo(0.25f).Within(0.0001f));
+            Assert.That(result.ImageWidth, Is.EqualTo(480f).Within(0.01f));
+            Assert.That(result.ImageHeight, Is.EqualTo(270f).Within(0.01f));
+            Assert.That(result.ContentWidth, Is.EqualTo(480f).Within(0.01f));
+            Assert.That(result.ContentHeight, Is.EqualTo(360f).Within(0.01f));
+        }
+
+        /// <summary>
+        /// 竖屏 source 在纵向 pane 中应按可用高度优先自动适配，并在较宽 pane 中保持水平留白。
+        /// </summary>
+        [Test]
+        public void StructurePreviewLayoutUtility_竖屏自动适配()
+        {
+            StructurePreviewLayoutResult result = StructurePreviewLayoutUtility.CalculateLayout(
+                new Vector2(420f, 620f),
+                new Vector2(1080f, 1920f),
+                1f);
+
+            Assert.IsTrue(result.IsValid, "有效输入应返回有效布局结果");
+            Assert.That(result.Scale, Is.EqualTo(620f / 1920f).Within(0.0001f));
+            Assert.That(result.ImageWidth, Is.EqualTo(348.75f).Within(0.01f));
+            Assert.That(result.ImageHeight, Is.EqualTo(620f).Within(0.01f));
+            Assert.That(result.ContentWidth, Is.EqualTo(420f).Within(0.01f));
+            Assert.That(result.ContentHeight, Is.EqualTo(620f).Within(0.01f));
+        }
+
+        /// <summary>
+        /// 手动缩放倍率大于 1 时，应扩大绘制尺寸并让滚动内容超过 pane 可视区。
+        /// </summary>
+        [Test]
+        public void StructurePreviewLayoutUtility_手动缩放会扩大滚动内容()
+        {
+            StructurePreviewLayoutResult result = StructurePreviewLayoutUtility.CalculateLayout(
+                new Vector2(420f, 620f),
+                new Vector2(1080f, 1920f),
+                1.5f);
+
+            Assert.IsTrue(result.IsValid, "有效输入应返回有效布局结果");
+            Assert.That(result.Scale, Is.EqualTo(0.484375f).Within(0.0001f));
+            Assert.That(result.ImageWidth, Is.EqualTo(523.125f).Within(0.01f));
+            Assert.That(result.ImageHeight, Is.EqualTo(930f).Within(0.01f));
+            Assert.That(result.ContentWidth, Is.GreaterThan(420f));
+            Assert.That(result.ContentHeight, Is.GreaterThan(620f));
+        }
+
+        /// <summary>
+        /// 当存在当前设计图尺寸时，即使节点带有 source canvas，也应优先使用设计图尺寸作为结构框预览坐标系。
+        /// </summary>
+        [Test]
+        public void StructurePreviewLayoutUtility_优先使用设计图尺寸()
+        {
+            var drawableChanges = new List<UguiNodeChange>
+            {
+                new UguiNodeChange
+                {
+                    Descriptor = new UguiNodeDescriptor
+                    {
+                        SourceBounds = new Rect(10f, 20f, 100f, 200f),
+                        SourceCanvasSize = new Vector2(1920f, 1080f)
+                    }
+                }
+            };
+
+            Vector2 sourceSize = StructurePreviewLayoutUtility.ResolveSourceSize(
+                drawableChanges,
+                new Vector2(720f, 1280f),
+                new Vector2(1920f, 1080f));
+
+            Assert.AreEqual(new Vector2(720f, 1280f), sourceSize,
+                "结构框叠加在当前设计图上时，应优先匹配设计图尺寸");
+        }
+
+        /// <summary>
+        /// 当节点未提供 source canvas 尺寸时，应优先回退到设计图尺寸。
+        /// </summary>
+        [Test]
+        public void StructurePreviewLayoutUtility_无SourceCanvas时回退到设计图尺寸()
+        {
+            var drawableChanges = new List<UguiNodeChange>
+            {
+                new UguiNodeChange
+                {
+                    Descriptor = new UguiNodeDescriptor
+                    {
+                        SourceBounds = new Rect(10f, 20f, 100f, 200f),
+                        SourceCanvasSize = Vector2.zero
+                    }
+                }
+            };
+
+            Vector2 sourceSize = StructurePreviewLayoutUtility.ResolveSourceSize(
+                drawableChanges,
+                new Vector2(720f, 1280f),
+                new Vector2(1920f, 1080f));
+
+            Assert.AreEqual(new Vector2(720f, 1280f), sourceSize,
+                "缺少 source canvas 时应回退到设计图尺寸");
+        }
+
+        /// <summary>
+        /// 当既没有 source canvas 也没有设计图尺寸时，应回退到当前画布尺寸。
+        /// </summary>
+        [Test]
+        public void StructurePreviewLayoutUtility_无SourceCanvas和设计图时回退到画布尺寸()
+        {
+            var drawableChanges = new List<UguiNodeChange>
+            {
+                new UguiNodeChange
+                {
+                    Descriptor = new UguiNodeDescriptor
+                    {
+                        SourceBounds = new Rect(10f, 20f, 100f, 200f),
+                        SourceCanvasSize = Vector2.zero
+                    }
+                }
+            };
+
+            Vector2 sourceSize = StructurePreviewLayoutUtility.ResolveSourceSize(
+                drawableChanges,
+                Vector2.zero,
+                new Vector2(1920f, 1080f));
+
+            Assert.AreEqual(new Vector2(1920f, 1080f), sourceSize,
+                "当没有 source canvas 和设计图时应回退到当前画布尺寸");
         }
 
         // ──────────────────────── 辅助方法 ────────────────────────

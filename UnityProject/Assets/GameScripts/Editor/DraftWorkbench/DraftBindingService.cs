@@ -165,7 +165,7 @@ namespace RogueCard.Editor.DraftWorkbench
                     if (lastDot > 0)
                     {
                         namespaceName = typeName.Substring(0, lastDot);
-                        if (namespaceName.StartsWith("UnityEngine.", StringComparison.Ordinal))
+                        if (namespaceName.StartsWith("UnityEngine.", StringComparison.Ordinal) || namespaceName == "TMPro")
                         {
                             requiredNamespaces.Add(namespaceName);
                         }
