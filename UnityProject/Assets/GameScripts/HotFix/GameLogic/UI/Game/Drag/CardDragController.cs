@@ -81,6 +81,8 @@ namespace GameLogic
                 if (dist > _options.DragThreshold)
                 {
                     EnterDragging(pos);
+                    _surface.UpdateGhostPosition(pos);
+                    UpdateDragSubMode(pos);
                 }
             }
             else

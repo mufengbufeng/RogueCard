@@ -194,3 +194,84 @@ ReferenceCollectorEditor 的"自动绑定UI脚本"能力 SHALL 继续定位并�
 - **THEN** 自动绑定或手写绑定 SHALL 使用 `Button`、`RectTransform`、`CanvasGroup`、`TextMeshProUGUI`、`Image` 等 UGUI/TMP 类型
 - **AND** SHALL NOT 生成 UXML、USS 或 `VisualTreeAsset` 字段
 
+### Requirement: 自动收集规则必须覆盖 GameView 规范命名节点
+
+ReferenceCollector 自动收集与脚本绑定生成 SHALL 支持 `GameView.prefab` 使用的项目命名规范。对于符合规范的 UGUI 节点后缀，系统 SHALL 能收集并推断适合的绑定类型：`Panel`、`Template` 为 `GameObject`；`Fill` 为 `Image`；`Bar`、`Layer`、`Zone`、`Rect`、`Sc` 为 `RectTransform`；`Btn` 为 `Button`；`Text` 为 `TextMeshProUGUI` 或项目现行文本类型规则。自动收集 SHALL NOT 因这些 key 不匹配旧的通用后缀而从 `ReferenceCollector` 中删除 `GameView` 必需绑定。
+
+#### Scenario: GameView 关键节点可自动收集
+
+- **WHEN** 对包含 `BattlePanel`、`RewardPanel`、`PlayerHpFill`、`PlayerBuffBar`、`DropZone`、`PreviewLayer`、`CardSc`、`HandCardTemplate` 的 `GameView.prefab` 执行自动收集
+- **THEN** `ReferenceCollector` SHALL 包含这些 key
+- **AND** 每个 key SHALL 引用非空对象或组件
+
+#### Scenario: 自动绑定生成符合 UHub 字段类型
+
+- **WHEN** ReferenceCollector 中包含 `PlayerHpFill`、`DropZone`、`PreviewLayer`、`BattlePanel`、`HandCardTemplate`
+- **THEN** 自动绑定 SHALL 生成或保留 UGUI 字段类型 `Image _playerHpFill`、`RectTransform _dropZone`、`RectTransform _previewLayer`、`GameObject _battlePanel`、`GameObject _handCardTemplate`
+- **AND** SHALL NOT 生成 UI Toolkit 字段或旧命名别名字段
+
+#### Scenario: 重新生成不会删除 GameView 必需绑定字段
+
+- **WHEN** `GameView.prefab` 的 ReferenceCollector 已包含 `gameview-ugui-prefab-composition` 规定的必需 key
+- **AND** 用户点击"添加变量到UI代码"重新生成 `GameView.cs` 自动生成区
+- **THEN** 自动生成区 SHALL 保留所有必需 key 对应的 `[UHubBind]` 字段
+- **AND** Unity C# 编译 SHALL NOT 出现这些字段名的 CS0103 错误
+
+### Requirement: Draft workbench ReferenceCollector binding plan
+
+The UI script auto-binding tooling SHALL support generating a ReferenceCollector binding plan for GameView nodes proposed or created by the draft workbench.
+
+#### Scenario: Binding plan uses project rules
+
+- **WHEN** the draft workbench asks for bindings for generated or selected GameView UGUI nodes
+- **THEN** the auto-binding tooling SHALL resolve ReferenceCollector keys and component types from the project ReferenceCollector rule configuration
+- **AND** it SHALL NOT use a separate suffix-to-component rule table
+
+#### Scenario: Duplicate key is reported
+
+- **WHEN** a proposed binding key already exists in the target ReferenceCollector
+- **THEN** the binding plan SHALL mark the entry as skipped or conflicting
+- **AND** the binding plan SHALL include the existing key in its report
+
+#### Scenario: Missing component is reported
+
+- **WHEN** a proposed node name matches a configured rule but the required component is missing
+- **THEN** the binding plan SHALL skip that node
+- **AND** the binding plan SHALL report the missing component type
+
+### Requirement: Draft workbench script field update
+
+The UI script auto-binding tooling SHALL update generated UI script fields for draft workbench bindings through the existing text rewriting path.
+
+#### Scenario: New binding requires script field
+
+- **WHEN** an applied draft workbench binding introduces a ReferenceCollector key that needs a corresponding UI script field
+- **THEN** the auto-binding tooling SHALL use the existing UI script binder text rewriter to add the field
+- **AND** the generated field type SHALL match the component type resolved from the ReferenceCollector rule configuration
+
+#### Scenario: Existing script field is preserved
+
+- **WHEN** the required UI script field already exists with a compatible type
+- **THEN** the auto-binding tooling SHALL preserve the existing field
+- **AND** it SHALL NOT emit a duplicate field for the same ReferenceCollector key
+
+#### Scenario: Incompatible script field is reported
+
+- **WHEN** the required UI script field already exists with an incompatible type
+- **THEN** the auto-binding tooling SHALL report a conflict
+- **AND** it SHALL NOT overwrite the existing field without explicit user confirmation
+
+### Requirement: Draft workbench binding report
+
+The UI script auto-binding tooling SHALL return a structured binding report to the draft workbench after preview or apply.
+
+#### Scenario: Preview report is generated
+
+- **WHEN** the draft workbench previews binding changes
+- **THEN** the auto-binding tooling SHALL return the proposed ReferenceCollector entries, script field changes, skipped entries, and conflicts without modifying files
+
+#### Scenario: Apply report is generated
+
+- **WHEN** the draft workbench applies binding changes
+- **THEN** the auto-binding tooling SHALL return the applied ReferenceCollector entries, script field changes, skipped entries, warnings, and conflicts
+

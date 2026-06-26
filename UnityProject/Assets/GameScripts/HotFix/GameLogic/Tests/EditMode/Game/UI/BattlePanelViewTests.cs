@@ -79,7 +79,7 @@ namespace GameLogic.Tests
         {
             using var view = new BattlePanelView(_bindings, _context, new HandFanLayoutOptions());
 
-            InvokeCardDroppedOnZone(view, 0, false);
+            InvokeCardDroppedOnZone(view.HandFanView, 0, false);
 
             CollectionAssert.AreEqual(new[] { (0, -1) }, _context.UseCardLog);
             Assert.IsFalse(view.TargetSelector.IsActive);
@@ -93,7 +93,7 @@ namespace GameLogic.Tests
         {
             using var view = new BattlePanelView(_bindings, _context, new HandFanLayoutOptions());
 
-            InvokeCardDroppedOnZone(view, 1, true);
+            InvokeCardDroppedOnZone(view.HandFanView, 1, true);
 
             Assert.IsTrue(view.TargetSelector.IsActive);
             Assert.IsTrue(view.MonsterListView.Items[0].IsTargetSelectable);
@@ -107,7 +107,7 @@ namespace GameLogic.Tests
         public void Phase离开玩家回合_取消目标选择()
         {
             using var view = new BattlePanelView(_bindings, _context, new HandFanLayoutOptions());
-            InvokeCardDroppedOnZone(view, 1, true);
+            InvokeCardDroppedOnZone(view.HandFanView, 1, true);
 
             _context.Phase.Value = BattlePhase.MonsterTurn;
 
@@ -179,10 +179,10 @@ namespace GameLogic.Tests
             };
         }
 
-        private static void InvokeCardDroppedOnZone(BattlePanelView view, int handIdx, bool needsManualTarget)
+        private static void InvokeCardDroppedOnZone(HandFanView view, int handIdx, bool needsManualTarget)
         {
-            MethodInfo method = typeof(BattlePanelView).GetMethod("OnCardDroppedOnZone", BindingFlags.NonPublic | BindingFlags.Instance);
-            method.Invoke(view, new object[] { handIdx, needsManualTarget });
+            object callbacks = typeof(HandFanView).GetField("_callbacks", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(view);
+            callbacks.GetType().GetMethod("CardDroppedOnZone").Invoke(callbacks, new object[] { handIdx, needsManualTarget });
         }
 
         private static void InvokeCardClicked(HandFanView view, int handIdx)
@@ -193,7 +193,10 @@ namespace GameLogic.Tests
 
         private static void SimulatePointerDown(GameObject target)
         {
-            var eventData = new PointerEventData(null);
+            var eventData = new PointerEventData(null)
+            {
+                pointerPressRaycast = new RaycastResult { gameObject = target }
+            };
             foreach (IPointerDownHandler handler in target.GetComponents<IPointerDownHandler>())
             {
                 handler.OnPointerDown(eventData);

@@ -81,19 +81,15 @@ Tests/
 
 `Window > General > Test Runner > PlayMode` 标签 → 选中要跑的 fixture → Run。每个测试 1~3 秒，全套约 30~60 秒（首次会跑一遍 `EditorSimulateModeHelper.SimulateBuild`）。
 
-#### 2. Unity Skills（已开启服务时）
+#### 2. AIBridge CLI（已安装时）
 
 ```bash
 # 列出所有 PlayMode 测试
-curl -s -X POST -H "Content-Type: application/json" -H "X-Agent-Id: ClaudeCode" \
-  -d '{"testMode":"PlayMode"}' http://localhost:8091/skill/test_list
+.aibridge/cli/AIBridgeCLI.exe test run --mode PlayMode --list
 
-# 运行（filter 可按 fullName 或类名过滤）
-curl -s -X POST -H "Content-Type: application/json" -H "X-Agent-Id: ClaudeCode" \
-  -d '{"testMode":"PlayMode","filter":"BootstrapTest"}' http://localhost:8091/skill/test_run
+# 运行（filter 可按类名过滤）
+.aibridge/cli/AIBridgeCLI.exe test run --mode PlayMode --filter BootstrapTest
 ```
-
-注意：当前 Unity Skills 1.8.2 的 `test_run` 对 PlayMode 测试结果回流不稳定，跑结果建议看 Unity Test Runner 面板。
 
 ### 编译验证（不跑测试）
 
@@ -101,7 +97,7 @@ curl -s -X POST -H "Content-Type: application/json" -H "X-Agent-Id: ClaudeCode" 
 python .claude/skills/unity-compile-check/scripts/unity_compile_check.py
 ```
 
-脚本会优先通过 Unity Skills `debug_force_recompile` + `debug_get_errors` 验证；不可用时回退 `dotnet build UnityProject.slnx`。
+脚本会优先通过 AIBridge CLI `compile unity` + `get_logs` 验证；不可用时回退 `dotnet build UnityProject.slnx`。
 
 ### 已知限制 / 不在范围内
 

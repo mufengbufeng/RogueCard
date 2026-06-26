@@ -12,4 +12,5 @@
   <Project Path="SingularityGroup.HotReload.Runtime.Public.csproj" />
   <Project Path="GameLogic.Tests.PlayMode.csproj" />
   <Project Path="EF.Editor.UiScriptBinder.TextRewriter.Tests.csproj" />
+  <Project Path="ImageToUIPrefabBuilder.Editor.csproj" />
 </Solution>

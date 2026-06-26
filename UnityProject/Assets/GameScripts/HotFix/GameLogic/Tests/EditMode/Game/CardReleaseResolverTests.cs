@@ -289,6 +289,7 @@ namespace GameLogic.Tests.EditMode.Game
             });
             var model = new GameModel();
             model.InitBattleAttributes(maxEnergy: 3, handLimit: 5, maxHp: 30);
+            model.RestoreEnergy();
             model.SetPhase(BattlePhase.PlayerTurn);
             model.SetHand(new List<CardRuntime> { new CardRuntime { Config = damageCard } });
             var target = NewMonster(20);

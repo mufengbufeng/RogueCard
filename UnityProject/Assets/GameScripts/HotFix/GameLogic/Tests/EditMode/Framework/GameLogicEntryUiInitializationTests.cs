@@ -108,7 +108,7 @@ namespace GameLogic.Tests
                 string location,
                 LoadSceneMode sceneMode = LoadSceneMode.Single,
                 LocalPhysicsMode physicsMode = LocalPhysicsMode.None,
-                bool suspendLoad = false,
+                bool allowSceneActivation = true,
                 uint priority = 0,
                 System.Action<float> progress = null)
             {

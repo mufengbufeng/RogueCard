@@ -1,5 +1,3 @@
-using YooAsset;
-
 namespace EF.Resource
 {
     /// <summary>
@@ -28,21 +26,4 @@ namespace EF.Resource
         WebPlay
     }
 
-    internal static class ResourceModeUtility
-    {
-        /// <summary>
-        /// 将框架定义的资源模式转换为 YooAssets 的播放模式。
-        /// </summary>
-        public static EPlayMode ToYooPlayMode(this ResourceMode mode)
-        {
-            return mode switch
-            {
-                ResourceMode.EditorSimulate => EPlayMode.EditorSimulateMode,
-                ResourceMode.OfflinePlay => EPlayMode.OfflinePlayMode,
-                ResourceMode.HostPlay => EPlayMode.HostPlayMode,
-                ResourceMode.WebPlay => EPlayMode.WebPlayMode,
-                _ => EPlayMode.EditorSimulateMode
-            };
-        }
-    }
 }

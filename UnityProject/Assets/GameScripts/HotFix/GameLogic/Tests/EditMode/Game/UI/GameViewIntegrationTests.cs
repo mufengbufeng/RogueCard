@@ -120,6 +120,52 @@ namespace GameLogic.Tests
             Assert.IsTrue(toast.gameObject.activeSelf);
         }
 
+        /// <summary>
+        /// 事件波次等待确认时必须显示 RewardPanel 并刷新标题和按钮文案。
+        /// </summary>
+        [Test]
+        public void Render_事件波次等待确认_显示RewardPanel并刷新文案()
+        {
+            _viewModel.Phase.Value = BattlePhase.PlayerTurn;
+            _view.Render(_viewModel);
+            Assert.IsTrue(GetGameObject("BattlePanel").activeSelf);
+            Assert.IsFalse(GetGameObject("RewardPanel").activeSelf);
+
+            // 模拟进入事件波次等待确认
+            _viewModel.IsAwaitingWaveConfirmation.Value = true;
+            _viewModel.CurrentWaveTitle.Value = "神秘宝箱";
+            _viewModel.CurrentWaveContinueText.Value = "打开宝箱";
+            _view.Render(_viewModel);
+
+            Assert.IsFalse(GetGameObject("BattlePanel").activeSelf, "事件波次应隐藏 BattlePanel");
+            Assert.IsTrue(GetGameObject("RewardPanel").activeSelf, "事件波次应显示 RewardPanel");
+            Assert.AreEqual("神秘宝箱", GetComponent<TextMeshProUGUI>("RewardTitleText").text);
+            // 按钮文本在 RewardConfirmBtn 的子对象 Text 上
+            var btnText = GetGameObject("RewardConfirmBtn").GetComponentInChildren<TextMeshProUGUI>();
+            Assert.AreEqual("打开宝箱", btnText.text);
+        }
+
+        /// <summary>
+        /// 事件波次确认后恢复 BattlePanel。
+        /// </summary>
+        [Test]
+        public void Render_事件波次确认后_恢复BattlePanel()
+        {
+            _viewModel.IsAwaitingWaveConfirmation.Value = true;
+            _viewModel.CurrentWaveTitle.Value = "宝箱";
+            _viewModel.CurrentWaveContinueText.Value = "打开";
+            _view.Render(_viewModel);
+            Assert.IsTrue(GetGameObject("RewardPanel").activeSelf);
+
+            // 确认后恢复战斗阶段
+            _viewModel.IsAwaitingWaveConfirmation.Value = false;
+            _viewModel.Phase.Value = BattlePhase.PlayerTurn;
+            _view.Render(_viewModel);
+
+            Assert.IsTrue(GetGameObject("BattlePanel").activeSelf, "确认后应恢复 BattlePanel");
+            Assert.IsFalse(GetGameObject("RewardPanel").activeSelf, "确认后应隐藏 RewardPanel");
+        }
+
         private UIRuntimeContext CreateRuntimeContext()
         {
             var manager = new UIManager(new ThrowingResourceManager(), new ModelManager());
@@ -167,7 +213,7 @@ namespace GameLogic.Tests
             public YooAsset.ResourcePackage GetDefaultPackage() => throw new NotSupportedException();
             public Cysharp.Threading.Tasks.UniTask<YooAsset.AssetHandle> LoadAssetAsync<T>(string location, Action<float> progress = null, uint priority = 0) where T : Object => throw new NotSupportedException();
             public YooAsset.AssetHandle LoadAssetSync<T>(string location, uint priority = 0) where T : Object => throw new NotSupportedException();
-            public Cysharp.Threading.Tasks.UniTask<YooAsset.SceneHandle> LoadSceneAsync(string location, UnityEngine.SceneManagement.LoadSceneMode sceneMode = UnityEngine.SceneManagement.LoadSceneMode.Single, UnityEngine.SceneManagement.LocalPhysicsMode physicsMode = UnityEngine.SceneManagement.LocalPhysicsMode.None, bool suspendLoad = false, uint priority = 0, Action<float> progress = null) => throw new NotSupportedException();
+            public Cysharp.Threading.Tasks.UniTask<YooAsset.SceneHandle> LoadSceneAsync(string location, UnityEngine.SceneManagement.LoadSceneMode sceneMode = UnityEngine.SceneManagement.LoadSceneMode.Single, UnityEngine.SceneManagement.LocalPhysicsMode physicsMode = UnityEngine.SceneManagement.LocalPhysicsMode.None, bool allowSceneActivation = true, uint priority = 0, Action<float> progress = null) => throw new NotSupportedException();
             public void UnloadScene(YooAsset.SceneHandle handle) { }
             public void Release(YooAsset.HandleBase handle) { }
             public void ReleaseAll() { }

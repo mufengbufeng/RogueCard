@@ -52,7 +52,9 @@ namespace EF.Resource
                 progress?.Report(1f);
                 return;
             }
-            YooAssets.Initialize();
+
+            EnsureYooAssetsInitialized();
+
             _config = overrideConfig ?? LoadDefaultConfig();
             if (_config == null)
             {
@@ -63,8 +65,6 @@ namespace EF.Resource
             {
                 throw new InvalidOperationException("资源配置未包含任何包裹，请至少配置一个包裹信息");
             }
-
-            EnsureYooAssetsInitialized();
 
             _packages.Clear();
             _defaultPackageName = null;
@@ -79,161 +79,134 @@ namespace EF.Resource
                     continue;
                 }
 
-                ResourcePackage package = YooAssets.TryGetPackage(entry.PackageName) ?? YooAssets.CreatePackage(entry.PackageName);
+                if (!YooAssets.TryGetPackage(entry.PackageName, out ResourcePackage package))
+                {
+                    package = YooAssets.CreatePackage(entry.PackageName);
+                }
+
                 if (entry.IsDefault || string.IsNullOrEmpty(_defaultPackageName))
                 {
                     _defaultPackageName = package.PackageName;
-                    YooAssets.SetDefaultPackage(package);
                 }
 
-                InitializeParameters parameters = CreateInitializeParameters(entry);
-                parameters.BundleLoadingMaxConcurrency = _config.BundleLoadingMaxConcurrency;
+                Log.Info($"开始初始化资源包裹 {entry.PackageName}，运行模式 {Mode}...");
 
+                InitializePackageOptions options = CreateInitializeParameters(entry);
+                options.BundleLoadingMaxConcurrency = _config.BundleLoadingMaxConcurrency;
 
-                InitializationOperation operation = package.InitializeAsync(parameters);
+                InitializePackageOperation operation = package.InitializePackageAsync(options);
                 await operation;
-                if (operation.Status != EOperationStatus.Succeed)
+                if (operation.Status != EOperationStatus.Succeeded)
                 {
                     throw new InvalidOperationException($"资源包裹 {entry.PackageName} 初始化失败：{operation.Error}");
                 }
 
-                Log.Info($"开始初始化资源包裹 {entry.PackageName}，运行模式 {Mode}...");
-                // await MonitorInitializationAsync(operation, progress, index, total);
-                var requestVersionOperation = RequestPackageVersion(package);
+                RequestPackageVersionOperation requestVersionOperation = RequestPackageVersion(package);
                 await requestVersionOperation;
-                if (requestVersionOperation.Status != EOperationStatus.Succeed)
+                if (requestVersionOperation.Status != EOperationStatus.Succeeded)
                 {
                     throw new InvalidOperationException($"资源包裹 {entry.PackageName} 请求版本失败：{requestVersionOperation.Error}");
                 }
 
-                var updateManifestOperation = UpdatePackageManifest(package, requestVersionOperation.PackageVersion);
-                await updateManifestOperation;
-                if (updateManifestOperation.Status != EOperationStatus.Succeed)
+                LoadPackageManifestOperation loadManifestOperation = LoadPackageManifest(package, requestVersionOperation.PackageVersion);
+                await loadManifestOperation;
+                if (loadManifestOperation.Status != EOperationStatus.Succeeded)
                 {
-                    throw new InvalidOperationException($"资源包裹 {entry.PackageName} 更新清单失败：{updateManifestOperation.Error}");
+                    throw new InvalidOperationException($"资源包裹 {entry.PackageName} 更新清单失败：{loadManifestOperation.Error}");
                 }
 
                 await Download(package);
 
-                if (_packages.TryGetValue(package.PackageName, out ResourcePackage existing))
+                if (_packages.TryGetValue(package.PackageName, out ResourcePackage existing) && !ReferenceEquals(existing, package))
                 {
-                    DestroyOperation destroyOperation = existing.DestroyAsync();
-                    destroyOperation.WaitForAsyncComplete();
-                    YooAssets.RemovePackage(existing);
+                    DestroyPackageOperation destroyOperation = existing.DestroyPackageAsync();
+                    await destroyOperation;
+                    if (destroyOperation.Status == EOperationStatus.Succeeded)
+                    {
+                        YooAssets.RemovePackage(existing.PackageName);
+                    }
                 }
 
                 _packages[package.PackageName] = package;
-
-
+                progress?.Report(CalcProgress(index + 1, total, 0f));
             }
 
             if (string.IsNullOrEmpty(_defaultPackageName))
             {
                 ResourcePackageEntry fallbackEntry = _config.GetDefaultPackage();
                 _defaultPackageName = fallbackEntry?.PackageName;
-                if (!string.IsNullOrEmpty(_defaultPackageName) && _packages.TryGetValue(_defaultPackageName, out ResourcePackage fallbackPackage))
-                {
-                    YooAssets.SetDefaultPackage(fallbackPackage);
-                }
             }
 
             _isInitialized = true;
             progress?.Report(1f);
         }
 
-        private RequestPackageVersionOperation RequestPackageVersion(ResourcePackage package)
+        private static RequestPackageVersionOperation RequestPackageVersion(ResourcePackage package)
         {
-            RequestPackageVersionOperation operation = package.RequestPackageVersionAsync();
-            return operation;
+            return package.RequestPackageVersionAsync();
         }
 
-
-        private UpdatePackageManifestOperation UpdatePackageManifest(ResourcePackage package, string packageVersion)
+        private static LoadPackageManifestOperation LoadPackageManifest(ResourcePackage package, string packageVersion)
         {
-            var operation = package.UpdatePackageManifestAsync(packageVersion);
-            return operation;
-
+            var options = new LoadPackageManifestOptions(packageVersion, 60);
+            return package.LoadPackageManifestAsync(options);
         }
 
-        async UniTask Download(ResourcePackage package)
+        private static async UniTask Download(ResourcePackage package)
         {
-            int downloadingMaxNum = 10;
-            int failedTryAgain = 3;
-            var downloader = package.CreateResourceDownloader(downloadingMaxNum, failedTryAgain);
+            var options = new ResourceDownloaderOptions(10, 3);
+            ResourceDownloaderOperation downloader = package.CreateResourceDownloader(options);
 
-            //没有需要下载的资源
             if (downloader.TotalDownloadCount == 0)
             {
                 return;
             }
 
-            //需要下载的文件总数和总大小
-            int totalDownloadCount = downloader.TotalDownloadCount;
-            long totalDownloadBytes = downloader.TotalDownloadBytes;
+            downloader.DownloadCompleted += OnDownloadCompleted;
+            downloader.DownloadError += OnDownloadError;
+            downloader.DownloadProgressChanged += OnDownloadProgressChanged;
+            downloader.DownloadFileStarted += OnDownloadFileStarted;
 
-            //注册回调方法
-            downloader.DownloadFinishCallback = OnDownloadFinishFunction; //当下载器结束（无论成功或失败）
-            downloader.DownloadErrorCallback = OnDownloadErrorFunction; //当下载器发生错误
-            downloader.DownloadUpdateCallback = OnDownloadUpdateFunction; //当下载进度发生变化
-            downloader.DownloadFileBeginCallback = OnDownloadFileBeginFunction; //当开始下载某个文件
-
-            //开启下载
-            downloader.BeginDownload();
+            downloader.StartDownload();
             await downloader;
 
-            //检测下载结果
-            if (downloader.Status == EOperationStatus.Succeed)
-            {
-                //下载成功
-            }
-            else
+            if (downloader.Status != EOperationStatus.Succeeded)
             {
                 Log.Error($"资源包裹 {package.PackageName} 下载失败：{downloader.Error}");
-                //下载失败
             }
         }
 
-        private void OnDownloadFileBeginFunction(DownloadFileData data)
+        private static void OnDownloadFileStarted(DownloadFileStartedEventArgs data)
         {
-            //开始下载某个文件
-            Log.Info($"资源包裹 {data.PackageName} 开始下载文件：{data.FileName}");
+            Log.Info($"资源包裹 {data.PackageName} 开始下载文件：{data.FileName}，大小：{data.FileSize} 字节");
         }
 
-
-        private void OnDownloadUpdateFunction(DownloadUpdateData data)
+        private static void OnDownloadProgressChanged(DownloadProgressChangedEventArgs data)
         {
-            //下载进度变化
-            Log.Info($"资源包裹 {data.PackageName} 下载进度：{data.Progress:P2}");
+            Log.Info(
+                $"资源包裹 {data.PackageName} 下载进度：{data.Progress:P2}，文件 {data.CurrentDownloadCount}/{data.TotalDownloadCount}，字节 {data.CurrentDownloadBytes}/{data.TotalDownloadBytes}");
         }
 
-
-        private void OnDownloadErrorFunction(DownloadErrorData data)
+        private static void OnDownloadError(DownloadErrorEventArgs data)
         {
-            //下载器发生错误
             Log.Error($"资源包裹 {data.PackageName} 下载错误，文件名称：{data.FileName}，错误信息：{data.ErrorInfo}");
         }
 
-
-        private void OnDownloadFinishFunction(DownloaderFinishData data)
+        private static void OnDownloadCompleted(DownloadCompletedEventArgs data)
         {
-            //下载器结束（无论成功或失败）
-            if (data.Succeed)
+            if (data.Succeeded)
             {
                 Log.Info($"资源包裹 {data.PackageName} 下载完成");
             }
             else
             {
-                Log.Error($"资源包裹 {data.PackageName} 下载失败");
+                Log.Error($"资源包裹 {data.PackageName} 下载失败：{data.Error}");
             }
         }
-
-
-
 
         #endregion
 
         #region 包裹管理
-
 
         /// <inheritdoc />
         public ResourcePackage GetPackage(string packageName)
@@ -271,7 +244,8 @@ namespace EF.Resource
         #region 资源加载
 
         /// <inheritdoc />
-        public async UniTask<AssetHandle> LoadAssetAsync<T>(string location, Action<float> progress = null, uint priority = 0) where T : UnityEngine.Object
+        public async UniTask<AssetHandle> LoadAssetAsync<T>(string location, Action<float> progress = null, uint priority = 0)
+            where T : UnityEngine.Object
         {
             EnsureInitialized();
             if (string.IsNullOrWhiteSpace(location))
@@ -291,7 +265,7 @@ namespace EF.Resource
                 }
             }
 
-            await handle.Task;
+            await handle;
             HandleFailureIfNeed(handle, location, "加载资源");
             RegisterHandle(handle);
             progress?.Invoke(1f);
@@ -318,7 +292,14 @@ namespace EF.Resource
 
         #region 场景管理
 
-        public async UniTask<SceneHandle> LoadSceneAsync(string location, LoadSceneMode sceneMode = LoadSceneMode.Single, LocalPhysicsMode physicsMode = LocalPhysicsMode.None, bool suspendLoad = false, uint priority = 0, Action<float> progress = null)
+        /// <inheritdoc />
+        public async UniTask<SceneHandle> LoadSceneAsync(
+            string location,
+            LoadSceneMode sceneMode = LoadSceneMode.Single,
+            LocalPhysicsMode physicsMode = LocalPhysicsMode.None,
+            bool allowSceneActivation = true,
+            uint priority = 0,
+            Action<float> progress = null)
         {
             EnsureInitialized();
             if (string.IsNullOrWhiteSpace(location))
@@ -327,7 +308,7 @@ namespace EF.Resource
             }
 
             ResourcePackage package = GetDefaultPackage();
-            SceneHandle handle = package.LoadSceneAsync(location, sceneMode, physicsMode, suspendLoad, priority);
+            SceneHandle handle = package.LoadSceneAsync(location, sceneMode, physicsMode, allowSceneActivation, priority);
 
             if (progress != null)
             {
@@ -338,7 +319,7 @@ namespace EF.Resource
                 }
             }
 
-            await handle.Task;
+            await handle;
             HandleFailureIfNeed(handle, location, "加载场景");
             RegisterHandle(handle);
             progress?.Invoke(1f);
@@ -354,8 +335,14 @@ namespace EF.Resource
             }
 
             _trackedHandles.Remove(handle);
-            UnloadSceneOperation operation = handle.UnloadAsync();
-            operation.WaitForAsyncComplete();
+            UnloadSceneOperation operation = handle.UnloadSceneAsync();
+            operation.Completed += completedOperation =>
+            {
+                if (completedOperation.Status == EOperationStatus.Failed)
+                {
+                    Log.Error($"卸载场景失败：{completedOperation.Error}");
+                }
+            };
         }
 
         #endregion
@@ -405,17 +392,10 @@ namespace EF.Resource
 
             if (_packages.Count > 0)
             {
-                foreach (ResourcePackage package in _packages.Values)
-                {
-                    DestroyOperation destroyOperation = package.DestroyAsync();
-                    destroyOperation.WaitForAsyncComplete();
-                    YooAssets.RemovePackage(package);
-                }
-
                 _packages.Clear();
             }
 
-            if (YooAssets.Initialized)
+            if (YooAssets.IsInitialized)
             {
                 YooAssets.Destroy();
             }
@@ -431,9 +411,9 @@ namespace EF.Resource
 
         private static void EnsureYooAssetsInitialized()
         {
-            if (!YooAssets.Initialized)
+            if (!YooAssets.IsInitialized)
             {
-                YooAssets.Initialize();
+                YooAssets.Initialize(null);
             }
         }
 
@@ -459,8 +439,7 @@ namespace EF.Resource
             }
         }
 
-
-        private InitializeParameters CreateInitializeParameters(ResourcePackageEntry entry)
+        private InitializePackageOptions CreateInitializeParameters(ResourcePackageEntry entry)
         {
             return Mode switch
             {
@@ -473,99 +452,65 @@ namespace EF.Resource
         }
 
 #if UNITY_EDITOR
-        private static InitializeParameters CreateEditorSimulateParameters(ResourcePackageEntry entry)
+        private static InitializePackageOptions CreateEditorSimulateParameters(ResourcePackageEntry entry)
         {
+            PackageBuildResult buildResult = EditorSimulateBuildInvoker.Build(entry.PackageName, (int)EBundleType.VirtualAssetBundle);
+            string packageRoot = buildResult.PackageRootDirectory;
+            FileSystemParameters fileSystemParams = FileSystemParameters.CreateDefaultEditorFileSystemParameters(packageRoot);
 
-            var buildResult = EditorSimulateModeHelper.SimulateBuild(entry.PackageName);
-            var packageRoot = buildResult.PackageRootDirectory;
-            var fileSystemParams = FileSystemParameters.CreateDefaultEditorFileSystemParameters(packageRoot);
-
-            var createParameters = new EditorSimulateModeParameters();
-            createParameters.EditorFileSystemParameters = fileSystemParams;
-
-            return createParameters;
-
+            return new EditorSimulateModeOptions
+            {
+                EditorFileSystemParameters = fileSystemParams
+            };
         }
 #else
-        private static InitializeParameters CreateEditorSimulateParameters(ResourcePackageEntry entry)
+        private static InitializePackageOptions CreateEditorSimulateParameters(ResourcePackageEntry entry)
         {
             throw new InvalidOperationException("编辑器模拟模式仅支持在 Unity 编辑器环境下运行");
         }
 #endif
 
-        private static InitializeParameters CreateOfflineParameters()
+        private static InitializePackageOptions CreateOfflineParameters()
         {
-            var parameters = new OfflinePlayModeParameters
+            return new OfflinePlayModeOptions
             {
-                BuildinFileSystemParameters = FileSystemParameters.CreateDefaultBuildinFileSystemParameters()
+                BuiltinFileSystemParameters = FileSystemParameters.CreateDefaultBuiltinFileSystemParameters()
             };
-            return parameters;
         }
 
-        #endregion
-
-        #region 嵌套类
-
-        /// <summary>
-        /// 远端资源地址查询服务类
-        /// </summary>
-        private class RemoteServices : IRemoteServices
-        {
-            private readonly string _defaultHostServer;
-            private readonly string _fallbackHostServer;
-
-            public RemoteServices(string defaultHostServer, string fallbackHostServer)
-            {
-                _defaultHostServer = defaultHostServer;
-                _fallbackHostServer = fallbackHostServer;
-            }
-            string IRemoteServices.GetRemoteMainURL(string fileName)
-            {
-                return $"{_defaultHostServer}/{fileName}";
-            }
-            string IRemoteServices.GetRemoteFallbackURL(string fileName)
-            {
-                return $"{_fallbackHostServer}/{fileName}";
-            }
-        }
-
-        #endregion
-
-        #region 私有辅助方法
-
-        private InitializeParameters CreateHostParameters(ResourcePackageEntry entry)
+        private InitializePackageOptions CreateHostParameters(ResourcePackageEntry entry)
         {
             string defaultHostServer = entry.GetSanitizedMainServer();
             string fallbackHostServer = entry.GetSanitizedFallbackServer();
             Log.Info("资源主服务器地址：" + defaultHostServer);
-            IRemoteServices remoteServices = new RemoteServices(defaultHostServer, fallbackHostServer);
-            var cacheFileSystemParams = FileSystemParameters.CreateDefaultCacheFileSystemParameters(remoteServices);
 
-            // 注释掉内置文件系统，支持完全从远端下载（无需 StreamingAssets）
-            var buildinFileSystemParams = FileSystemParameters.CreateDefaultBuildinFileSystemParameters();
+            IRemoteService remoteService = new DefaultResourceRemoteServices(defaultHostServer, fallbackHostServer);
+            FileSystemParameters cacheFileSystemParams = FileSystemParameters.CreateDefaultSandboxFileSystemParameters(remoteService);
+            FileSystemParameters builtinFileSystemParams = FileSystemParameters.CreateDefaultBuiltinFileSystemParameters();
 
-            var createParameters = new HostPlayModeParameters();
-            createParameters.BuildinFileSystemParameters = buildinFileSystemParams;
-            createParameters.CacheFileSystemParameters = cacheFileSystemParams;
-
-            return createParameters;
+            return new HostPlayModeOptions
+            {
+                BuiltinFileSystemParameters = builtinFileSystemParams,
+                CacheFileSystemParameters = cacheFileSystemParams
+            };
         }
 
-        private InitializeParameters CreateWebParameters(ResourcePackageEntry entry)
+        private InitializePackageOptions CreateWebParameters(ResourcePackageEntry entry)
         {
             string defaultHostServer = entry.GetSanitizedMainServer();
             string fallbackHostServer = entry.GetSanitizedFallbackServer();
 
-            IRemoteServices remoteServices = new RemoteServices(defaultHostServer, fallbackHostServer);
-            var webServerFileSystemParams = FileSystemParameters.CreateDefaultWebServerFileSystemParameters();
-            var webRemoteFileSystemParams = FileSystemParameters.CreateDefaultWebRemoteFileSystemParameters(remoteServices); //支持跨域下载
+            IRemoteService remoteService = new DefaultResourceRemoteServices(defaultHostServer, fallbackHostServer);
+            FileSystemParameters webServerFileSystemParams =
+                FileSystemParameters.CreateDefaultWebServerFileSystemParameters(entry.DisableUnityWebCache);
+            FileSystemParameters webRemoteFileSystemParams =
+                FileSystemParameters.CreateDefaultWebRemoteFileSystemParameters(remoteService, entry.DisableUnityWebCache);
 
-            var createParameters = new WebPlayModeParameters();
-            createParameters.WebServerFileSystemParameters = webServerFileSystemParams;
-            createParameters.WebRemoteFileSystemParameters = webRemoteFileSystemParams;
-
-            return createParameters;
-
+            return new WebPlayModeOptions
+            {
+                WebServerFileSystemParameters = webServerFileSystemParams,
+                WebRemoteFileSystemParameters = webRemoteFileSystemParams
+            };
         }
 
         private static void HandleFailureIfNeed(HandleBase handle, string location, string action)
@@ -577,7 +522,7 @@ namespace EF.Resource
 
             if (handle.Status == EOperationStatus.Failed)
             {
-                string error = string.IsNullOrEmpty(handle.LastError) ? "未知错误" : handle.LastError;
+                string error = string.IsNullOrEmpty(handle.Error) ? "未知错误" : handle.Error;
                 handle.Release();
                 throw new InvalidOperationException($"{action}失败：{location}，错误信息：{error}");
             }

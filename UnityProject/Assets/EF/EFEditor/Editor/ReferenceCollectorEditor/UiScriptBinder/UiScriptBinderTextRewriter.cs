@@ -12,17 +12,17 @@ namespace GT
     public static class UiScriptBinderTextRewriter
     {
         /// <summary>
-        /// region 标识符正则，匹配 `#region 自动生成 ... #endregion`。
+        /// region 标识符正则，匹配 `#region 自动生成 ... #endregion`，并把紧邻的换行/缩进吸入 match，便于整块替换时保持原行结构。
         /// </summary>
         private static readonly Regex RegionRegex = new Regex(
-            @"#region\s+自动生成[\s\S]*?#endregion",
+            @"(?<lead>(?:\r?\n)?[ \t]*)#region[ \t]+自动生成[\s\S]*?#endregion",
             RegexOptions.Multiline);
 
         /// <summary>
-        /// 类首大括号识别正则。
+        /// 类首大括号识别正则；只匹配到类名为止，开括号在后续手动定位。
         /// </summary>
         private static readonly Regex ClassOpenRegex = new Regex(
-            @"class\s+\w+(?:\s*:\s*[^\{]+)?\s*\{",
+            @"class\s+\w+",
             RegexOptions.Multiline);
 
         /// <summary>
@@ -63,9 +63,11 @@ namespace GT
                 sanitized = "field";
             }
 
+            bool prefixedForDigit = false;
             if (char.IsDigit(sanitized[0]))
             {
                 sanitized = "_" + sanitized;
+                prefixedForDigit = true;
             }
 
             if (sanitized.Length > 0 && char.IsUpper(sanitized[0]))
@@ -73,7 +75,9 @@ namespace GT
                 sanitized = char.ToLowerInvariant(sanitized[0]) + sanitized.Substring(1);
             }
 
-            var baseName = sanitized.StartsWith("_", StringComparison.Ordinal) ? sanitized : "_" + sanitized;
+            var baseName = prefixedForDigit || !sanitized.StartsWith("_", StringComparison.Ordinal)
+                ? "_" + sanitized
+                : sanitized;
             var unique = baseName;
             var index = 1;
             while (usedNames.Contains(unique))
@@ -179,7 +183,8 @@ namespace GT
         }
 
         /// <summary>
-        /// 整块替换或首次插入 region：找到则整体替换为新内容；找不到则插入到类首大括号后。
+        /// 整块替换或首次插入 region：找到则连同前导缩进整体替换；找不到则在类首大括号后插入，
+        /// 吸收 `{` 紧邻的空白，避免多次执行后堆出冗余空行或缩进。
         /// </summary>
         public static string ReplaceOrInsertRegion(string content, string regionBlock)
         {
@@ -188,9 +193,17 @@ namespace GT
                 throw new ArgumentException("regionBlock 不能为空", nameof(regionBlock));
             }
 
-            if (RegionRegex.IsMatch(content))
+            var regionMatch = RegionRegex.Match(content);
+            if (regionMatch.Success)
             {
-                return RegionRegex.Replace(content, regionBlock, 1);
+                var lead = regionMatch.Groups["lead"].Value;
+                var leadingNewline = lead.StartsWith("\r\n", StringComparison.Ordinal) ? "\r\n"
+                    : lead.StartsWith("\n", StringComparison.Ordinal) ? "\n"
+                    : string.Empty;
+                return content.Substring(0, regionMatch.Index)
+                    + leadingNewline
+                    + regionBlock
+                    + content.Substring(regionMatch.Index + regionMatch.Length);
             }
 
             var classMatch = ClassOpenRegex.Match(content);
@@ -199,8 +212,22 @@ namespace GT
                 return content;
             }
 
-            var insertPos = classMatch.Index + classMatch.Length;
-            return content.Insert(insertPos, "\n" + regionBlock + "\n");
+            var braceIndex = content.IndexOf('{', classMatch.Index + classMatch.Length);
+            if (braceIndex < 0)
+            {
+                return content;
+            }
+
+            var insertPos = braceIndex + 1;
+            var scan = insertPos;
+            while (scan < content.Length && (content[scan] == ' ' || content[scan] == '\t' || content[scan] == '\n' || content[scan] == '\r'))
+            {
+                scan++;
+            }
+
+            bool hasFollowing = scan < content.Length;
+            var suffix = hasFollowing ? "\n" : string.Empty;
+            return content.Substring(0, insertPos) + regionBlock + suffix + content.Substring(scan);
         }
 
         /// <summary>

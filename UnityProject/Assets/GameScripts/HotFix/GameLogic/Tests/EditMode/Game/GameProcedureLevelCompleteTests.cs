@@ -14,8 +14,9 @@ using ProcedureOwner = EF.Fsm.IFsm<EF.Procedure.IProcedureManager>;
 namespace GameLogic.Tests.EditMode.Game
 {
     /// <summary>
-    /// 验证 GameProcedure 关卡完成回调的契约：
-    /// - 私有 OnLevelComplete 通过保存的 ProcedureOwner 调用 ChangeState&lt;MainMenuProcedure&gt;；
+    /// 验证 GameProcedure 关卡完成与事件波次确认回调的契约：
+    /// - 私有 OnLevelComplete 记录关卡完成等待确认状态，不立即切换流程；
+    /// - OnRewardSelected 优先处理事件波次确认，其次处理关卡完成确认切回主菜单；
     /// - Cleanup 取消 LevelCompleteEvent 订阅，使后续事件不再触发回调。
     /// 因为 GameProcedure.EnterAsync 依赖 GameLogicEntry 单例（UIManager / Model / Config），
     /// 这里使用反射直接对私有字段与方法进行精确装配，验证关键回调路径与订阅生命周期。
@@ -24,7 +25,7 @@ namespace GameLogic.Tests.EditMode.Game
     public class GameProcedureLevelCompleteTests
     {
         [Test]
-        public void OnLevelComplete_切换到MainMenuProcedure()
+        public void OnLevelComplete_记录等待确认状态_不立即切流程()
         {
             var procedure = new GameProcedure();
             var fakeOwner = new FakeProcedureOwner();
@@ -33,8 +34,10 @@ namespace GameLogic.Tests.EditMode.Game
 
             InvokePrivate(procedure, "OnLevelComplete", new LevelCompleteEvent(101));
 
-            Assert.AreEqual(1, fakeOwner.GenericChangeStateCalls.Count, "应调用一次 ChangeState<TState>()");
-            Assert.AreEqual(typeof(MainMenuProcedure), fakeOwner.GenericChangeStateCalls[0]);
+            Assert.AreEqual(0, fakeOwner.GenericChangeStateCalls.Count,
+                "OnLevelComplete 不应立即切换流程");
+            Assert.IsTrue(GetPrivateField<bool>(procedure, "_isLevelCompleteAwaitingConfirm"),
+                "应记录关卡完成等待确认状态");
         }
 
         [Test]
@@ -47,17 +50,75 @@ namespace GameLogic.Tests.EditMode.Game
         }
 
         [Test]
-        public void OnRewardSelected_切换到MainMenuProcedure()
+        public void OnRewardSelected_关卡完成等待确认时_切换到MainMenuProcedure()
         {
             var procedure = new GameProcedure();
             var fakeOwner = new FakeProcedureOwner();
+            var fakeViewModel = new FakeViewModel();
 
             SetPrivateField(procedure, "_procedureOwner", fakeOwner);
+            SetPrivateField(procedure, "_viewModel", fakeViewModel);
+            SetPrivateField(procedure, "_isLevelCompleteAwaitingConfirm", true);
 
             InvokePrivate(procedure, "OnRewardSelected");
 
             Assert.AreEqual(1, fakeOwner.GenericChangeStateCalls.Count, "应调用一次 ChangeState<TState>()");
             Assert.AreEqual(typeof(MainMenuProcedure), fakeOwner.GenericChangeStateCalls[0]);
+        }
+
+        [Test]
+        public void OnRewardSelected_事件波次等待确认时_调用WaveSystem确认()
+        {
+            var procedure = new GameProcedure();
+            var fakeOwner = new FakeProcedureOwner();
+            var fakeViewModel = new FakeViewModel();
+            fakeViewModel.IsAwaitingWaveConfirmation.Value = true;
+            var fakeWaveSystem = new FakeWaveSystem();
+
+            SetPrivateField(procedure, "_procedureOwner", fakeOwner);
+            SetPrivateField(procedure, "_viewModel", fakeViewModel);
+            SetPrivateField(procedure, "_waveSystem", fakeWaveSystem);
+
+            InvokePrivate(procedure, "OnRewardSelected");
+
+            Assert.AreEqual(1, fakeWaveSystem.ConfirmCalls, "应调用 WaveSystem.ConfirmCurrentWave");
+            Assert.AreEqual(0, fakeOwner.GenericChangeStateCalls.Count, "不应切换流程");
+        }
+
+        [Test]
+        public void OnRewardSelected_事件波次优先于关卡完成()
+        {
+            var procedure = new GameProcedure();
+            var fakeOwner = new FakeProcedureOwner();
+            var fakeViewModel = new FakeViewModel();
+            fakeViewModel.IsAwaitingWaveConfirmation.Value = true;
+            var fakeWaveSystem = new FakeWaveSystem();
+
+            SetPrivateField(procedure, "_procedureOwner", fakeOwner);
+            SetPrivateField(procedure, "_viewModel", fakeViewModel);
+            SetPrivateField(procedure, "_waveSystem", fakeWaveSystem);
+            SetPrivateField(procedure, "_isLevelCompleteAwaitingConfirm", true);
+
+            InvokePrivate(procedure, "OnRewardSelected");
+
+            // 事件波次确认优先，不应切主菜单
+            Assert.AreEqual(1, fakeWaveSystem.ConfirmCalls, "应调用 WaveSystem.ConfirmCurrentWave");
+            Assert.AreEqual(0, fakeOwner.GenericChangeStateCalls.Count, "事件波次确认优先，不应切主菜单");
+        }
+
+        [Test]
+        public void OnRewardSelected_无待处理确认时_安全忽略()
+        {
+            var procedure = new GameProcedure();
+            var fakeOwner = new FakeProcedureOwner();
+            var fakeViewModel = new FakeViewModel();
+
+            SetPrivateField(procedure, "_procedureOwner", fakeOwner);
+            SetPrivateField(procedure, "_viewModel", fakeViewModel);
+
+            InvokePrivate(procedure, "OnRewardSelected");
+
+            Assert.AreEqual(0, fakeOwner.GenericChangeStateCalls.Count, "无待处理确认时不应切流程");
         }
 
         [Test]
@@ -113,13 +174,13 @@ namespace GameLogic.Tests.EditMode.Game
                 // 调用 Cleanup：应取消订阅；本地总线 _localEventBus 字段被置空；ProcedureOwner 字段被清空
                 InvokePrivate(procedure, "Cleanup");
 
-                Assert.IsNull(GetPrivateField(procedure, "_procedureOwner"),
+                Assert.IsNull(GetPrivateField<object>(procedure, "_procedureOwner"),
                     "Cleanup 后 _procedureOwner 应被置空");
-                Assert.IsNull(GetPrivateField(procedure, "_localEventBus"),
+                Assert.IsNull(GetPrivateField<object>(procedure, "_localEventBus"),
                     "Cleanup 后 _localEventBus 应被置空（确认幂等清理路径）");
 
                 // 触发器：在原 bus 上再次发布事件——由于生产代码 Cleanup 已经取消了 OnLevelComplete 订阅，
-                // 不会调用 ChangeState；这里 handler 已主动 Unsubscribe（由 GameProcedure.Cleanup 内部完成）。
+                // 不会设置 _isLevelCompleteAwaitingConfirm。
                 bus.GetChannel<LevelCompleteEvent>().Publish(new LevelCompleteEvent(999));
 
                 Assert.AreEqual(0, fakeOwner.GenericChangeStateCalls.Count,
@@ -129,6 +190,18 @@ namespace GameLogic.Tests.EditMode.Game
             {
                 bus.Dispose();
             }
+        }
+
+        [Test]
+        public void Cleanup_重置关卡完成等待确认状态()
+        {
+            var procedure = new GameProcedure();
+
+            SetPrivateField(procedure, "_isLevelCompleteAwaitingConfirm", true);
+            InvokePrivate(procedure, "Cleanup");
+
+            Assert.IsFalse(GetPrivateField<bool>(procedure, "_isLevelCompleteAwaitingConfirm"),
+                "Cleanup 应重置关卡完成等待确认状态");
         }
 
         [Test]
@@ -150,13 +223,13 @@ namespace GameLogic.Tests.EditMode.Game
             field.SetValue(target, value);
         }
 
-        private static object GetPrivateField(object target, string fieldName)
+        private static T GetPrivateField<T>(object target, string fieldName)
         {
             var field = target.GetType().GetField(
                 fieldName,
                 BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.NotNull(field, $"未找到私有字段 {fieldName}");
-            return field.GetValue(target);
+            return (T)field.GetValue(target);
         }
 
         private static void InvokePrivate(object target, string methodName, params object[] args)
@@ -175,6 +248,40 @@ namespace GameLogic.Tests.EditMode.Game
                 BindingFlags.NonPublic | BindingFlags.Instance);
             Assert.NotNull(method, $"未找到生命周期方法 {methodName}");
             method.Invoke(target, args);
+        }
+
+        /// <summary>
+        /// 最小化的 GameViewModel 替身，仅暴露 IsAwaitingWaveConfirmation。
+        /// 使用真实 ReactiveProperty 以匹配生产代码访问模式。
+        /// </summary>
+        private sealed class FakeViewModel : IDisposable
+        {
+            public ReactiveProperty<bool> IsAwaitingWaveConfirmation { get; } = new ReactiveProperty<bool>(false);
+
+            public event Action RewardSelected;
+            public event Action<int, int> CardUsed;
+            public event Action EndTurnRequested;
+            public event Action<string> CardPlayFailed;
+
+            public void Dispose()
+            {
+                RewardSelected = null;
+                CardUsed = null;
+                EndTurnRequested = null;
+                CardPlayFailed = null;
+            }
+        }
+
+        /// <summary>
+        /// 最小化的 WaveSystem 替身，仅记录 ConfirmCurrentWave 调用次数。
+        /// </summary>
+        private sealed class FakeWaveSystem : IDisposable
+        {
+            public int ConfirmCalls { get; private set; }
+
+            public void ConfirmCurrentWave() => ConfirmCalls++;
+
+            public void Dispose() { }
         }
 
         /// <summary>

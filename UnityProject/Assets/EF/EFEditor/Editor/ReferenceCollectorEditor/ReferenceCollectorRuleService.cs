@@ -262,6 +262,9 @@ namespace GT
                 case "Transform":
                 case "UnityEngine.Transform":
                     return typeof(Transform);
+                case "RectTransform":
+                case "UnityEngine.RectTransform":
+                    return typeof(RectTransform);
                 case "SpriteRenderer":
                 case "UnityEngine.SpriteRenderer":
                     return typeof(SpriteRenderer);
@@ -271,6 +274,9 @@ namespace GT
                 case "Text":
                 case "UnityEngine.UI.Text":
                     return typeof(UnityEngine.UI.Text);
+                case "TextMeshProUGUI":
+                case "TMPro.TextMeshProUGUI":
+                    return typeof(TMPro.TextMeshProUGUI);
                 case "Image":
                 case "UnityEngine.UI.Image":
                     return typeof(UnityEngine.UI.Image);

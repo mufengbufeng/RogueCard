@@ -63,6 +63,26 @@ namespace GameLogic
         /// 玩家是否已死亡。
         /// </summary>
         bool IsPlayerDead { get; }
+
+        /// <summary>
+        /// 是否正在等待事件波次确认（Chest / Shop 波次已展示，等待玩家点击继续）。
+        /// </summary>
+        bool IsAwaitingWaveConfirmation { get; }
+
+        /// <summary>
+        /// 当前事件波次展示标题。
+        /// </summary>
+        string CurrentWaveTitle { get; }
+
+        /// <summary>
+        /// 当前事件波次展示描述。
+        /// </summary>
+        string CurrentWaveDesc { get; }
+
+        /// <summary>
+        /// 当前事件波次继续按钮文案。
+        /// </summary>
+        string CurrentWaveContinueText { get; }
     }
 
     /// <summary>
@@ -84,6 +104,7 @@ namespace GameLogic
         private readonly ModelValue<int> _playerArmor;
         private readonly ModelValue<bool> _isLevelComplete;
         private readonly ModelValue<bool> _isPlayerDead;
+        private readonly ModelValue<bool> _isAwaitingWaveConfirmation;
 
         private GameConfig.level.Level _currentLevel;
         private List<GameConfig.level.LevelWave> _waves;
@@ -95,6 +116,10 @@ namespace GameLogic
         private List<CardRuntime> _discardPile;
         private readonly List<BuffRuntime> _playerBuffs = new();
         private int _playerLevelId = 1;
+
+        private string _currentWaveTitle;
+        private string _currentWaveDesc;
+        private string _currentWaveContinueText;
 
         /// <summary>
         /// 当前战斗阶段。
@@ -140,6 +165,26 @@ namespace GameLogic
         /// 玩家是否已死亡。
         /// </summary>
         public bool IsPlayerDead => GetValue(_isPlayerDead);
+
+        /// <summary>
+        /// 是否正在等待事件波次确认。
+        /// </summary>
+        public bool IsAwaitingWaveConfirmation => GetValue(_isAwaitingWaveConfirmation);
+
+        /// <summary>
+        /// 当前事件波次展示标题。
+        /// </summary>
+        public string CurrentWaveTitle => _currentWaveTitle;
+
+        /// <summary>
+        /// 当前事件波次展示描述。
+        /// </summary>
+        public string CurrentWaveDesc => _currentWaveDesc;
+
+        /// <summary>
+        /// 当前事件波次继续按钮文案。
+        /// </summary>
+        public string CurrentWaveContinueText => _currentWaveContinueText;
 
         /// <summary>
         /// 当前关卡配置。
@@ -240,6 +285,7 @@ namespace GameLogic
             _playerArmor = CreateValue(0);
             _isLevelComplete = CreateValue(false);
             _isPlayerDead = CreateValue(false);
+            _isAwaitingWaveConfirmation = CreateValue(false);
 
             _monsters = new List<MonsterRuntime>();
             _hand = new List<CardRuntime>();
@@ -265,6 +311,7 @@ namespace GameLogic
             _waves = waves;
             _waveIndex = 0;
             _batchIndex = 0;
+            ClearEventWaveState();
         }
 
         /// <summary>
@@ -435,6 +482,34 @@ namespace GameLogic
         }
 
         /// <summary>
+        /// 设置事件波次展示状态并标记等待确认。
+        /// </summary>
+        public void SetEventWaveState(string title, string desc, string continueText)
+        {
+            _currentWaveTitle = title ?? string.Empty;
+            _currentWaveDesc = desc ?? string.Empty;
+            _currentWaveContinueText = !string.IsNullOrEmpty(continueText) ? continueText : "继续";
+            SetValue(_isAwaitingWaveConfirmation, true, nameof(IsAwaitingWaveConfirmation));
+            RaisePropertyChanged(nameof(CurrentWaveTitle));
+            RaisePropertyChanged(nameof(CurrentWaveDesc));
+            RaisePropertyChanged(nameof(CurrentWaveContinueText));
+        }
+
+        /// <summary>
+        /// 清除事件波次展示和等待确认状态。
+        /// </summary>
+        public void ClearEventWaveState()
+        {
+            _currentWaveTitle = null;
+            _currentWaveDesc = null;
+            _currentWaveContinueText = null;
+            SetValue(_isAwaitingWaveConfirmation, false, nameof(IsAwaitingWaveConfirmation));
+            RaisePropertyChanged(nameof(CurrentWaveTitle));
+            RaisePropertyChanged(nameof(CurrentWaveDesc));
+            RaisePropertyChanged(nameof(CurrentWaveContinueText));
+        }
+
+        /// <summary>
         /// 模型释放，清理运行时状态。
         /// </summary>
         protected override void OnModelReleased()
@@ -446,6 +521,7 @@ namespace GameLogic
             SetValue(_phase, BattlePhase.Idle, nameof(Phase));
             SetValue(_isLevelComplete, false, nameof(IsLevelComplete));
             SetValue(_isPlayerDead, false, nameof(IsPlayerDead));
+            ClearEventWaveState();
             base.OnModelReleased();
         }
 
@@ -472,6 +548,10 @@ namespace GameLogic
             public IReadOnlyList<CardRuntime> Hand => _model.Hand;
             public bool IsLevelComplete => _model.IsLevelComplete;
             public bool IsPlayerDead => _model.IsPlayerDead;
+            public bool IsAwaitingWaveConfirmation => _model.IsAwaitingWaveConfirmation;
+            public string CurrentWaveTitle => _model.CurrentWaveTitle;
+            public string CurrentWaveDesc => _model.CurrentWaveDesc;
+            public string CurrentWaveContinueText => _model.CurrentWaveContinueText;
         }
     }
 }

@@ -300,10 +300,28 @@ namespace GameLogic.Tests
         }
 
         [Test]
+        public void Drag_FirstThresholdMoveOverDropZone_ThenUp_TriggersCardDroppedOnZone()
+        {
+            _surface.ConfiguredCardCount = 1;
+            _surface.CardBounds = new[] { new Rect(900, 100, 150, 230) };
+            _surface.ConfiguredDropZoneBound = new Rect(800, 1000, 200, 200);
+            _surface.ConfiguredHandFanBound = new Rect(0, 0, 1920, 400);
+            _ctx.SetHand(new[] { NewCard(1, TargetMode.SingleAuto) });
+
+            _controller.OnPointerDown(handIdx: 0, visualIdx: 0, pointerId: 0, pos: new Vector2(975, 215));
+            _controller.OnPointerMove(0, new Vector2(900, 1100));
+            _controller.OnPointerUp(0, new Vector2(900, 1100));
+
+            CollectionAssert.AreEqual(new[] { (0, false) }, _callbacks.CardDroppedOnZoneLog,
+                "首个超过阈值的 PointerMove 已落在 DropZone 时 SHALL 立刻进入 OverDropZone 子态");
+            Assert.AreEqual(0, _callbacks.CardDragCancelledLog.Count,
+                "命中 dropZone 时 SHALL NOT 触发 CardDragCancelled");
+            Assert.AreEqual(CardInteractionState.Idle, _controller.State);
+        }
+
+        [Test]
         public void Drag_PointerOverDropZoneRect_TransitionsToOverDropZoneAndCallsCardDroppedOnZone()
         {
-            // 用屏幕像素值域配置（DropZone 在 800-1000 x 1000-1200；HandFan 0-1920 x 0-400），
-            // 覆盖 fix-card-drag-drop-not-played 主路径：屏幕像素 pos 落在 dropRect 内 → OverDropZone → CardDroppedOnZone(0, false)
             _surface.ConfiguredCardCount = 1;
             _surface.CardBounds = new[] { new Rect(900, 100, 150, 230) };
             _surface.ConfiguredDropZoneBound = new Rect(800, 1000, 200, 200);

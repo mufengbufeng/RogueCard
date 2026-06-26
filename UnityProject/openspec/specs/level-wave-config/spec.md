@@ -27,6 +27,11 @@
 - **AND** 所属关卡标识字段 MUST 使用指向 `TbLevel` 的 `int` 引用
 - **AND** 可选负载标识字段 MUST 能填写 `int` 刷怪方案标识
 
+#### Scenario: 非战斗波次文案可供运行时展示
+- **WHEN** 运行时读取 Chest 或 Shop 类型的 `LevelWave`
+- **THEN** 系统 MUST 能读取该波次的标题、描述和继续文案
+- **AND** 这些字段 MUST 可用于局内事件确认 UI
+
 ### Requirement: 波次类型枚举必须覆盖第一阶段节点类型
 系统 MUST 提供波次类型枚举结构，用于限制关卡波次只能配置为第一阶段支持的节点类型。
 

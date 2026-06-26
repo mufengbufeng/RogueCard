@@ -22,7 +22,7 @@ Implement tasks from an OpenSpec change.
    - Auto-select if only one active change exists
    - If ambiguous, run `openspec list --json` to get available changes and use the **AskUserQuestion tool** to let the user select
 
-   Always announce: "Using change: <name>" and how to override (e.g., `/opsx:apply <other>`).
+   Always announce: "Using change: <name>" and how to override.
 
 2. **Check status to understand the schema**
    ```bash
@@ -30,6 +30,7 @@ Implement tasks from an OpenSpec change.
    ```
    Parse the JSON to understand:
    - `schemaName`: The workflow being used (e.g., "spec-driven")
+   - `planningHome`, `changeRoot`, and `actionContext`: planning scope and edit constraints
    - Which artifact contains the tasks (typically "tasks" for spec-driven, check status for others)
 
 3. **Get apply instructions**
@@ -39,15 +40,19 @@ Implement tasks from an OpenSpec change.
    ```
 
    This returns:
-   - `contextFiles`: artifact ID -> array of concrete file paths (varies by schema - could be proposal/specs/design/tasks or spec/tests/implementation/docs)
+   - `contextFiles`: artifact ID -> array of concrete file paths (varies by schema)
    - Progress (total, complete, remaining)
-   - Task list with status
+   - `tasks`: each entry includes `description`, `done`, `feedbackType`, `defaulted`, and optionally `invalidRaw`
    - Dynamic instruction based on current state
 
    **Handle states:**
    - If `state: "blocked"` (missing artifacts): show message, suggest using openspec-continue-change
    - If `state: "all_done"`: congratulate, suggest archive
    - Otherwise: proceed to implementation
+
+   **Workspace guard:** If status JSON reports `actionContext.mode: "workspace-planning"` and `allowedEditRoots` is empty, explain that full workspace apply is not supported in this slice. Treat linked repos and folders as read-only context, ask the user to select an affected area through an explicit implementation workflow, and STOP before editing files.
+
+   **Invalid feedback-type guard:** If any task entry has `feedbackType: null` (i.e. carries an invalid annotation in tasks.md), STOP immediately. Report each offending task with its `invalidRaw` value. Tell the user the valid values are: `tdd`, `repl`, `static`, `doc`, `manual`. Do not begin work until the annotations are corrected.
 
 4. **Read context files**
 
@@ -61,43 +66,96 @@ Implement tasks from an OpenSpec change.
    Display:
    - Schema being used
    - Progress: "N/M tasks complete"
-   - Remaining tasks overview
+   - Remaining tasks overview, including each task's `feedbackType`
    - Dynamic instruction from CLI
+   - For every task with `defaulted: true`, emit a one-line warning:
+     `Warning: task "<description>" had no [type] annotation; defaulting to [static].`
 
-6. **Implement tasks (loop until done or blocked)**
+6. **Implement tasks (loop until done, blocked, or stuck)**
 
-   For each pending task:
-   - Show which task is being worked on
-   - Make the code changes required
-   - Keep changes minimal and focused
-   - Mark task complete in the tasks file: `- [ ]` → `- [x]`
-   - Continue to next task
+   For each pending task, switch on its `feedbackType` and run the matching feedback loop. Do NOT use a uniform loop for every task — different types demand different evidence of completion.
 
-   **Pause if:**
+   **6a. `tdd` — red → green → refactor**
+
+   1. Write or extend a test that captures the task's behavior.
+   2. Run the test. **Confirm it fails with the expected error.**
+      - If the test passes on the first run before any implementation, STOP and report. Either the test is wrong or the change is already done. Do NOT mark the task complete.
+   3. Implement until the test passes.
+   4. Run the closest relevant test suite. Confirm no regressions were introduced.
+   5. Refactor if helpful; tests still pass.
+   6. Mark the task `- [x]`.
+
+   **6b. `repl` — runnable command demonstrates the change**
+
+   1. Identify a concrete command that demonstrates the behavior. Prefer one named in the task body; otherwise pick the closest CLI/script invocation that exercises the change.
+   2. Implement.
+   3. Run the command. Confirm the output matches the task's stated expectation.
+   4. Mark the task `- [x]`.
+
+   **6c. `static` — refactor / typing / no behavior change**
+
+   1. Implement.
+   2. Run the project's typecheck (`tsc` or equivalent). Confirm pass.
+   3. Run lint where applicable. Confirm pass.
+   4. Run the closest relevant test suite. Confirm no regressions.
+   5. Mark the task `- [x]` only when all three signals are clean.
+
+   **6d. `doc` — documentation / comments / README / changelog**
+
+   1. Write or edit the documentation.
+   2. Report to the user what was changed and where.
+   3. Leave the task's checkbox `- [ ]` (UNCHECKED). The user marks it complete after review.
+   4. Continue to the next task without blocking the run.
+
+   **6e. `manual` — UI / copy / anything needing human eyeball**
+
+   1. Make the change to the best of your ability.
+   2. Report to the user with specifically what to inspect and why.
+   3. Leave the task's checkbox `- [ ]` (UNCHECKED). The user marks it complete after verifying.
+   4. Continue to the next task without blocking the run.
+
+   **Stuck detection (`tdd` and `repl` only):**
+
+   If three consecutive iterations of the loop for the same task fail to reach the success signal:
+   - Do NOT mark the task complete.
+   - Append an indented bullet under that task in `tasks.md` summarizing what was attempted, e.g.
+     ```
+     - [ ] [tdd] 4.2 Foo behaves like bar
+       - stuck after 3 attempts: tests still failing on edge case X; tried approaches Y, Z
+     ```
+   - STOP the apply session.
+   - Recommend the user inspect the artifacts or run a diagnose workflow (when available) before retrying.
+
+   **Pause if** (separate from stuck):
    - Task is unclear → ask for clarification
    - Implementation reveals a design issue → suggest updating artifacts
-   - Error or blocker encountered → report and wait for guidance
+   - Unexpected error or blocker encountered → report and wait for guidance
    - User interrupts
 
-7. **On completion or pause, show status**
+7. **On completion, pause, or stuck, show status**
 
    Display:
    - Tasks completed this session
+   - Tasks **deferred** (`doc` and `manual` tasks left unchecked for user action) — list each with what the user needs to do
    - Overall progress: "N/M tasks complete"
-   - If all done: suggest archive
-   - If paused: explain why and wait for guidance
+   - If all done: suggest archive (openspec-archive-change)
+   - If paused or stuck: explain why and wait for guidance
 
 **Output During Implementation**
 
 ```
 ## Implementing: <change-name> (schema: <schema-name>)
 
-Working on task 3/7: <task description>
-[...implementation happening...]
+Working on task 3/7 [tdd]: <task description>
+[...write test → confirm red → implement → green...]
 ✓ Task complete
 
-Working on task 4/7: <task description>
-[...implementation happening...]
+Working on task 4/7 [doc]: <task description>
+[...write doc...]
+↳ Doc updated at <path>; left unchecked for your review
+
+Working on task 5/7 [static]: <task description>
+[...implement → tsc → lint → tests...]
 ✓ Task complete
 ```
 
@@ -111,11 +169,35 @@ Working on task 4/7: <task description>
 **Progress:** 7/7 tasks complete ✓
 
 ### Completed This Session
-- [x] Task 1
-- [x] Task 2
+- [x] [tdd] Task 1
+- [x] [static] Task 2
 ...
 
-All tasks complete! Ready to archive this change.
+### Deferred (awaiting your action)
+- [ ] [doc] Task 4 — please review <path>
+- [ ] [manual] Task 6 — please verify <what>
+
+All non-deferred tasks complete!
+```
+
+**Output On Stuck**
+
+```
+## Implementation Stuck
+
+**Change:** <change-name>
+**Schema:** <schema-name>
+**Progress:** 4/7 tasks complete; stuck on task 5
+
+### Stuck Task
+- [ ] [tdd] 5.x <description>
+  - 3 attempts; test still failing on <symptom>
+
+**Recommendation:**
+- Inspect <relevant context paths>
+- Or run a diagnose workflow (when available)
+
+Do NOT retry without a new hypothesis.
 ```
 
 **Output On Pause (Issue Encountered)**
@@ -139,14 +221,16 @@ What would you like to do?
 ```
 
 **Guardrails**
-- Keep going through tasks until done or blocked
+- Branch on each task's `feedbackType` — do NOT run a uniform loop
+- For `tdd` tasks, red-before-green is mandatory; a test that passes immediately is a stop signal, not a success signal
+- For `doc` and `manual` tasks, NEVER auto-mark the checkbox; leave it unchecked and report what the user needs to do
+- After three failed iterations on the same `tdd` or `repl` task, STOP — do not keep trying
+- Warn once per defaulted task at the start of step 5
+- Stop and report if any task carries an invalid `feedbackType` (`null` with `invalidRaw` set)
 - Always read context files before starting (from the apply instructions output)
-- If task is ambiguous, pause and ask before implementing
-- If implementation reveals issues, pause and suggest artifact updates
 - Keep code changes minimal and scoped to each task
-- Update task checkbox immediately after completing each task
-- Pause on errors, blockers, or unclear requirements - don't guess
-- Use contextFiles from CLI output, don't assume specific file names
+- Update task checkbox immediately after completing each non-deferred task
+- Use `contextFiles` from CLI output, don't assume specific file names
 
 **Fluid Workflow Integration**
 

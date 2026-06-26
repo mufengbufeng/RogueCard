@@ -30,7 +30,10 @@ Archive a completed change in the experimental workflow.
 
    Parse the JSON to understand:
    - `schemaName`: The workflow being used
+   - `planningHome`, `changeRoot`, `artifactPaths`, and `actionContext`: path and scope context
    - `artifacts`: List of artifacts with their status (`done` or other)
+
+   If status reports `actionContext.mode: "workspace-planning"`, explain that workspace archive is not supported in this slice and STOP. Do not move workspace changes into repo-local archives or edit linked repos.
 
    **If any artifacts are not `done`:**
    - Display warning listing incomplete artifacts
@@ -52,7 +55,7 @@ Archive a completed change in the experimental workflow.
 
 4. **Assess delta spec sync state**
 
-   Check for delta specs at `openspec/changes/<name>/specs/`. If none exist, proceed without sync prompt.
+   Use `artifactPaths.specs.existingOutputPaths` from status JSON to check for delta specs. If none exist, proceed without sync prompt.
 
    **If delta specs exist:**
    - Compare each delta spec with its corresponding main spec at `openspec/specs/<capability>/spec.md`
@@ -67,19 +70,19 @@ Archive a completed change in the experimental workflow.
 
 5. **Perform the archive**
 
-   Create the archive directory if it doesn't exist:
+   Create an `archive` directory under `planningHome.changesDir` if it doesn't exist:
    ```bash
-   mkdir -p openspec/changes/archive
+   mkdir -p "<planningHome.changesDir>/archive"
    ```
 
    Generate target name using current date: `YYYY-MM-DD-<change-name>`
 
    **Check if target already exists:**
    - If yes: Fail with error, suggest renaming existing archive or using different date
-   - If no: Move the change directory to archive
+   - If no: Move `changeRoot` to the archive directory
 
    ```bash
-   mv openspec/changes/<name> openspec/changes/archive/YYYY-MM-DD-<name>
+   mv "<changeRoot>" "<planningHome.changesDir>/archive/YYYY-MM-DD-<name>"
    ```
 
 6. **Display summary**
@@ -91,24 +94,6 @@ Archive a completed change in the experimental workflow.
    - Whether specs were synced (if applicable)
    - Note about any warnings (incomplete artifacts/tasks)
 
-7. **Record MemPalace memory**
-
-   After a successful archive and before the final response, record the archive event in the local MemPalace diary:
-
-   Windows:
-   ```powershell
-   py -3 harness-workspace/tools/mempalace_record_event.py openspec-archive --change "<name>" --archive-path "openspec/changes/archive/YYYY-MM-DD-<name>" --schema "<schema-name>" --specs "<synced|skipped|no-delta-specs>" --allow-failure
-   ```
-
-   POSIX shell:
-   ```bash
-   python3 harness-workspace/tools/mempalace_record_event.py openspec-archive --change "<name>" --archive-path "openspec/changes/archive/YYYY-MM-DD-<name>" --schema "<schema-name>" --specs "<synced|skipped|no-delta-specs>" --allow-failure
-   ```
-
-   Use any available Python 3 launcher (`py -3`, `python3`, or the project venv Python). The helper resolves the project-local MemPalace virtualenv via `MEMPALACE_PYTHON` or `harness-workspace/mempalace-github-code/.venv`.
-
-   If the command fails, report the warning in the final summary, but do not roll back the archive.
-
 **Output On Success**
 
 ```
@@ -116,7 +101,7 @@ Archive a completed change in the experimental workflow.
 
 **Change:** <change-name>
 **Schema:** <schema-name>
-**Archived to:** openspec/changes/archive/YYYY-MM-DD-<name>/
+**Archived to:** the archive path derived from `planningHome.changesDir`/YYYY-MM-DD-<name>/
 **Specs:** ✓ Synced to main specs (or "No delta specs" or "Sync skipped")
 
 All artifacts complete. All tasks complete.
