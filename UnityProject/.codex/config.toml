@@ -1,0 +1,4 @@
+[mcp_servers.codedb-mcp]
+command = 'C:\Users\mfbf\.claude\skills\codedb-mcp\assets\codebase-mcp.exe'
+args = ['--config', 'D:\UnityGame\Self\RogueCard\UnityProject\.codedb-mcp\codedb-mcp.toml', 'mcp', 'D:\UnityGame\Self\RogueCard\UnityProject']
+startup_timeout_sec = 120

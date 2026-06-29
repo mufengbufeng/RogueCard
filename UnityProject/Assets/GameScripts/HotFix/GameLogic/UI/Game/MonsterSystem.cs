@@ -57,7 +57,7 @@ namespace GameLogic
         /// <summary>
         /// Prepare 阶段：恢复每只存活怪物能量、按剧本/抽牌生成 PendingCards。
         /// </summary>
-        public void BeginMonsterPrepare()
+        public virtual void BeginMonsterPrepare()
         {
             if (_cardSystem == null)
             {

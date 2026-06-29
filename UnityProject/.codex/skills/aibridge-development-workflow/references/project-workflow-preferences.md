@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # 项目 Workflow 偏好
+=======
+﻿# 项目 Workflow 偏好
+>>>>>>> origin/main
 
 > 本文件由 AIBridge/Workflows 根据项目设置生成。不要手动编辑；修改请回到 Unity 的 `AIBridge/Workflows > Workflow Options`。
 

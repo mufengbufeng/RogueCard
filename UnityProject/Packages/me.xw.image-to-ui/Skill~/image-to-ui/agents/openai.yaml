@@ -1,0 +1,4 @@
+interface:
+  display_name: "Image to UI"
+  short_description: "Extract Unity-ready UI JSON with sub-sprite and prefab handoff settings"
+  default_prompt: "Use $image-to-ui to inventory the prompt's Unity sliced Sprite directory in place, author Unity-ready ui_structure.json from the inventory and grid, validate it, and keep multi-sprite references explicit with spriteName."

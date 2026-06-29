@@ -10,7 +10,7 @@
         "com.unity.modules.imageconversion": "1.0.0",
         "com.unity.modules.screencapture": "1.0.0"
       },
-      "hash": "23ec2ea542535ab8055223b296d08c44ae4a0d06"
+      "hash": "deb00bb545696e4081b1efbbf0bcebbf21a21ed8"
     },
     "com.besty.unity-skills": {
       "version": "file:com.besty.unity-skills",
@@ -52,14 +52,14 @@
       }
     },
     "com.tuyoogame.yooasset": {
-      "version": "2.3.18",
+      "version": "3.0.1-beta",
       "depth": 0,
       "source": "registry",
       "dependencies": {
-        "com.unity.scriptablebuildpipeline": "1.21.25",
         "com.unity.modules.assetbundle": "1.0.0",
         "com.unity.modules.unitywebrequest": "1.0.0",
-        "com.unity.modules.unitywebrequestassetbundle": "1.0.0"
+        "com.unity.modules.unitywebrequestassetbundle": "1.0.0",
+        "com.unity.scriptablebuildpipeline": "1.21.25"
       },
       "url": "https://package.openupm.com"
     },
@@ -515,6 +515,15 @@
       "source": "git",
       "dependencies": {},
       "hash": "6e6972730ce316fab2408f20e7a160aec070e48b"
+    },
+    "me.xw.image-to-ui": {
+      "version": "file:me.xw.image-to-ui",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.ugui": "2.0.0",
+        "com.unity.nuget.newtonsoft-json": "3.2.1"
+      }
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",

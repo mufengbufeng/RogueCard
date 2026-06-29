@@ -300,6 +300,14 @@ namespace GameLogic.Tests.EditMode.Game
             {
                 ExecuteTurnCallCount++;
             }
+
+            /// <summary>
+            /// 覆盖基类的 Prepare 实现：测试场景下不需要 MonsterCardSystem 注入，
+            /// 直接返回，避免链路推进到 Prepare 时因依赖未注入而抛 InvalidOperationException。
+            /// </summary>
+            public override void BeginMonsterPrepare()
+            {
+            }
         }
     }
 }

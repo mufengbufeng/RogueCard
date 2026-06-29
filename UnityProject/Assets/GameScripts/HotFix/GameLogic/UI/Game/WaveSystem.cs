@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using EF.Debugger;
 using EF.Event;
 
 namespace GameLogic
@@ -35,6 +36,22 @@ namespace GameLogic
         public void Initialize(BattleSystem battleSystem)
         {
             _battleSystem = battleSystem;
+        }
+
+        /// <summary>
+        /// 确认当前事件波次。仅在 Model 处于等待确认状态时有效；
+        /// 清除等待状态后推进到下一波次。
+        /// </summary>
+        public void ConfirmCurrentWave()
+        {
+            if (_model == null || !_model.IsAwaitingWaveConfirmation)
+            {
+                Log.Warning("[WaveSystem] ConfirmCurrentWave 被调用但未处于事件波次等待确认状态");
+                return;
+            }
+
+            _model.ClearEventWaveState();
+            AdvanceToNextWave();
         }
 
         /// <summary>
@@ -77,7 +94,11 @@ namespace GameLogic
             }
             else
             {
-                AdvanceToNextWave();
+                // 非战斗波次（Chest / Shop）：写入展示状态，等待玩家确认
+                _model.SetEventWaveState(
+                    wave.Title ?? string.Empty,
+                    wave.Desc ?? string.Empty,
+                    wave.ContinueText);
             }
         }
 

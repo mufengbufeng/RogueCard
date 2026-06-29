@@ -1,0 +1,14 @@
+{
+  "name": "me.xw.image-to-ui",
+  "version": "0.1.0",
+  "displayName": "Image To UI",
+  "description": "Codex skill and Unity Editor tools for generating UGUI prefabs from UI reference images and sliced sprites.",
+  "unity": "2021.3",
+  "author": {
+    "name": "XuToWei"
+  },
+  "dependencies": {
+    "com.unity.ugui": "2.0.0",
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  }
+}

@@ -85,7 +85,7 @@ namespace EF.Scene
             {
                 try
                 {
-                    _currentSceneHandle.UnloadAsync();
+                    _currentSceneHandle.UnloadSceneAsync();
                 }
                 catch (Exception ex)
                 {
@@ -108,7 +108,7 @@ namespace EF.Scene
 
         /// <inheritdoc />
         public async UniTask<bool> LoadSceneAsync(string sceneName, LoadSceneMode sceneMode = LoadSceneMode.Single,
-            LocalPhysicsMode physicsMode = LocalPhysicsMode.None, bool suspendLoad = false, uint priority = 0)
+            LocalPhysicsMode physicsMode = LocalPhysicsMode.None, bool allowSceneActivation = true, uint priority = 0)
         {
             if (string.IsNullOrEmpty(sceneName))
             {
@@ -129,13 +129,13 @@ namespace EF.Scene
                 };
 
                 // 异步加载场景 - 这里会等待UniTask完成并获得SceneHandle
-                var sceneHandle = await _resourceManager.LoadSceneAsync(sceneName, sceneMode, physicsMode, suspendLoad, priority, (progress) =>
+                var sceneHandle = await _resourceManager.LoadSceneAsync(sceneName, sceneMode, physicsMode, allowSceneActivation, priority, (progress) =>
                 {
                     OnLoadingProgress?.Invoke(progress);
                 });
 
                 // 检查加载结果
-                if (sceneHandle.Status == EOperationStatus.Succeed)
+                if (sceneHandle.Status == EOperationStatus.Succeeded)
                 {
                     // 卸载之前的场景
                     if (_currentSceneHandle != null && sceneMode == LoadSceneMode.Single)
@@ -157,7 +157,7 @@ namespace EF.Scene
                 }
                 else
                 {
-                    var error = new Exception($"场景 '{sceneName}' 加载失败：{sceneHandle.LastError}");
+                    var error = new Exception($"场景 '{sceneName}' 加载失败：{sceneHandle.Error}");
                     OnSceneError?.Invoke(error);
                     return false;
                 }
@@ -232,14 +232,14 @@ namespace EF.Scene
             {
                 Log.Info($"[SceneManager] 开始卸载场景：{sceneName}");
 
-                var unloadOperation = sceneHandle.UnloadAsync();
+                var unloadOperation = sceneHandle.UnloadSceneAsync();
 
                 while (!unloadOperation.IsDone)
                 {
                     await UniTask.Yield();
                 }
 
-                if (unloadOperation.Status == EOperationStatus.Succeed)
+                if (unloadOperation.Status == EOperationStatus.Succeeded)
                 {
                     OnSceneUnloaded?.Invoke(sceneName);
 

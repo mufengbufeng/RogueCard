@@ -25,7 +25,7 @@ namespace GameLogic.Tests.PlayMode.Framework
         protected int ModulesAtSetUpStart { get; private set; }
 
         /// <summary>
-        /// 进入 [UnitySetUp] 时 <see cref="YooAssets.Initialized"/> 的快照；用于跨用例隔离断言。
+        /// 进入 [UnitySetUp] 时 <see cref="YooAssets.IsInitialized"/> 的快照；用于跨用例隔离断言。
         /// 期望值：false（上一个测试 TearDown 已经 destroy 全部 package + YooAssets.Destroy()）。
         /// </summary>
         protected bool YooAssetsInitializedAtSetUpStart { get; private set; }
@@ -52,7 +52,7 @@ namespace GameLogic.Tests.PlayMode.Framework
         public IEnumerator UnitySetUp() => UniTask.ToCoroutine(async () =>
         {
             ModulesAtSetUpStart = ModuleSystem.RegisteredServiceCount;
-            YooAssetsInitializedAtSetUpStart = YooAssets.Initialized;
+            YooAssetsInitializedAtSetUpStart = YooAssets.IsInitialized;
             ModuleSystem.ShutdownAll();
 
             TestRoot = new GameObject($"PlayModeTestRoot[{GetType().Name}]");
@@ -72,11 +72,9 @@ namespace GameLogic.Tests.PlayMode.Framework
         /// 顺序：
         /// 1. 子类 <see cref="OnTearDownAsync"/>。
         /// 2. 把 ResourceManager 从 ModuleSystem 移出（不触发其 Shutdown）— 因为
-        ///    <see cref="ResourceManager.Shutdown"/> 内部调 <c>DestroyOperation.WaitForAsyncComplete()</c>，
-        ///    YooAsset v2.3.18 的 <c>DestroyOperation</c> 没有重写 <c>InternalWaitForAsyncComplete</c>，会抛
-        ///    NotImplementedException。
+        ///    <see cref="ResourceManager.Shutdown"/> 内部使用 v3 的 <c>DestroyPackageOperation</c>。
         /// 3. 手动 ReleaseAll 释放追踪句柄 → 反射读 <c>_packages</c> 集合 → 逐个调
-        ///    <c>package.DestroyAsync()</c> 并 <c>await operation.Task</c>（异步等待，不踩同步 wait 的坑）→
+        ///    <c>package.DestroyPackageAsync()</c> 并 <c>await operation</c> →
         ///    <c>YooAssets.RemovePackage</c>。
         /// 4. <c>YooAssets.Destroy()</c> 反初始化全局静态状态，确保下次 SetUp 干净启动。
         /// 5. <c>ModuleSystem.ShutdownAll()</c> 关闭剩余模块。
@@ -108,8 +106,7 @@ namespace GameLogic.Tests.PlayMode.Framework
 
         /// <summary>
         /// 异步反初始化基类持有的 ResourceManager 与 YooAsset 全局状态，
-        /// 绕过 <c>ResourceManager.Shutdown</c> 内部对 <c>DestroyOperation.WaitForAsyncComplete()</c> 的同步等待
-        /// （YooAsset v2.3.18 未实现该路径）。
+        /// 绕过模块系统批量关闭，确保测试可以显式 await YooAsset v3 销毁流程。
         /// </summary>
         private async UniTask TeardownResourceManagerAsync()
         {
@@ -138,15 +135,15 @@ namespace GameLogic.Tests.PlayMode.Framework
                             continue;
                         }
 
-                        DestroyOperation destroyOperation = package.DestroyAsync();
-                        await destroyOperation.Task;
-                        YooAssets.RemovePackage(package);
+                        DestroyPackageOperation destroyOperation = package.DestroyPackageAsync();
+                        await destroyOperation;
+                        YooAssets.RemovePackage(package.PackageName);
                     }
 
                     packages.Clear();
                 }
 
-                if (YooAssets.Initialized)
+                if (YooAssets.IsInitialized)
                 {
                     YooAssets.Destroy();
                 }

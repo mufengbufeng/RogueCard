@@ -22,6 +22,7 @@ namespace GameLogic
         private BattleSystem _battleSystem;
         private WaveSystem _waveSystem;
         private LocalEventBus _localEventBus;
+        private bool _isLevelCompleteAwaitingConfirm;
 
         /// <summary>
         /// 待进入的关卡标识（由 MainMenuProcedure 在切换前设置）。
@@ -130,18 +131,33 @@ namespace GameLogic
         private void OnEndTurnRequested() => _battleSystem.EndTurn();
 
         /// <summary>
-        /// 转发奖励确认操作到流程层，当前关卡完成后回到主菜单。
+        /// 转发确认命令：优先处理事件波次确认，其次处理关卡完成确认。
         /// </summary>
         private void OnRewardSelected()
         {
-            if (_procedureOwner == null)
+            // 优先：事件波次等待确认 → 推进到下一波次
+            if (_waveSystem != null && _viewModel != null && _viewModel.IsAwaitingWaveConfirmation.Value)
             {
-                Log.Warning("[GameProcedure] 收到奖励确认但流程状态机未就绪，无法切回主菜单");
+                Log.Info("[GameProcedure] 事件波次确认，推进到下一波次");
+                _waveSystem.ConfirmCurrentWave();
                 return;
             }
 
-            Log.Info("[GameProcedure] 奖励确认完成，切回主菜单流程");
-            ChangeState<MainMenuProcedure>(_procedureOwner);
+            // 其次：关卡完成等待确认 → 切回主菜单
+            if (_isLevelCompleteAwaitingConfirm)
+            {
+                if (_procedureOwner == null)
+                {
+                    Log.Warning("[GameProcedure] 关卡完成确认但流程状态机未就绪，无法切回主菜单");
+                    return;
+                }
+
+                Log.Info("[GameProcedure] 关卡完成确认，切回主菜单流程");
+                ChangeState<MainMenuProcedure>(_procedureOwner);
+                return;
+            }
+
+            Log.Warning("[GameProcedure] 收到确认命令但无待处理的确认状态");
         }
 
         /// <summary>
@@ -153,19 +169,12 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 关卡完成回调：通过流程状态机切回 <see cref="MainMenuProcedure"/>，
-        /// 由 OnLeave → Cleanup 负责取消订阅并释放局内 System / 本地事件总线。
+        /// 关卡完成回调：记录关卡完成等待确认状态，不再立即切回主菜单。
         /// </summary>
         private void OnLevelComplete(LevelCompleteEvent evt)
         {
-            if (_procedureOwner == null)
-            {
-                Log.Warning("[GameProcedure] 收到 LevelCompleteEvent 但流程状态机未就绪，无法切回主菜单");
-                return;
-            }
-
-            Log.Info($"[GameProcedure] 关卡完成（LevelId={evt.LevelId}），切回主菜单流程");
-            ChangeState<MainMenuProcedure>(_procedureOwner);
+            Log.Info($"[GameProcedure] 关卡完成（LevelId={evt.LevelId}），等待玩家确认");
+            _isLevelCompleteAwaitingConfirm = true;
         }
 
         /// <summary>
@@ -174,6 +183,8 @@ namespace GameLogic
         /// </summary>
         private void Cleanup()
         {
+            _isLevelCompleteAwaitingConfirm = false;
+
             if (_localEventBus != null)
             {
                 _localEventBus.GetChannel<CardPlayFailedEvent>().Unsubscribe(OnCardPlayFailed);

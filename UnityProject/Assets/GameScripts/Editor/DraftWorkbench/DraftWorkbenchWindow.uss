@@ -1,0 +1,228 @@
+/* ═══════════════════════════════════════════════════════════
+   DraftWorkbenchWindow 样式表
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── 根布局 ── */
+.root {
+    flex-direction: row;
+    padding: 4px;
+    min-width: 400px;
+}
+
+/* ── 工作流区域 ── */
+.workflow-area {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 240px;
+}
+
+/* ── 右侧预览面板 ── */
+.preview-panel {
+    flex-shrink: 0;
+    width: 42%;
+    min-width: 280px;
+    max-width: 560px;
+    border-left-width: 1px;
+    border-left-color: #444;
+    padding-left: 8px;
+    margin-left: 8px;
+}
+
+/* ── 内嵌预览面板 ── */
+.inline-preview-pane {
+    border-width: 1px;
+    border-color: #555;
+    padding: 6px;
+    margin-top: 6px;
+    margin-bottom: 6px;
+    border-radius: 4px;
+}
+
+/* ── 结构框预览滚动区域 ── */
+.structure-preview-scroll {
+    min-height: 180px;
+    flex-grow: 1;
+}
+
+/* ── 控件通用样式 ── */
+.bold-label {
+    -unity-font-style: bold;
+    font-size: 13px;
+    margin-top: 4px;
+    margin-bottom: 2px;
+}
+
+.section-label {
+    -unity-font-style: bold;
+    font-size: 12px;
+    margin-top: 8px;
+    margin-bottom: 2px;
+    color: #aaa;
+}
+
+.summary-label {
+    -unity-font-style: bold;
+    font-size: 12px;
+    margin-bottom: 4px;
+    white-space: normal;
+}
+
+.mini-label {
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 4px;
+    white-space: normal;
+}
+
+.button-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.button-row Button {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 140px;
+}
+
+.primary-button {
+    -unity-font-style: bold;
+    height: 28px;
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+.input-row {
+    flex-direction: row;
+    align-items: center;
+    margin-top: 4px;
+    margin-bottom: 2px;
+}
+
+.ai-response-textarea {
+    min-height: 120px;
+    flex-grow: 1;
+}
+
+.ai-result-scroll {
+    min-height: 120px;
+    max-height: 300px;
+}
+
+/* ── 节点列表 ── */
+.node-list {
+    min-height: 100px;
+    max-height: 180px;
+}
+
+/* ── 自动切图区域 ── */
+.auto-slice-status-card {
+    border-width: 1px;
+    border-color: #555;
+    border-radius: 4px;
+    padding: 6px;
+    margin-bottom: 6px;
+    background-color: rgba(255, 255, 255, 0.04);
+    gap: 2px;
+}
+
+.auto-slice-buttons Button {
+    min-width: 140px;
+}
+
+.region-list,
+.assignment-list {
+    min-height: 120px;
+    max-height: 220px;
+    border-width: 1px;
+    border-color: #444;
+    margin-bottom: 6px;
+}
+
+.region-row,
+.assignment-row {
+    padding: 4px;
+    border-bottom-width: 1px;
+    border-bottom-color: #333;
+}
+
+.region-row {
+    flex-direction: row;
+    align-items: flex-start;
+    min-height: 72px;
+}
+
+.assignment-row {
+    min-height: 120px;
+}
+
+.region-marker-field {
+    min-width: 96px;
+    flex-grow: 1;
+}
+
+.region-detail,
+.assignment-detail {
+    white-space: normal;
+    flex-grow: 1;
+}
+
+/* ── 报告区域 ── */
+.report-scroll {
+    min-height: 60px;
+    max-height: 300px;
+}
+
+.report-section {
+    margin-bottom: 8px;
+    white-space: normal;
+}
+
+/* ── 缩放控制 ── */
+.zoom-controls {
+    flex-direction: row;
+    align-items: center;
+}
+
+.zoom-controls Slider {
+    flex-grow: 1;
+}
+
+.zoom-controls Label {
+    width: 48px;
+}
+
+.zoom-controls Button {
+    width: 44px;
+    margin-left: 4px;
+}
+
+/* ── Foldout 间距 ── */
+Foldout {
+    margin-bottom: 4px;
+}
+
+/* ── 结构框基础样式（在 C# 中动态设置具体值） ── */
+.structure-box {
+    position: absolute;
+    background-color: transparent;
+    border-left-width: 2px;
+    border-right-width: 2px;
+    border-top-width: 2px;
+    border-bottom-width: 2px;
+    border-left-color: white;
+    border-right-color: white;
+    border-top-color: white;
+    border-bottom-color: white;
+}
+
+/* ── 窄布局时预览面板隐藏 ── */
+.preview-panel.hidden {
+    display: none;
+}
+
+.inline-preview-pane.hidden {
+    display: none;
+}

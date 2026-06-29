@@ -45,6 +45,7 @@
 11. 编译器输出按 UTF-8 读取；中文诊断仍可能受 Roslyn/系统输出影响，优先查看结果里的结构化 `diagnostics`。
 12. 用户脚本末尾已有顶层 `return` 或 `throw` 时，包装器不会追加 fallback return，避免 `CS0162` 噪声。
 
+<<<<<<< HEAD
 ## `.csx` 语法边界
 
 AIBridge 会把 `.csx` 文件体包装进生成类的 `Execute` 方法内执行，因此脚本顶层代码按“方法体”编写，不按普通 `.cs` 类型体编写。
@@ -65,6 +66,8 @@ void AddAsset(string path)
 }
 ```
 
+=======
+>>>>>>> origin/main
 ## 推荐脚本模板
 
 ```csharp

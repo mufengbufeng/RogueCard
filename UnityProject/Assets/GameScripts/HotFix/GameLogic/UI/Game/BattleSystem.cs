@@ -342,11 +342,13 @@ namespace GameLogic
         }
 
         /// <summary>
-        /// 出牌结算完成回调：每次玩家成功打出一张卡之后，尝试自动结束玩家回合。
+        /// 出牌结算完成回调：每次玩家成功打出一张卡之后，尝试自动推进玩家回合。
+        /// 优先尝试"清场即胜利"分支，否则若手牌已耗尽则走正常 EndTurn 进入怪物回合。
         /// </summary>
         private void OnCardPlayed(CardPlayedEvent _)
         {
-            TryAutoEndPlayerTurnIfCleared();
+            if (TryAutoEndPlayerTurnIfCleared()) return;
+            TryAutoEndPlayerTurnIfHandEmpty();
         }
 
         /// <summary>
@@ -354,22 +356,40 @@ namespace GameLogic
         /// 仅在 PlayerTurn 才工作，避免在卡牌效果内层递归或其他阶段误触发；
         /// 直接走 <see cref="BattlePhase.Check"/> 而非 <see cref="EndTurn"/>，
         /// 以跳过敌人回合开始/结束的 Buff Tick 与延迟效果结算（"清场即胜利"语义）。
+        /// 返回值用于让 <see cref="OnCardPlayed"/> 在已经清场时跳过后续的手牌耗尽判定。
         /// </summary>
-        private void TryAutoEndPlayerTurnIfCleared()
+        private bool TryAutoEndPlayerTurnIfCleared()
         {
-            if (_model == null) return;
-            if (_model.Phase != BattlePhase.PlayerTurn) return;
+            if (_model == null) return false;
+            if (_model.Phase != BattlePhase.PlayerTurn) return false;
 
             var monsters = _model.Monsters;
-            if (monsters == null || monsters.Count == 0) return;
+            if (monsters == null || monsters.Count == 0) return false;
 
             for (int i = 0; i < monsters.Count; i++)
             {
                 var monster = monsters[i];
-                if (monster != null && monster.Hp > 0) return;
+                if (monster != null && monster.Hp > 0) return false;
             }
 
             SetPhase(BattlePhase.Check);
+            return true;
+        }
+
+        /// <summary>
+        /// 玩家回合内手牌全部打完时，自动结束玩家回合并进入怪物回合。
+        /// 走 <see cref="EndTurn"/> 是为了复用怪物行动、敌人回合 Buff Tick、TurnEndedEvent
+        /// （供 CardSystem 弃手抽新一轮）以及 Check 阶段的完整链路；否则关卡会卡在 PlayerTurn。
+        /// </summary>
+        private void TryAutoEndPlayerTurnIfHandEmpty()
+        {
+            if (_model == null) return;
+            if (_model.Phase != BattlePhase.PlayerTurn) return;
+
+            var hand = _model.Hand;
+            if (hand == null || hand.Count > 0) return;
+
+            EndTurn();
         }
 
         /// <summary>
