@@ -25,6 +25,7 @@ namespace EF.UI
 
         private readonly List<UIWindowInstance> _updateBuffer = new();
         private IUIManagerPrefabLoader _prefabLoader;
+        private IUIControllerFactory _controllerFactory = new ReflectionUIControllerFactory();
 
         private Transform _fallbackRoot;
         private uint _nextInstanceId = 1;
@@ -71,6 +72,12 @@ namespace EF.UI
             }
 
             _descriptors.Add(descriptor.Name, descriptor);
+        }
+
+        /// <inheritdoc />
+        public void SetControllerFactory(IUIControllerFactory controllerFactory)
+        {
+            _controllerFactory = controllerFactory ?? new ReflectionUIControllerFactory();
         }
 
         /// <inheritdoc />
@@ -132,36 +139,90 @@ namespace EF.UI
         }
 
         /// <inheritdoc />
-        public UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
+        public UniTask<UIWindowHandle> OpenWindowAsync<TView>(
             string location,
             object userData = null,
             CancellationToken cancellationToken = default)
             where TView : UIView
-            where TController : UIController, new()
         {
-            return OpenWindowAsync<TView, TController>(
+            return OpenWindowAsync<TView>(
                 location,
                 UILayer.Normal,
-                true,  // cacheOnClose = true (默认缓存以提高性能)
-                false, // allowMultiple = false (默认单实例模式)
+                true,
+                false,
                 userData,
                 cancellationToken);
         }
 
         /// <inheritdoc />
-        public UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
+        public UniTask<UIWindowHandle> OpenWindowAsync<TView>(
             string location,
             UILayer layer,
             object userData = null,
             CancellationToken cancellationToken = default)
             where TView : UIView
-            where TController : UIController, new()
         {
-            return OpenWindowAsync<TView, TController>(
+            return OpenWindowAsync<TView>(
                 location,
                 layer,
-                true,  // cacheOnClose = true (默认缓存以提高性能)
-                false, // allowMultiple = false (默认单实例模式)
+                true,
+                false,
+                userData,
+                cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public async UniTask<UIWindowHandle> OpenWindowAsync<TView>(
+            string location,
+            UILayer layer,
+            bool cacheOnClose,
+            bool allowMultiple,
+            object userData = null,
+            CancellationToken cancellationToken = default)
+            where TView : UIView
+        {
+            Type controllerType = UIControllerTypeResolver.ResolveByConvention(typeof(TView));
+            return await OpenWindowAsync<TView, UIController>(
+                location,
+                controllerType,
+                layer,
+                cacheOnClose,
+                allowMultiple,
+                userData,
+                cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public async UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
+            string location,
+            object userData = null,
+            CancellationToken cancellationToken = default)
+            where TView : UIView
+            where TController : UIController
+        {
+            return await OpenWindowAsync<TView, TController>(
+                location,
+                UILayer.Normal,
+                true,
+                false,
+                userData,
+                cancellationToken);
+        }
+
+        /// <inheritdoc />
+        public async UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
+            string location,
+            UILayer layer,
+            object userData = null,
+            CancellationToken cancellationToken = default)
+            where TView : UIView
+            where TController : UIController
+        {
+            return await OpenWindowAsync<TView, TController>(
+                location,
+                layer,
+                true,
+                false,
                 userData,
                 cancellationToken);
         }
@@ -175,22 +236,39 @@ namespace EF.UI
             object userData = null,
             CancellationToken cancellationToken = default)
             where TView : UIView
-            where TController : UIController, new()
+            where TController : UIController
         {
-            // 使用类型全名作为窗口标识符
-            string windowName = typeof(TView).Name;
+            return await OpenWindowAsync<TView, TController>(
+                location,
+                typeof(TController),
+                layer,
+                cacheOnClose,
+                allowMultiple,
+                userData,
+                cancellationToken);
+        }
 
-            // 创建窗口描述符
+        private async UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
+            string location,
+            Type controllerType,
+            UILayer layer,
+            bool cacheOnClose,
+            bool allowMultiple,
+            object userData,
+            CancellationToken cancellationToken)
+            where TView : UIView
+            where TController : UIController
+        {
+            string windowName = typeof(TView).Name;
             var descriptor = new UIWindowDescriptor(
                 windowName,
                 location,
                 typeof(TView),
-                () => new TController(),
+                controllerType,
                 layer,
                 cacheOnClose,
                 allowMultiple);
 
-            // 如果尚未注册，则注册窗口描述符
             if (!_descriptors.ContainsKey(windowName))
             {
                 _descriptors.Add(windowName, descriptor);
@@ -447,7 +525,7 @@ namespace EF.UI
 
                 viewComponent = view;
 
-                controller = descriptor.ControllerFactory();
+                controller = _controllerFactory.Create(descriptor.ControllerType);
                 if (controller == null)
                 {
                     DestroyObject(viewObject);

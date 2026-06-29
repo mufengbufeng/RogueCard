@@ -1,6 +1,6 @@
 ---
 name: tdd-development
-description: Enforce a standard test-driven development workflow. Use when implementing OpenSpec changes, applying tasks, adding a new feature, modifying existing behavior, or fixing behavior that should be covered by tests.
+description: Enforce a standard test-driven development workflow. Use when applying tasks, adding a new feature, modifying existing behavior, or fixing behavior that should be covered by tests.
 ---
 
 # TDD Development
@@ -10,7 +10,6 @@ Use this skill whenever code behavior is being added or changed. The default wor
 ## Required Triggers
 
 Follow this workflow for:
-- OpenSpec apply implementation work
 - New features
 - Existing feature modifications
 - Bug fixes with observable behavior
@@ -38,14 +37,6 @@ For each behavior-sized task:
 - Use PlayMode tests only when behavior depends on scene lifecycle, GameObject interaction, coroutines over frames, physics, UI Toolkit runtime behavior, or other runtime integration.
 - Keep gameplay logic testable outside MonoBehaviour lifecycle when a small seam is reasonable.
 - If a behavior depends on assets, scenes, or generated Unity files, use the narrowest stable fixture and avoid broad scene loading unless the behavior requires it.
-
-## OpenSpec Artifact Guidance
-
-When creating or updating OpenSpec tasks for implementation:
-- Include test-first tasks before production implementation tasks.
-- Make each test task describe the observable behavior being protected.
-- Include a final verification task that names the targeted test command or Unity Test Runner mode.
-- Do not write tasks that only say "add tests"; tie tests to requirements or scenarios.
 
 ## Blockers
 

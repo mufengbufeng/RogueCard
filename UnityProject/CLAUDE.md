@@ -219,19 +219,6 @@ Unity 6000.3 (Unity 6) 游戏项目，使用 **EasyFramework (EF)** 自研模块
 - 切换全自动 → 输入"全自动模式"（可操作 GameObject/组件/材质）
 - 优先级 → Unity 已打开时，编译/Console/EditMode 测试/场景检查走 Unity Skills
 
-### OpenSpec（变更管理）
-
-| 想做的事 | 斜杠命令 |
-| -------- | -------- |
-| 创建完整变更提案 | `/opsx:propose` |
-| 实施变更任务 | `/opsx:apply` |
-| 验证实现是否符合规格 | `/opsx:verify` |
-| 归档已完成变更 | `/opsx:archive` |
-| 探索/分析 | `/opsx:explore` |
-
-- 制品流 → `proposal.md` → `design.md` → `tasks.md` → 实现
-- 正式功能变更入口 → OpenSpec；Matt skills 仅作辅助
-
 ### Matt Pocock Skills（调试/TDD 辅助）
 
 | 想做的事 | 斜杠命令 |

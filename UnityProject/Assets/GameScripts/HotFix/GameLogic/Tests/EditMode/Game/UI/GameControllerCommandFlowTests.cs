@@ -50,7 +50,7 @@ namespace GameLogic.Tests
                 "GameView",
                 "GameView",
                 typeof(GameView),
-                () => _controller,
+                typeof(GameController),
                 UILayer.Normal,
                 cacheOnClose: false,
                 allowMultiple: false);

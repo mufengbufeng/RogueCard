@@ -14,6 +14,7 @@ using EF.UI;
 using UnityEngine;
 using UnityEngine.UI;
 using GameConfig;
+using VContainer;
 
 namespace GameLogic
 {
@@ -35,6 +36,7 @@ namespace GameLogic
         private static IEntityManager _entityManager;
         private static Camera _uiCamera;
         private static ConfigSystem _configSystem;
+        private static IObjectResolver _container;
 
         /// <summary>
         /// 资源管理器。
@@ -123,9 +125,39 @@ namespace GameLogic
             _uiManager = ModuleSystem.Get<IUIManager>();
 
             InitializeUI();
+            InitializeContainer();
             InitializeProcedures();
 
             Log.Info("[GameLogicEntry] 游戏逻辑初始化完成。");
+        }
+
+        /// <summary>
+        /// 初始化热更新层 DI 容器，并将 UI Controller 创建交给 VContainer。
+        /// </summary>
+        private static void InitializeContainer()
+        {
+            _container?.Dispose();
+            _container = null;
+
+            var builder = new ContainerBuilder();
+            builder.RegisterInstance(_resourceManager).As<IResourceManager>();
+            builder.RegisterInstance(_configSystem).AsSelf();
+            builder.RegisterInstance(_eventHub).AsSelf();
+            builder.RegisterInstance(_soundManager).As<ISoundManager>();
+            builder.RegisterInstance(_timerManager).As<ITimerManager>();
+            builder.RegisterInstance(_objectPoolManager).As<IObjectPoolManager>();
+            builder.RegisterInstance(_fsmManager).As<IFsmManager>();
+            builder.RegisterInstance(_procedureManager).As<IProcedureManager>();
+            builder.RegisterInstance(_saveManager).As<ISaveManager>();
+            builder.RegisterInstance(_entityManager).As<IEntityManager>();
+            builder.RegisterInstance(_modelManager).AsSelf();
+            builder.RegisterInstance(_uiManager).As<IUIManager>();
+            builder.Register<MainController>(Lifetime.Transient);
+            builder.Register<GameController>(Lifetime.Transient);
+
+            _container = builder.Build();
+            _uiManager.SetControllerFactory(new VContainerUIControllerFactory(_container));
+            Log.Info("[GameLogicEntry] VContainer DI 容器初始化完成。");
         }
 
         /// <summary>
@@ -304,6 +336,35 @@ namespace GameLogic
             {
                 Log.Error($"[GameLogicEntry] 流程管理器初始化失败：{e.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// 通过 VContainer 创建 UIController 的工厂。
+    /// </summary>
+    internal sealed class VContainerUIControllerFactory : IUIControllerFactory
+    {
+        private readonly IObjectResolver _resolver;
+
+        public VContainerUIControllerFactory(IObjectResolver resolver)
+        {
+            _resolver = resolver ?? throw new System.ArgumentNullException(nameof(resolver));
+        }
+
+        public UIController Create(System.Type controllerType)
+        {
+            if (controllerType == null)
+            {
+                throw new System.ArgumentNullException(nameof(controllerType));
+            }
+
+            if (!typeof(UIController).IsAssignableFrom(controllerType))
+            {
+                throw new System.ArgumentException($"Controller 类型必须继承 {nameof(UIController)}：{controllerType.FullName}", nameof(controllerType));
+            }
+
+            return _resolver.Resolve(controllerType) as UIController
+                ?? throw new System.InvalidOperationException($"VContainer 创建的实例不是 UIController：{controllerType.FullName}");
         }
     }
 }

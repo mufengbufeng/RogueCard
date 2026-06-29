@@ -26,6 +26,11 @@ namespace EF.UI
         void RegisterWindow(UIWindowDescriptor descriptor);
 
         /// <summary>
+        /// 设置 UI Controller 创建工厂。
+        /// </summary>
+        void SetControllerFactory(IUIControllerFactory controllerFactory);
+
+        /// <summary>
         /// 注销 UI 描述信息。
         /// </summary>
         bool UnregisterWindow(string windowName);
@@ -41,44 +46,39 @@ namespace EF.UI
         UniTask<UIWindowHandle> OpenWindowAsync(string windowName, object userData = null, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// 打开界面（简化版本）- 使用默认配置：Normal层级，缓存关闭，单实例模式。
+        /// 打开界面（单泛型）- 按命名约定解析 Controller，并使用默认配置：Normal 层级、缓存关闭、单实例模式。
         /// </summary>
-        /// <typeparam name="TView">UI视图类型，必须继承UIView</typeparam>
-        /// <typeparam name="TController">UI控制器类型，必须继承UIController并有无参构造函数</typeparam>
+        /// <typeparam name="TView">UI 视图类型，必须继承 UIView</typeparam>
         /// <param name="location">Prefab资源路径</param>
         /// <param name="userData">传递给界面的用户数据</param>
         /// <param name="cancellationToken">取消令牌</param>
         /// <returns>界面句柄</returns>
-        UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
+        UniTask<UIWindowHandle> OpenWindowAsync<TView>(
             string location,
             object userData = null,
             CancellationToken cancellationToken = default)
-            where TView : UIView
-            where TController : UIController, new();
+            where TView : UIView;
 
         /// <summary>
-        /// 打开界面（指定层级）- 使用指定层级，其他参数使用默认值：缓存关闭，单实例模式。
+        /// 打开界面（单泛型）- 按命名约定解析 Controller，并使用指定层级，其他参数使用默认值：缓存关闭，单实例模式。
         /// </summary>
-        /// <typeparam name="TView">UI视图类型，必须继承UIView</typeparam>
-        /// <typeparam name="TController">UI控制器类型，必须继承UIController并有无参构造函数</typeparam>
+        /// <typeparam name="TView">UI 视图类型，必须继承 UIView</typeparam>
         /// <param name="location">Prefab资源路径</param>
         /// <param name="layer">UI显示层级</param>
         /// <param name="userData">传递给界面的用户数据</param>
         /// <param name="cancellationToken">取消令牌</param>
         /// <returns>界面句柄</returns>
-        UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
+        UniTask<UIWindowHandle> OpenWindowAsync<TView>(
             string location,
             UILayer layer,
             object userData = null,
             CancellationToken cancellationToken = default)
-            where TView : UIView
-            where TController : UIController, new();
+            where TView : UIView;
 
         /// <summary>
-        /// 打开界面（完全配置）- 可以指定所有参数以获得最大控制能力。
+        /// 打开界面（单泛型）- 按命名约定解析 Controller，并可以指定所有参数以获得最大控制能力。
         /// </summary>
-        /// <typeparam name="TView">UI视图类型，必须继承UIView</typeparam>
-        /// <typeparam name="TController">UI控制器类型，必须继承UIController并有无参构造函数</typeparam>
+        /// <typeparam name="TView">UI 视图类型，必须继承 UIView</typeparam>
         /// <param name="location">Prefab资源路径</param>
         /// <param name="layer">UI显示层级</param>
         /// <param name="cacheOnClose">关闭时是否缓存而不销毁</param>
@@ -86,6 +86,39 @@ namespace EF.UI
         /// <param name="userData">传递给界面的用户数据</param>
         /// <param name="cancellationToken">取消令牌</param>
         /// <returns>界面句柄</returns>
+        UniTask<UIWindowHandle> OpenWindowAsync<TView>(
+            string location,
+            UILayer layer,
+            bool cacheOnClose,
+            bool allowMultiple,
+            object userData = null,
+            CancellationToken cancellationToken = default)
+            where TView : UIView;
+
+        /// <summary>
+        /// 打开界面（显式指定 Controller）。
+        /// </summary>
+        UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
+            string location,
+            object userData = null,
+            CancellationToken cancellationToken = default)
+            where TView : UIView
+            where TController : UIController;
+
+        /// <summary>
+        /// 打开界面（显式指定 Controller 和层级）。
+        /// </summary>
+        UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
+            string location,
+            UILayer layer,
+            object userData = null,
+            CancellationToken cancellationToken = default)
+            where TView : UIView
+            where TController : UIController;
+
+        /// <summary>
+        /// 打开界面（显式指定 Controller 和完整配置）。
+        /// </summary>
         UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
             string location,
             UILayer layer,
@@ -94,7 +127,7 @@ namespace EF.UI
             object userData = null,
             CancellationToken cancellationToken = default)
             where TView : UIView
-            where TController : UIController, new();
+            where TController : UIController;
 
         /// <summary>
         /// 关闭界面。

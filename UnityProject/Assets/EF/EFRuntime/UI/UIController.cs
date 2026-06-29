@@ -7,6 +7,41 @@ using EF.Model;
 namespace EF.UI
 {
     /// <summary>
+    /// UI Controller 创建工厂，允许外部 DI 容器接管 Controller 构造。
+    /// </summary>
+    public interface IUIControllerFactory
+    {
+        /// <summary>
+        /// 创建指定 Controller 类型的实例。
+        /// </summary>
+        UIController Create(Type controllerType);
+    }
+
+    internal sealed class ReflectionUIControllerFactory : IUIControllerFactory
+    {
+        public UIController Create(Type controllerType)
+        {
+            if (controllerType == null)
+            {
+                throw new ArgumentNullException(nameof(controllerType));
+            }
+
+            if (!typeof(UIController).IsAssignableFrom(controllerType))
+            {
+                throw new ArgumentException($"Controller 类型必须继承 {nameof(UIController)}：{controllerType.FullName}", nameof(controllerType));
+            }
+
+            if (controllerType.IsAbstract || controllerType.IsInterface)
+            {
+                throw new InvalidOperationException($"Controller 类型不能是抽象类型或接口：{controllerType.FullName}");
+            }
+
+            return Activator.CreateInstance(controllerType) as UIController
+                ?? throw new InvalidOperationException($"无法创建 UI Controller：{controllerType.FullName}");
+        }
+    }
+
+    /// <summary>
     /// UI Controller 抽象基类，负责协调 Model 和 View。
     /// Controller 通过 ModelManager 访问数据 Model，持有 View 的引用。
     /// </summary>

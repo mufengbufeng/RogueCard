@@ -1,6 +1,7 @@
 using System;
 using EF.Debugger;
 using EF.UI;
+using VContainer;
 
 namespace GameLogic
 {
@@ -11,6 +12,9 @@ namespace GameLogic
     {
         private MainView _mainView;
         private MainModel _mainModel;
+
+        [Inject]
+        private EventHub _eventHub;
 
         /// <summary>
         /// 初始化主界面控制器。
@@ -65,7 +69,7 @@ namespace GameLogic
             RefreshViewFromModel();
             _mainView?.SetFeedbackText($"正在进入默认关卡：{levelId}");
 
-            GameLogicEntry.Event?.StartLevelRequestedEvent.Publish(new StartLevelRequestedEvent(levelId, levelName));
+            (_eventHub ?? GameLogicEntry.Event)?.StartLevelRequestedEvent.Publish(new StartLevelRequestedEvent(levelId, levelName));
             Log.Info($"[MainController] 已请求进入默认关卡：{levelId}");
         }
 

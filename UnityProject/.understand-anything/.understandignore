@@ -122,9 +122,6 @@ ExportedObj/
 .vscode/
 .understand-anything/
 
-# --- OpenSpec archived (historical, merged) changes ---
-openspec/changes/archive/
-
 # --- Plugin/third-party UPM mirrors checked into Packages/ (keep manifest.json) ---
 /Packages/com.singularitygroup.hotreload/
 

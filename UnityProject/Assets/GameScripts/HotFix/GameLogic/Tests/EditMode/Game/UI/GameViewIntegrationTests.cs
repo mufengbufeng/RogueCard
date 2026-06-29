@@ -128,7 +128,7 @@ namespace GameLogic.Tests
                 "GameView",
                 "GameView",
                 typeof(GameView),
-                () => new GameController(),
+                typeof(GameController),
                 UILayer.Normal,
                 cacheOnClose: false,
                 allowMultiple: false);

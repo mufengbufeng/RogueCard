@@ -1,0 +1,266 @@
+{
+    "schemaVersion": 1,
+    "kind": "aibridge-workflow-branch-graph",
+    "branchId": "implementation",
+    "title": "Implementation Branch",
+    "subtitle": "Branch Detail",
+    "summary": "Editor-only branch detail graph for implementation tasks.",
+    "nodes": [
+        {
+            "id": "implementation-root",
+            "kind": "Root",
+            "title": "Implementation Branch",
+            "subtitle": "Change Task Entry",
+            "state": "Ready",
+            "description": "Entry node for implementation tasks.",
+            "source": "references/branches/implementation.md",
+            "parent": "",
+            "semanticRole": "branch-root",
+            "optional": false,
+            "column": 0,
+            "order": 0,
+            "row": 0,
+            "details": [
+                {
+                    "label": "Goal",
+                    "value": "Change current worktree and verify"
+                },
+                {
+                    "label": "Source",
+                    "value": "implementation.md"
+                }
+            ]
+        },
+        {
+            "id": "implementation-locate",
+            "kind": "Action",
+            "title": "Locate Real Path",
+            "subtitle": "Find actual code or asset entry",
+            "state": "Ready",
+            "description": "Locate the real implementation path before changing anything.",
+            "source": "references/branches/implementation.md",
+            "parent": "implementation-root",
+            "semanticRole": "mandatory-step",
+            "optional": false,
+            "column": 1,
+            "order": 0,
+            "row": 0,
+            "details": [
+                {
+                    "label": "Rule",
+                    "value": "Locate real code path before editing"
+                },
+                {
+                    "label": "Why",
+                    "value": "Avoid changing guessed or mirrored paths"
+                }
+            ]
+        },
+        {
+            "id": "implementation-risk",
+            "kind": "Condition",
+            "title": "Risk Gate",
+            "subtitle": "Boundary / compatibility / acceptance",
+            "state": "Ready",
+            "description": "Confirm the change is still within the agreed scope.",
+            "source": "references/risk-gates.md",
+            "parent": "implementation-root",
+            "semanticRole": "mandatory-gate",
+            "optional": false,
+            "column": 2,
+            "order": 0,
+            "row": 0,
+            "details": [
+                {
+                    "label": "Check",
+                    "value": "scope / compatibility / acceptance"
+                },
+                {
+                    "label": "Fallback",
+                    "value": "Return to requirements or debug when preconditions are not met"
+                }
+            ]
+        },
+        {
+            "id": "implementation-modify",
+            "kind": "Action",
+            "title": "Modify Worktree",
+            "subtitle": "Scoped implementation",
+            "state": "Ready",
+            "description": "Change only the real control point and keep the diff narrow.",
+            "source": "references/branches/implementation.md",
+            "parent": "implementation-root",
+            "semanticRole": "mandatory-step",
+            "optional": false,
+            "column": 3,
+            "order": 0,
+            "row": 0,
+            "details": [
+                {
+                    "label": "Rule",
+                    "value": "Keep diff narrow"
+                },
+                {
+                    "label": "Tooling",
+                    "value": "aibridge / code-index / prefab-patch / yaml-editing on demand"
+                }
+            ]
+        },
+        {
+            "id": "implementation-verify",
+            "kind": "Gate",
+            "title": "Verify Result",
+            "subtitle": "Compile and required evidence",
+            "state": "Ready",
+            "description": "Run the default verification path for the project after the change.",
+            "source": "references/checklist.md",
+            "parent": "implementation-root",
+            "semanticRole": "mandatory-gate",
+            "optional": false,
+            "column": 4,
+            "order": 0,
+            "row": 0,
+            "details": [
+                {
+                    "label": "Default",
+                    "value": "compileAndLogs"
+                },
+                {
+                    "label": "Command",
+                    "value": "$CLI compile unity -> $CLI get_logs --logType Error"
+                }
+            ]
+        },
+        {
+            "id": "implementation-handoff",
+            "kind": "Handoff",
+            "title": "Handoff",
+            "subtitle": "Result / risk / next step",
+            "state": "NotStarted",
+            "description": "Summarize what changed, what was verified, and what remains.",
+            "source": "references/checklist.md",
+            "parent": "implementation-root",
+            "semanticRole": "handoff",
+            "optional": false,
+            "column": 5,
+            "order": 0,
+            "row": 0,
+            "details": [
+                {
+                    "label": "Output",
+                    "value": "changed files / verification / residual risk"
+                },
+                {
+                    "label": "Next",
+                    "value": "validation branch when extra proof is needed"
+                }
+            ]
+        },
+        {
+            "id": "implementation-editor",
+            "kind": "Condition",
+            "title": "Editor Generation",
+            "subtitle": "Only for complex one-off editor tasks",
+            "state": "NotStarted",
+            "description": "Optional branch for complex editor-side generation work.",
+            "source": "references/editor-generation.md",
+            "parent": "implementation-root",
+            "semanticRole": "optional-branch",
+            "optional": true,
+            "column": 3,
+            "order": 1,
+            "row": 1,
+            "details": [
+                {
+                    "label": "Condition",
+                    "value": "complex one-off editor C# task"
+                },
+                {
+                    "label": "Optional",
+                    "value": "yes"
+                }
+            ]
+        },
+        {
+            "id": "implementation-runtime",
+            "kind": "Condition",
+            "title": "Runtime Evidence",
+            "subtitle": "Only when task explicitly needs runtime proof",
+            "state": "NotStarted",
+            "description": "Optional verification branch for runtime or UI evidence.",
+            "source": "references/branches/validation.md",
+            "parent": "implementation-root",
+            "semanticRole": "optional-branch",
+            "optional": true,
+            "column": 4,
+            "order": 1,
+            "row": 1,
+            "details": [
+                {
+                    "label": "Condition",
+                    "value": "runtime or UI evidence explicitly required"
+                },
+                {
+                    "label": "Optional",
+                    "value": "yes"
+                }
+            ]
+        }
+    ],
+    "edges": [
+        {
+            "from": "implementation-root",
+            "to": "implementation-locate",
+            "label": "",
+            "kind": "Flow"
+        },
+        {
+            "from": "implementation-locate",
+            "to": "implementation-risk",
+            "label": "",
+            "kind": "Flow"
+        },
+        {
+            "from": "implementation-risk",
+            "to": "implementation-modify",
+            "label": "",
+            "kind": "Flow"
+        },
+        {
+            "from": "implementation-modify",
+            "to": "implementation-verify",
+            "label": "",
+            "kind": "Flow"
+        },
+        {
+            "from": "implementation-verify",
+            "to": "implementation-handoff",
+            "label": "",
+            "kind": "Flow"
+        },
+        {
+            "from": "implementation-risk",
+            "to": "implementation-editor",
+            "label": "complex editor task",
+            "kind": "OptionalFlow"
+        },
+        {
+            "from": "implementation-editor",
+            "to": "implementation-modify",
+            "label": "generated",
+            "kind": "OptionalFlow"
+        },
+        {
+            "from": "implementation-verify",
+            "to": "implementation-runtime",
+            "label": "runtime needed",
+            "kind": "OptionalFlow"
+        },
+        {
+            "from": "implementation-runtime",
+            "to": "implementation-handoff",
+            "label": "evidence ready",
+            "kind": "OptionalFlow"
+        }
+    ]
+}

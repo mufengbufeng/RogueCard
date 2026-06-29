@@ -89,7 +89,7 @@ namespace GameLogic
 
                 _waveSystem.StartLevel(levelId);
 
-                await _uiManager.OpenWindowAsync<GameView, GameController>(
+                await _uiManager.OpenWindowAsync<GameView>(
                     "GameView",
                     UILayer.Normal,
                     cacheOnClose: false,

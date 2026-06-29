@@ -1,0 +1,172 @@
+{
+    "schemaVersion": 1,
+    "kind": "aibridge-workflow-routing-graph",
+    "generatedFrom": {
+        "assistant": "codex",
+        "settingsHash": "e5467d2ad0001df0a5c25f52ae1b5f4bdce4574783286b53106aaf594c34f7a0"
+    },
+    "nodes": [
+        {
+            "id": "root",
+            "kind": "Root",
+            "title": "Root",
+            "subtitle": "Task Entry",
+            "source": "",
+            "editable": "false",
+            "enabled": true
+        },
+        {
+            "id": "preflight",
+            "kind": "Preflight",
+            "title": "Preflight / Skill Routing",
+            "subtitle": "Project preferences and Skill routing",
+            "source": "",
+            "editable": "false",
+            "enabled": true
+        },
+        {
+            "id": "requirements",
+            "kind": "Condition",
+            "title": "Requirements Discussion",
+            "subtitle": "When scope or risk is unclear",
+            "source": "references/branches/requirements.md",
+            "editable": "false",
+            "enabled": true
+        },
+        {
+            "id": "selector",
+            "kind": "Selector",
+            "title": "Branch Selector",
+            "subtitle": "Enabled workflow branches",
+            "source": "",
+            "editable": "false",
+            "enabled": true
+        },
+        {
+            "id": "branch-implementation",
+            "kind": "Action",
+            "title": "Implementation Branch",
+            "subtitle": "Change-oriented",
+            "source": "references/branches/implementation.md",
+            "editable": "setting",
+            "enabled": true
+        },
+        {
+            "id": "branch-debug",
+            "kind": "Action",
+            "title": "Debug Branch",
+            "subtitle": "Diagnosis-oriented",
+            "source": "references/branches/debug.md",
+            "editable": "setting",
+            "enabled": true
+        },
+        {
+            "id": "branch-review",
+            "kind": "Action",
+            "title": "Review Branch",
+            "subtitle": "Read-only review",
+            "source": "references/branches/review.md",
+            "editable": "setting",
+            "enabled": true
+        },
+        {
+            "id": "branch-validation",
+            "kind": "Action",
+            "title": "Validation Branch",
+            "subtitle": "Compile / logs / runtime",
+            "source": "references/branches/validation.md",
+            "editable": "setting",
+            "enabled": true
+        },
+        {
+            "id": "branch-orchestration",
+            "kind": "Action",
+            "title": "Orchestration Branch",
+            "subtitle": "Multi-step workflow",
+            "source": "references/branches/orchestration.md",
+            "editable": "setting",
+            "enabled": true
+        },
+        {
+            "id": "handoff",
+            "kind": "Handoff",
+            "title": "Mode Exit / SkillHandoff",
+            "subtitle": "Artifact refs, gates, and open risks",
+            "source": "",
+            "editable": "false",
+            "enabled": true
+        }
+    ],
+    "edges": [
+        {
+            "from": "root",
+            "to": "preflight",
+            "condition": ""
+        },
+        {
+            "from": "preflight",
+            "to": "requirements",
+            "condition": "on demand"
+        },
+        {
+            "from": "requirements",
+            "to": "selector",
+            "condition": "confirmed"
+        },
+        {
+            "from": "preflight",
+            "to": "selector",
+            "condition": "ready"
+        },
+        {
+            "from": "selector",
+            "to": "branch-implementation",
+            "condition": "change"
+        },
+        {
+            "from": "selector",
+            "to": "branch-debug",
+            "condition": "diagnose"
+        },
+        {
+            "from": "selector",
+            "to": "branch-review",
+            "condition": "review"
+        },
+        {
+            "from": "selector",
+            "to": "branch-validation",
+            "condition": "validate"
+        },
+        {
+            "from": "selector",
+            "to": "branch-orchestration",
+            "condition": "recipe"
+        },
+        {
+            "from": "branch-implementation",
+            "to": "handoff",
+            "condition": ""
+        },
+        {
+            "from": "branch-debug",
+            "to": "handoff",
+            "condition": ""
+        },
+        {
+            "from": "branch-review",
+            "to": "handoff",
+            "condition": ""
+        },
+        {
+            "from": "branch-validation",
+            "to": "handoff",
+            "condition": ""
+        },
+        {
+            "from": "branch-orchestration",
+            "to": "handoff",
+            "condition": ""
+        }
+    ]
+}

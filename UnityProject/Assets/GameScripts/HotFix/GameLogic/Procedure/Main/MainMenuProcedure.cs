@@ -42,11 +42,9 @@ namespace GameLogic
                     return;
                 }
 
-                await _uiManager.OpenWindowAsync<MainView, MainController>(
+                await _uiManager.OpenWindowAsync<MainView>(
                     "MainView",
-                    UILayer.Normal,
-                    cacheOnClose: true,
-                    allowMultiple: false);
+                    UILayer.Normal);
                 Log.Info("[MainMenuProcedure] 主界面已打开");
             }
             catch (Exception e)

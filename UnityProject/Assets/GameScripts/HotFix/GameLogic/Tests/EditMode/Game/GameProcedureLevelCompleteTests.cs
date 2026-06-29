@@ -73,7 +73,8 @@ namespace GameLogic.Tests.EditMode.Game
         {
             string source = File.ReadAllText("Assets/GameScripts/HotFix/GameLogic/Procedure/Game/GameProcedure.cs");
 
-            Assert.That(source, Does.Contain("OpenWindowAsync<GameView, GameController>"));
+            Assert.That(source, Does.Contain("OpenWindowAsync<GameView>("));
+            Assert.That(source, Does.Not.Contain("OpenWindowAsync<GameView, GameController>"));
             Assert.That(source, Does.Contain("\"GameView\""));
             Assert.That(source, Does.Contain("UILayer.Normal"));
             Assert.That(source, Does.Contain("cacheOnClose: false"));
@@ -228,18 +229,25 @@ namespace GameLogic.Tests.EditMode.Game
             public int RegisteredWindowCount => 0;
             public int ActiveWindowCount => 0;
             public void RegisterWindow(UIWindowDescriptor descriptor) { }
+            public void SetControllerFactory(IUIControllerFactory controllerFactory) { }
             public bool UnregisterWindow(string windowName) => false;
             public bool Contains(string windowName) => false;
             public UniTask<UIWindowHandle> OpenWindowAsync(string windowName, object userData = null, CancellationToken cancellationToken = default) => UniTask.FromResult<UIWindowHandle>(null);
+            public UniTask<UIWindowHandle> OpenWindowAsync<TView>(string location, object userData = null, CancellationToken cancellationToken = default)
+                where TView : UIView => UniTask.FromResult<UIWindowHandle>(null);
+            public UniTask<UIWindowHandle> OpenWindowAsync<TView>(string location, UILayer layer, object userData = null, CancellationToken cancellationToken = default)
+                where TView : UIView => UniTask.FromResult<UIWindowHandle>(null);
+            public UniTask<UIWindowHandle> OpenWindowAsync<TView>(string location, UILayer layer, bool cacheOnClose, bool allowMultiple, object userData = null, CancellationToken cancellationToken = default)
+                where TView : UIView => UniTask.FromResult<UIWindowHandle>(null);
             public UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(string location, object userData = null, CancellationToken cancellationToken = default)
                 where TView : UIView
-                where TController : UIController, new() => UniTask.FromResult<UIWindowHandle>(null);
+                where TController : UIController => UniTask.FromResult<UIWindowHandle>(null);
             public UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(string location, UILayer layer, object userData = null, CancellationToken cancellationToken = default)
                 where TView : UIView
-                where TController : UIController, new() => UniTask.FromResult<UIWindowHandle>(null);
+                where TController : UIController => UniTask.FromResult<UIWindowHandle>(null);
             public UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(string location, UILayer layer, bool cacheOnClose, bool allowMultiple, object userData = null, CancellationToken cancellationToken = default)
                 where TView : UIView
-                where TController : UIController, new() => UniTask.FromResult<UIWindowHandle>(null);
+                where TController : UIController => UniTask.FromResult<UIWindowHandle>(null);
             public UniTask CloseWindowAsync(string windowName)
             {
                 ClosedWindows.Add(windowName);

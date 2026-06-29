@@ -96,25 +96,6 @@ def commit_entry() -> tuple[str, str]:
     return "git-commit", "\n".join(lines)
 
 
-def openspec_archive_entry(args: argparse.Namespace) -> tuple[str, str]:
-    change = args.change or os.environ.get("OPENSPEC_CHANGE") or "unknown"
-    archive_path = args.archive_path or os.environ.get("OPENSPEC_ARCHIVE_PATH") or ""
-    schema = args.schema or os.environ.get("OPENSPEC_SCHEMA") or ""
-    specs = args.specs or os.environ.get("OPENSPEC_SPECS") or ""
-
-    lines = [
-        "OpenSpec change archived for RogueCard.",
-        f"- Change: {change}",
-    ]
-    if schema:
-        lines.append(f"- Schema: {schema}")
-    if archive_path:
-        lines.append(f"- Archive path: {archive_path}")
-    if specs:
-        lines.append(f"- Specs: {specs}")
-    return "openspec-archive", "\n".join(lines)
-
-
 def write_diary(topic: str, entry: str, agent_name: str) -> int:
     python_exe = resolve_python()
     active_palace = resolve_active_palace(palace_root())
@@ -173,19 +154,12 @@ def write_diary(topic: str, entry: str, agent_name: str) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("event", choices=["git-commit", "openspec-archive"])
+    parser.add_argument("event", choices=["git-commit"])
     parser.add_argument("--agent-name", default=os.environ.get("MEMPALACE_AGENT_NAME", "codex"))
-    parser.add_argument("--change", default="")
-    parser.add_argument("--archive-path", default="")
-    parser.add_argument("--schema", default="")
-    parser.add_argument("--specs", default="")
     parser.add_argument("--allow-failure", action="store_true")
     args = parser.parse_args(argv)
 
-    if args.event == "git-commit":
-        topic, entry = commit_entry()
-    else:
-        topic, entry = openspec_archive_entry(args)
+    topic, entry = commit_entry()
 
     entry = f"{entry}\n- Recorded at: {datetime.now().isoformat(timespec='seconds')}\n"
     exit_code = write_diary(topic, entry, args.agent_name)

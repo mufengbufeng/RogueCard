@@ -1,14 +1,25 @@
 {
   "dependencies": {
-    "com.besty.unity-skills": {
-      "version": "https://github.com/Besty0728/Unity-Skills.git?path=/SkillsForUnity",
+    "cn.lys.aibridge": {
+      "version": "https://github.com/liyingsong99/AIBridge.git",
       "depth": 0,
       "source": "git",
       "dependencies": {
+        "com.unity.ugui": "1.0.0",
+        "com.unity.test-framework": "1.1.31",
+        "com.unity.modules.imageconversion": "1.0.0",
+        "com.unity.modules.screencapture": "1.0.0"
+      },
+      "hash": "23ec2ea542535ab8055223b296d08c44ae4a0d06"
+    },
+    "com.besty.unity-skills": {
+      "version": "file:com.besty.unity-skills",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
         "com.unity.nuget.newtonsoft-json": "3.0.2",
         "com.unity.timeline": "1.7.7"
-      },
-      "hash": "cfa14585b621936d5f05eabb1173164fc4c94240"
+      }
     },
     "com.code-philosophy.hybridclr": {
       "version": "https://github.com/focus-creative-games/hybridclr_unity.git",
@@ -497,6 +508,13 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       },
       "url": "https://packages.unity.com"
+    },
+    "jp.hadashikick.vcontainer": {
+      "version": "https://github.com/hadashiA/VContainer.git?path=/VContainer/Assets/VContainer#1.18.0",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {},
+      "hash": "6e6972730ce316fab2408f20e7a160aec070e48b"
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
