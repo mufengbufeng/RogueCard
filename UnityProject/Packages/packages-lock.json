@@ -52,7 +52,7 @@
       }
     },
     "com.tuyoogame.yooasset": {
-      "version": "3.0.1-beta",
+      "version": "3.0.3-beta",
       "depth": 0,
       "source": "registry",
       "dependencies": {

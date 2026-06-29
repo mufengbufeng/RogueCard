@@ -22,10 +22,6 @@ $CLI workflow plan --recipe runtime-ui-validation --format markdown
 $CLI workflow init --recipe runtime-ui-validation
 $CLI workflow begin --recipe unity-change-implementation
 $CLI workflow run-cli --file ".aibridge/workflows/recipes/runtime-target-sweep.aibridge-workflow.json" --inputs ".aibridge/workflows/inputs.json"
-<<<<<<< HEAD
-$CLI workflow run-cli --recipe performance-hotspot-investigation --inputs ".aibridge/workflows/perf-inputs.json" --timeout 30000
-=======
->>>>>>> origin/main
 $CLI workflow run-cli --recipe unity-sharded-review --allow-partial true
 $CLI workflow run-cli --recipe unity-sharded-review --resume <runId> --rerun failed
 $CLI harness status
@@ -52,11 +48,7 @@ For resumed work, run `workflow status --run <runId>` before adding new evidence
 
 `export` compiles a recipe into an external task package or script (`codex-task-pack`, `generic-cli`, `claude-workflow`). Exporters do not run external agents and do not provide an LLM runtime.
 
-<<<<<<< HEAD
-`workflow clean` is an explicit maintenance command and is safe by default (`dry-run=true`). Do not suggest it for routine context or disk upkeep; ordinary expired run directories are handled by the AIBridge cache cleanup settings, while `workflow clean` remains available when the user explicitly asks to inspect or manually maintain workflow artifacts.
-=======
 `clean` is safe by default (`dry-run=true`). Persisted auto-clean settings live in `.aibridge/workflows/settings.json`; when `autoCleanEnabled=true`, `workflow run-cli` opportunistically removes old runs before starting a new run while respecting `keepFailed`, `keepLatest`, and `maxDeletePerRun`.
->>>>>>> origin/main
 
 ## Recipe Shape
 
@@ -75,16 +67,6 @@ Optional fields:
 - `inputs`
 - `requiredSkills`
 - `artifacts`
-<<<<<<< HEAD
-- `terminalState`
-- `terminalReason`
-- `retryBudget`
-- `stopWhen`
-- `loopIteration`
-
-These fields are forward-compatible metadata. The CLI validates and preserves them, but it does not treat them as a closed runtime contract.
-=======
->>>>>>> origin/main
 
 ```json
 {
@@ -231,11 +213,7 @@ Allowed `kind` values:
 
 Required gates failing make the run `failed` or `blocked`. Optional gate failures make evidence visible without forcing the run to fail.
 
-<<<<<<< HEAD
-`artifactRequired` may filter by `artifactKind`, `schema`, and `stepId`. `artifactKind` matches both persisted artifact `kind` and semantic command-result `semanticKind`, so a `command-result/runtime-perf` artifact satisfies `artifactKind=runtime-perf`. `externalVerdict` uses `allow` values such as `confirmed`. `uncertain` is reported as an evidence gap and does not count as pass or fail.
-=======
 `artifactRequired` may filter by `artifactKind`, `schema`, and `stepId`. `externalVerdict` uses `allow` values such as `confirmed`. `uncertain` is reported as an evidence gap and does not count as pass or fail.
->>>>>>> origin/main
 
 ## External Result Schemas
 

@@ -1,7 +1,6 @@
 using EF.Common;
 using EF.Debugger;
 using EF.Entity;
-using EF.Event;
 using EF.Fsm;
 using EF.Model;
 using EF.ObjectPool;
@@ -13,7 +12,6 @@ using EF.Timer;
 using EF.UI;
 using UnityEngine;
 using UnityEngine.UI;
-using GameConfig;
 using VContainer;
 
 namespace GameLogic

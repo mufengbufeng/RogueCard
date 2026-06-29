@@ -241,7 +241,7 @@ $CLI editor log --message "Hello" --logType Warning
 ```
 
 **Host Exec**:
-- 当外部 host 工具参数不简单、包含正则/通配符/JSON/空格、需要 stdin、需要超时/输出限制或多个 jobs 时，优先用 `$CLI exec run --stdin`。`harness status`、`compile unity`、`get_logs`、`asset`、`inspector`、`runtime`、`workflow`、`multi`、`code execute` 这类 AIBridge 命令直接调用。`exec run --stdin` 从 stdin 读取 JSON；使用 `command`，不是 `cmd`，也不要在 `--stdin` 后面追加裸 shell 命令。请求里如果包含引号、反斜杠或正则，先用 PowerShell 对象再 `ConvertTo-Json`，或者改用 `--request-file`。`$CLI exec batch --stdin` 只用于多个外部 host 任务。
+- 当 AIBridge CLI 可用时，调用 `rg`、`git`、`dotnet`、`python`、`node`、`sg`、`grep` 等外部 host 工具优先用 `$CLI exec run --stdin`，快速查找/显示任务也适用；多任务使用 `$CLI exec batch --stdin`。直接 host shell 仅用于极简单的一次性命令、用户明确要求或 AIBridge CLI 不可用时。
 
 **路由原则**:
 - 快速任务：纯问答、代码解释、简单查找/显示，且不需要修改代码或 Unity 资源、不输出审查/验证/根因结论时，直接回答或执行，不加载 `aibridge-development-workflow`。
@@ -258,5 +258,5 @@ $CLI editor log --message "Hello" --logType Warning
 
 **当前能力状态**:
 - Harness 能力快照：`.aibridge/harness/capabilities.json`。RootRule 只提供 compact 摘要；工作流任务需要确认能力时先用 `$CLI harness status` compact 输出，仅在缺失、过期或任务需要未确认能力时读取完整 snapshot 或运行完整探测。已选助手：codex。Skill 根目录：.codex/skills。Code Index：enabled。外部 agent/sub-agent 能力：Unity 无法判断，按 unknown 处理。
-- Code Index：已启用。C# 代码查找或源码导航中，只要查询可表达为符号、定义、引用、实现、派生类型、调用者或诊断查询，应优先加载 `aibridge-code-index`。Unity 已导入资源或脚本资源的名称/类型查找中，当 AIBridge 和 Editor 可用时使用 `asset search/find --format paths`。字面量或正则内容搜索优先使用 `text_index search`；模糊文本、未索引仓库文件、任意路径正则或 Text Index/Code Index/AIBridge 不可用时使用 `rg`。
+- Code Index：已启用。C# 代码查找或源码导航中，只要查询可表达为符号、定义、引用、实现、派生类型、调用者或诊断查询，应优先加载 `aibridge-code-index`。Unity 已导入资源或脚本资源的名称/类型查找中，当 AIBridge 和 Editor 可用时使用 `asset search/find --format paths`。字面量内容、模糊文本、非 C# 仓库文件、任意路径正则或 Code Index/AIBridge 不可用时使用 `rg`。
 <!-- AIBRIDGE:END -->

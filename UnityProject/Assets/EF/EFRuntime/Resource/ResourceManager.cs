@@ -503,13 +503,13 @@ namespace EF.Resource
             IRemoteService remoteService = new DefaultResourceRemoteServices(defaultHostServer, fallbackHostServer);
             FileSystemParameters webServerFileSystemParams =
                 FileSystemParameters.CreateDefaultWebServerFileSystemParameters(entry.DisableUnityWebCache);
-            FileSystemParameters webRemoteFileSystemParams =
-                FileSystemParameters.CreateDefaultWebRemoteFileSystemParameters(remoteService, entry.DisableUnityWebCache);
+            FileSystemParameters webNetworkFileSystemParams =
+                FileSystemParameters.CreateDefaultWebNetworkFileSystemParameters(remoteService, entry.DisableUnityWebCache);
 
             return new WebPlayModeOptions
             {
                 WebServerFileSystemParameters = webServerFileSystemParams,
-                WebRemoteFileSystemParameters = webRemoteFileSystemParams
+                WebNetworkFileSystemParameters = webNetworkFileSystemParams
             };
         }
 

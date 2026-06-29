@@ -13,10 +13,6 @@ Prefer `multi --stdin` for long scripts, JSON-heavy commands, or PowerShell quot
 
 - Run commands from the Unity project root
 - Plain `multi` lines become Batch `call` lines automatically
-<<<<<<< HEAD
-- `multi --cmd` is only for `multi`; `exec run --stdin` uses JSON `command`, not `cmd`
-=======
->>>>>>> origin/main
 - Native Batch lines are kept as-is: `call`, `delay`, `log`, `menu`, `wait_compile`, `wait_playmode`, `assert_log_empty`, `assert_object`, `set_var`, `print_var`, `dialog click`, and `#` comments
 - `dialog click ok | yes | Save` declares dialog auto-click choices; after that line executes, later steps auto-click the first matching logical choice or visible button text. A later `dialog click` declaration replaces the previous strategy. Keep the CLI invocation waiting; `--no-wait` cannot continue clicking after the process exits.
 - Keep generated scripts under `.aibridge/scripts/` when a file is needed

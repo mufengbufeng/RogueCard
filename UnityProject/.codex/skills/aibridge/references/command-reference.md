@@ -246,11 +246,6 @@ $CLI test run --test-name "MyNamespace.MyFixture.MyTest"
 $CLI test status
 ```
 
-<<<<<<< HEAD
-`test run` must start while the Editor is in Edit Mode. If Unity is already in Play Mode, the command fails immediately and tells the agent to stop Play Mode before retrying.
-
-=======
->>>>>>> origin/main
 ### `transform` - Transform Operations
 
 ```bash
