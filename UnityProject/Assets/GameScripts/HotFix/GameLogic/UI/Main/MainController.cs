@@ -1,7 +1,5 @@
-using System;
 using EF.Debugger;
 using EF.UI;
-using VContainer;
 
 namespace GameLogic
 {
@@ -12,9 +10,6 @@ namespace GameLogic
     {
         private MainView _mainView;
         private MainModel _mainModel;
-
-        [Inject]
-        private EventHub _eventHub;
 
         /// <summary>
         /// 初始化主界面控制器。
@@ -37,10 +32,7 @@ namespace GameLogic
 
             if (_mainView != null)
             {
-                BindEvent<Action>(
-                    h => _mainView.OnStartGameRequested += h,
-                    h => _mainView.OnStartGameRequested -= h,
-                    HandleStartGame);
+                EventBinder.BindEvent(_mainView.StartGameRequestedEvent, HandleStartGame);
             }
 
             _mainModel?.SetInteractable(true);
@@ -59,7 +51,7 @@ namespace GameLogic
             RefreshViewFromModel();
         }
 
-        private void HandleStartGame()
+        private void HandleStartGame(MainStartGameRequestedEvent _)
         {
             int levelId = _mainModel?.DefaultLevelId ?? MainModel.FallbackLevelId;
             string levelName = _mainModel?.DefaultLevelName ?? MainModel.FallbackLevelName;
@@ -69,7 +61,7 @@ namespace GameLogic
             RefreshViewFromModel();
             _mainView?.SetFeedbackText($"正在进入默认关卡：{levelId}");
 
-            (_eventHub ?? GameLogicEntry.Event)?.StartLevelRequestedEvent.Publish(new StartLevelRequestedEvent(levelId, levelName));
+            GameLogicEntry.Event?.StartLevelRequestedEvent.Publish(new StartLevelRequestedEvent(levelId, levelName));
             Log.Info($"[MainController] 已请求进入默认关卡：{levelId}");
         }
 

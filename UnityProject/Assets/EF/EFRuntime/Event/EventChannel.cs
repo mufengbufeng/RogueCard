@@ -43,13 +43,19 @@ namespace EF.Event
             _ring = new T[DefaultRingCapacity];
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取事件类型名称，返回事件参数类型 T 的类型名。
+        /// </summary>
         public string EventName => typeof(T).Name;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取当前已注册的事件处理器数量。
+        /// </summary>
         public int HandlerCount => _handlerCount;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取异步队列中等待分发的事件数量。
+        /// </summary>
         public int PendingCount
         {
             get
@@ -60,7 +66,9 @@ namespace EF.Event
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取当前 Channel 状态：存在待分发事件时为 Active，否则为 Idle。
+        /// </summary>
         public EventChannelLifecycleState State => PendingCount > 0
             ? EventChannelLifecycleState.Active
             : EventChannelLifecycleState.Idle;
@@ -148,7 +156,9 @@ namespace EF.Event
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 派发异步队列中的所有待处理事件，直到队列清空。
+        /// </summary>
         public void Flush()
         {
             if (_ringHead == _ringTail)
@@ -165,7 +175,9 @@ namespace EF.Event
             _scheduler?.OnChannelBecameIdle(this);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 清空所有已注册处理器和待分发事件，并重置队列状态。
+        /// </summary>
         public void Clear()
         {
             bool hadPending = _ringHead != _ringTail;
@@ -182,7 +194,10 @@ namespace EF.Event
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取所有已注册处理器的目标方法名称，供调试显示使用。
+        /// </summary>
+        /// <returns>处理器目标方法名称数组。</returns>
         public string[] GetHandlerNames()
         {
             var names = new string[_handlerCount];

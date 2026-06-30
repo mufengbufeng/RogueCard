@@ -528,7 +528,9 @@ namespace GameLogic
 
         // ── 释放 ──
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 释放拖拽控制器；若仍处于拖拽中则先清理拖拽视觉状态，并重置状态、索引与指针捕获记录。
+        /// </summary>
         public void Dispose()
         {
             if (_disposed) return;

@@ -318,7 +318,10 @@ namespace GameLogic
                 maxHp: data.BaseHp);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 处理战斗参与者死亡通知；当死亡对象是怪物时，定位其列表索引并发布 <see cref="MonsterDeathEvent"/>。
+        /// </summary>
+        /// <param name="actor">刚刚死亡的战斗参与者。</param>
         public void OnActorDied(IBattleActor actor)
         {
             if (actor is MonsterRuntime monster)

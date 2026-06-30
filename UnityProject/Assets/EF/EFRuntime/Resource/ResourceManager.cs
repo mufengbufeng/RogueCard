@@ -28,23 +28,35 @@ namespace EF.Resource
 
         #region 属性
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 当前资源运行模式；未加载配置时默认使用编辑器模拟模式。
+        /// </summary>
         public ResourceMode Mode => _config != null ? _config.Mode : ResourceMode.EditorSimulate;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 资源模块是否已完成初始化。
+        /// </summary>
         public bool IsInitialized => _isInitialized;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 当前默认资源包名称。
+        /// </summary>
         public string DefaultPackageName => _defaultPackageName;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 当前资源管理器使用的运行配置。
+        /// </summary>
         public ResourceModeConfig Configuration => _config;
 
         #endregion
 
         #region 初始化
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 初始化 YooAssets 与配置中的资源包裹，并完成版本、清单和资源下载流程。
+        /// </summary>
+        /// <param name="overrideConfig">外部指定的资源配置；为 null 时从默认 Resources 路径加载。</param>
+        /// <param name="progress">初始化总进度回调。</param>
         public async UniTask InitializeAsync(ResourceModeConfig overrideConfig = null, IProgress<float> progress = null)
         {
             if (_isInitialized)
@@ -208,7 +220,11 @@ namespace EF.Resource
 
         #region 包裹管理
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取已初始化并缓存的指定资源包裹。
+        /// </summary>
+        /// <param name="packageName">资源包裹名称。</param>
+        /// <returns>匹配名称的资源包裹。</returns>
         public ResourcePackage GetPackage(string packageName)
         {
             EnsureInitialized();
@@ -226,7 +242,10 @@ namespace EF.Resource
             throw new KeyNotFoundException($"未找到名称为 {packageName} 的资源包，请检查配置");
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取初始化时选定的默认资源包裹。
+        /// </summary>
+        /// <returns>默认资源包裹。</returns>
         public ResourcePackage GetDefaultPackage()
         {
             EnsureInitialized();
@@ -243,7 +262,14 @@ namespace EF.Resource
 
         #region 资源加载
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 从默认资源包裹异步加载资源，并登记返回的资源句柄。
+        /// </summary>
+        /// <typeparam name="T">要加载的 Unity 资源类型。</typeparam>
+        /// <param name="location">资源定位地址。</param>
+        /// <param name="progress">加载进度回调。</param>
+        /// <param name="priority">加载优先级。</param>
+        /// <returns>完成加载的资源句柄。</returns>
         public async UniTask<AssetHandle> LoadAssetAsync<T>(string location, Action<float> progress = null, uint priority = 0)
             where T : UnityEngine.Object
         {
@@ -272,7 +298,13 @@ namespace EF.Resource
             return handle;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 从默认资源包裹同步加载资源，并登记返回的资源句柄。
+        /// </summary>
+        /// <typeparam name="T">要加载的 Unity 资源类型。</typeparam>
+        /// <param name="location">资源定位地址。</param>
+        /// <param name="priority">加载优先级。</param>
+        /// <returns>完成加载的资源句柄。</returns>
         public AssetHandle LoadAssetSync<T>(string location, uint priority = 0) where T : UnityEngine.Object
         {
             EnsureInitialized();
@@ -292,7 +324,16 @@ namespace EF.Resource
 
         #region 场景管理
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 从默认资源包裹异步加载场景，并登记返回的场景句柄。
+        /// </summary>
+        /// <param name="location">场景定位地址。</param>
+        /// <param name="sceneMode">Unity 场景加载模式。</param>
+        /// <param name="physicsMode">局部物理模式。</param>
+        /// <param name="allowSceneActivation">是否允许场景加载完成后立即激活。</param>
+        /// <param name="priority">加载优先级。</param>
+        /// <param name="progress">加载进度回调。</param>
+        /// <returns>完成加载的场景句柄。</returns>
         public async UniTask<SceneHandle> LoadSceneAsync(
             string location,
             LoadSceneMode sceneMode = LoadSceneMode.Single,
@@ -326,7 +367,10 @@ namespace EF.Resource
             return handle;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 取消追踪并异步卸载指定场景句柄。
+        /// </summary>
+        /// <param name="handle">要卸载的场景句柄；为 null 时不执行操作。</param>
         public void UnloadScene(SceneHandle handle)
         {
             if (handle == null)
@@ -349,7 +393,10 @@ namespace EF.Resource
 
         #region 资源释放
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 取消追踪并释放指定资源句柄。
+        /// </summary>
+        /// <param name="handle">要释放的资源句柄；为 null 时不执行操作。</param>
         public void Release(HandleBase handle)
         {
             if (handle == null)
@@ -361,7 +408,9 @@ namespace EF.Resource
             handle.Release();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 释放所有由资源管理器追踪的资源句柄，并清空追踪记录。
+        /// </summary>
         public void ReleaseAll()
         {
             if (_trackedHandles.Count == 0)

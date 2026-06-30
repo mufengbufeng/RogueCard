@@ -149,7 +149,9 @@ namespace GameLogic
             SyncAll();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 释放局内 ViewModel，取消模型订阅并清空事件与响应式属性监听。
+        /// </summary>
         public void Dispose()
         {
             if (_model != null)

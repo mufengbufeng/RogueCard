@@ -89,7 +89,9 @@ namespace GameLogic
             _previewSource = null;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 释放预览控制器，退出当前预览态并忽略后续操作。
+        /// </summary>
         public void Dispose()
         {
             if (_disposed)

@@ -40,10 +40,14 @@ namespace EF.UI
             _prefabLoader = new ResourcePrefabLoader(_resourceManager);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取当前已注册的 UI 窗口描述数量。
+        /// </summary>
         public int RegisteredWindowCount => _descriptors.Count;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取当前处于活动列表中的 UI 窗口实例总数。
+        /// </summary>
         public int ActiveWindowCount
         {
             get
@@ -58,7 +62,10 @@ namespace EF.UI
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 注册一个可通过名称打开的 UI 窗口描述。
+        /// </summary>
+        /// <param name="descriptor">包含窗口名称、资源位置、视图、控制器和层级配置的描述信息。</param>
         public void RegisterWindow(UIWindowDescriptor descriptor)
         {
             if (descriptor == null)
@@ -74,13 +81,20 @@ namespace EF.UI
             _descriptors.Add(descriptor.Name, descriptor);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 设置 UI Controller 创建工厂，传入空值时恢复默认反射工厂。
+        /// </summary>
+        /// <param name="controllerFactory">用于创建 Controller 的工厂实例。</param>
         public void SetControllerFactory(IUIControllerFactory controllerFactory)
         {
             _controllerFactory = controllerFactory ?? new ReflectionUIControllerFactory();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 注销未运行的 UI 窗口描述，并清理对应的活动列表和缓存栈。
+        /// </summary>
+        /// <param name="windowName">要注销的 UI 窗口名称。</param>
+        /// <returns>成功移除已注册描述时返回 true；名称为空或未注册时返回 false。</returns>
         public bool UnregisterWindow(string windowName)
         {
             if (string.IsNullOrEmpty(windowName))
@@ -99,13 +113,23 @@ namespace EF.UI
             return removedDescriptor;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 检查指定名称的 UI 窗口是否已经注册。
+        /// </summary>
+        /// <param name="windowName">要检查的 UI 窗口名称。</param>
+        /// <returns>已注册时返回 true，否则返回 false。</returns>
         public bool Contains(string windowName)
         {
             return _descriptors.ContainsKey(windowName);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 按已注册名称打开 UI 窗口；单实例窗口已打开时会刷新现有实例。
+        /// </summary>
+        /// <param name="windowName">已注册的 UI 窗口名称。</param>
+        /// <param name="userData">传递给窗口打开或刷新的用户数据。</param>
+        /// <param name="cancellationToken">取消加载和准备流程的令牌。</param>
+        /// <returns>打开后的 UI 窗口句柄。</returns>
         public async UniTask<UIWindowHandle> OpenWindowAsync(string windowName, object userData = null, CancellationToken cancellationToken = default)
         {
             if (!_descriptors.TryGetValue(windowName, out UIWindowDescriptor descriptor))
@@ -138,7 +162,14 @@ namespace EF.UI
             return new UIWindowHandle(this, windowName, instance.InstanceId, instance.View, instance.Controller);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 按视图类型命名约定解析 Controller，并以 Normal 层、关闭缓存和单实例模式打开 UI。
+        /// </summary>
+        /// <typeparam name="TView">要打开的 UI 视图类型。</typeparam>
+        /// <param name="location">UI Prefab 的资源位置。</param>
+        /// <param name="userData">传递给窗口打开或刷新的用户数据。</param>
+        /// <param name="cancellationToken">取消加载和准备流程的令牌。</param>
+        /// <returns>打开后的 UI 窗口句柄。</returns>
         public UniTask<UIWindowHandle> OpenWindowAsync<TView>(
             string location,
             object userData = null,
@@ -154,7 +185,15 @@ namespace EF.UI
                 cancellationToken);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 按视图类型命名约定解析 Controller，并在指定层级以关闭缓存和单实例模式打开 UI。
+        /// </summary>
+        /// <typeparam name="TView">要打开的 UI 视图类型。</typeparam>
+        /// <param name="location">UI Prefab 的资源位置。</param>
+        /// <param name="layer">UI 挂载的显示层级。</param>
+        /// <param name="userData">传递给窗口打开或刷新的用户数据。</param>
+        /// <param name="cancellationToken">取消加载和准备流程的令牌。</param>
+        /// <returns>打开后的 UI 窗口句柄。</returns>
         public UniTask<UIWindowHandle> OpenWindowAsync<TView>(
             string location,
             UILayer layer,
@@ -171,7 +210,17 @@ namespace EF.UI
                 cancellationToken);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 按视图类型命名约定解析 Controller，并使用完整配置打开或自动注册 UI。
+        /// </summary>
+        /// <typeparam name="TView">要打开的 UI 视图类型。</typeparam>
+        /// <param name="location">UI Prefab 的资源位置。</param>
+        /// <param name="layer">UI 挂载的显示层级。</param>
+        /// <param name="cacheOnClose">关闭时是否缓存实例而不是销毁。</param>
+        /// <param name="allowMultiple">是否允许同一视图类型同时存在多个实例。</param>
+        /// <param name="userData">传递给窗口打开或刷新的用户数据。</param>
+        /// <param name="cancellationToken">取消加载和准备流程的令牌。</param>
+        /// <returns>打开后的 UI 窗口句柄。</returns>
         public async UniTask<UIWindowHandle> OpenWindowAsync<TView>(
             string location,
             UILayer layer,
@@ -192,7 +241,15 @@ namespace EF.UI
                 cancellationToken);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 使用显式 Controller 类型，并以 Normal 层、关闭缓存和单实例模式打开 UI。
+        /// </summary>
+        /// <typeparam name="TView">要打开的 UI 视图类型。</typeparam>
+        /// <typeparam name="TController">负责驱动视图的 Controller 类型。</typeparam>
+        /// <param name="location">UI Prefab 的资源位置。</param>
+        /// <param name="userData">传递给窗口打开或刷新的用户数据。</param>
+        /// <param name="cancellationToken">取消加载和准备流程的令牌。</param>
+        /// <returns>打开后的 UI 窗口句柄。</returns>
         public async UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
             string location,
             object userData = null,
@@ -209,7 +266,16 @@ namespace EF.UI
                 cancellationToken);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 使用显式 Controller 类型，并在指定层级以关闭缓存和单实例模式打开 UI。
+        /// </summary>
+        /// <typeparam name="TView">要打开的 UI 视图类型。</typeparam>
+        /// <typeparam name="TController">负责驱动视图的 Controller 类型。</typeparam>
+        /// <param name="location">UI Prefab 的资源位置。</param>
+        /// <param name="layer">UI 挂载的显示层级。</param>
+        /// <param name="userData">传递给窗口打开或刷新的用户数据。</param>
+        /// <param name="cancellationToken">取消加载和准备流程的令牌。</param>
+        /// <returns>打开后的 UI 窗口句柄。</returns>
         public async UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
             string location,
             UILayer layer,
@@ -227,7 +293,18 @@ namespace EF.UI
                 cancellationToken);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 使用显式 Controller 类型，并按完整配置打开或自动注册 UI。
+        /// </summary>
+        /// <typeparam name="TView">要打开的 UI 视图类型。</typeparam>
+        /// <typeparam name="TController">负责驱动视图的 Controller 类型。</typeparam>
+        /// <param name="location">UI Prefab 的资源位置。</param>
+        /// <param name="layer">UI 挂载的显示层级。</param>
+        /// <param name="cacheOnClose">关闭时是否缓存实例而不是销毁。</param>
+        /// <param name="allowMultiple">是否允许同一视图类型同时存在多个实例。</param>
+        /// <param name="userData">传递给窗口打开或刷新的用户数据。</param>
+        /// <param name="cancellationToken">取消加载和准备流程的令牌。</param>
+        /// <returns>打开后的 UI 窗口句柄。</returns>
         public async UniTask<UIWindowHandle> OpenWindowAsync<TView, TController>(
             string location,
             UILayer layer,
@@ -299,7 +376,11 @@ namespace EF.UI
             return new UIWindowHandle(this, windowName, instance.InstanceId, instance.View, instance.Controller);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 关闭指定名称最近打开的 UI 实例；没有活动实例时直接完成。
+        /// </summary>
+        /// <param name="windowName">要关闭的 UI 窗口名称。</param>
+        /// <returns>关闭流程完成后的任务。</returns>
         public UniTask CloseWindowAsync(string windowName)
         {
             if (!_activeWindows.TryGetValue(windowName, out List<UIWindowInstance> activeList) || activeList.Count == 0)
@@ -326,7 +407,10 @@ namespace EF.UI
             return UniTask.CompletedTask;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 关闭所有当前活动的 UI 实例，并按各自描述决定缓存或销毁。
+        /// </summary>
+        /// <returns>全部关闭流程完成后的任务。</returns>
         public UniTask CloseAllAsync()
         {
             List<UIWindowInstance> temp = new();
@@ -345,7 +429,13 @@ namespace EF.UI
             return UniTask.CompletedTask;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 尝试获取指定 UI 最近活动实例上的 Controller。
+        /// </summary>
+        /// <typeparam name="TController">期望获取的 Controller 类型。</typeparam>
+        /// <param name="windowName">UI 窗口名称。</param>
+        /// <param name="controller">获取成功时返回匹配类型的 Controller。</param>
+        /// <returns>存在活动实例且 Controller 类型匹配时返回 true，否则返回 false。</returns>
         public bool TryGetController<TController>(string windowName, out TController controller) where TController : UIController
         {
             controller = null;
@@ -364,7 +454,13 @@ namespace EF.UI
             return false;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 尝试获取指定 UI 最近活动实例上的视图组件。
+        /// </summary>
+        /// <typeparam name="TView">期望获取的视图类型。</typeparam>
+        /// <param name="windowName">UI 窗口名称。</param>
+        /// <param name="view">获取成功时返回匹配类型的视图组件。</param>
+        /// <returns>存在活动实例且视图类型匹配时返回 true，否则返回 false。</returns>
         public bool TryGetView<TView>(string windowName, out TView view) where TView : UIView
         {
             view = null;
@@ -383,7 +479,11 @@ namespace EF.UI
             return false;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 注册指定 UI 层级的根节点，后续窗口会挂载到该层级下。
+        /// </summary>
+        /// <param name="layer">要绑定的 UI 显示层级。</param>
+        /// <param name="rootTransform">该层级对应的父节点。</param>
         public void RegisterLayerRoot(UILayer layer, Transform rootTransform)
         {
             if (rootTransform == null)
@@ -394,7 +494,10 @@ namespace EF.UI
             _layerRoots[layer] = rootTransform;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 设置缺省 UI 根节点，在目标层级未注册根节点时作为挂载父节点。
+        /// </summary>
+        /// <param name="fallbackRoot">缺省父节点；传入 null 可清空设置。</param>
         public void SetFallbackRoot(Transform fallbackRoot)
         {
             _fallbackRoot = fallbackRoot;
@@ -429,7 +532,11 @@ namespace EF.UI
             return UIWindowState.None;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 每帧驱动所有已打开 UI 实例的 Controller 和 View 更新逻辑。
+        /// </summary>
+        /// <param name="elapseSeconds">逻辑流逝时间（秒）。</param>
+        /// <param name="realElapseSeconds">真实流逝时间（秒）。</param>
         public override void Update(float elapseSeconds, float realElapseSeconds)
         {
             _updateBuffer.Clear();
@@ -453,7 +560,9 @@ namespace EF.UI
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 关闭 UI 管理器，释放活动窗口、缓存实例、注册描述和层级引用。
+        /// </summary>
         public override void Shutdown()
         {
             CloseAllAsync();

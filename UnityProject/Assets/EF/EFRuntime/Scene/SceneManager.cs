@@ -26,7 +26,9 @@ namespace EF.Scene
 
         #region 属性
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 当前已加载场景的信息快照。
+        /// </summary>
         public SceneInfo? CurrentScene => _currentScene;
 
         /// <summary>
@@ -38,16 +40,24 @@ namespace EF.Scene
 
         #region 事件
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 场景加载成功后触发，参数为已加载场景信息。
+        /// </summary>
         public event Action<SceneInfo> OnSceneLoaded;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 场景卸载成功后触发，参数为卸载的场景名称。
+        /// </summary>
         public event Action<string> OnSceneUnloaded;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 场景加载进度变化时触发，参数为加载进度。
+        /// </summary>
         public event Action<float> OnLoadingProgress;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 场景加载或卸载发生错误时触发，参数为异常信息。
+        /// </summary>
         public event Action<Exception> OnSceneError;
 
         #endregion
@@ -106,7 +116,15 @@ namespace EF.Scene
 
         #region ISceneManager 实现
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 异步加载指定场景，并在成功后更新当前场景状态。
+        /// </summary>
+        /// <param name="sceneName">场景资源名称。</param>
+        /// <param name="sceneMode">场景加载模式。</param>
+        /// <param name="physicsMode">本地物理模式。</param>
+        /// <param name="allowSceneActivation">是否允许加载完成后立即激活场景。</param>
+        /// <param name="priority">加载优先级。</param>
+        /// <returns>场景是否加载成功。</returns>
         public async UniTask<bool> LoadSceneAsync(string sceneName, LoadSceneMode sceneMode = LoadSceneMode.Single,
             LocalPhysicsMode physicsMode = LocalPhysicsMode.None, bool allowSceneActivation = true, uint priority = 0)
         {
@@ -174,13 +192,20 @@ namespace EF.Scene
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 异步卸载当前已加载场景。
+        /// </summary>
+        /// <returns>场景是否卸载成功。</returns>
         public async UniTask<bool> UnloadSceneAsync()
         {
             return await UnloadSceneAsync(null);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 异步卸载当前场景，可通过期望快照防止误卸载已切换的场景。
+        /// </summary>
+        /// <param name="expectedScene">期望卸载的场景快照，为 null 时不校验。</param>
+        /// <returns>场景是否卸载成功。</returns>
         public async UniTask<bool> UnloadSceneAsync(SceneInfo? expectedScene)
         {
             await _sceneOperationLock.WaitAsync();
@@ -210,7 +235,10 @@ namespace EF.Scene
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取当前已加载场景的信息快照。
+        /// </summary>
+        /// <returns>当前场景信息，没有加载场景时返回 null。</returns>
         public SceneInfo? GetCurrentScene()
         {
             return _currentScene;

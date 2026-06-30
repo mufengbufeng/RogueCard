@@ -51,16 +51,24 @@ namespace EF.ObjectPool
             _options = options?.Clone() ?? new ObjectPoolOptions();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 对象池名称，用于调试和区分同类型对象池。
+        /// </summary>
         public string Name { get; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 池内对象的运行时类型。
+        /// </summary>
         public Type ObjectType => typeof(T);
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 池中已注册对象总数，包含使用中与空闲对象。
+        /// </summary>
         public int TotalCount => _all.Count;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 当前未被取用的对象数量。
+        /// </summary>
         public int AvailableCount
         {
             get
@@ -78,16 +86,25 @@ namespace EF.ObjectPool
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 当前已取出且尚未完全回收的对象数量。
+        /// </summary>
         public int SpawnedCount => TotalCount - AvailableCount;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 是否允许同一对象被重复取出并通过引用计数回收。
+        /// </summary>
         public bool AllowMultiSpawn => _options.AllowMultiSpawn;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 对象池当前使用的运行配置。
+        /// </summary>
         public ObjectPoolOptions Options => _options;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 使用默认工厂从池中取出对象，空闲不足时创建新对象。
+        /// </summary>
+        /// <returns>取出的对象实例。</returns>
         public T Spawn()
         {
             if (_defaultFactory == null)
@@ -98,7 +115,11 @@ namespace EF.ObjectPool
             return Spawn(_defaultFactory);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 从池中取出对象，空闲不足时使用指定工厂创建新对象。
+        /// </summary>
+        /// <param name="factory">用于创建新对象的工厂方法。</param>
+        /// <returns>取出的对象实例。</returns>
         public T Spawn(Func<T> factory)
         {
             if (factory == null)
@@ -128,7 +149,10 @@ namespace EF.ObjectPool
             return entry.Instance;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 回收已注册对象，无法回收时抛出异常。
+        /// </summary>
+        /// <param name="instance">需要回收的对象实例。</param>
         public void Recycle(T instance)
         {
             if (!TryRecycleInternal(instance, true))
@@ -137,19 +161,32 @@ namespace EF.ObjectPool
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 尝试回收已注册对象，失败时返回 false。
+        /// </summary>
+        /// <param name="instance">需要回收的对象实例。</param>
+        /// <returns>回收成功返回 true，否则返回 false。</returns>
         public bool TryRecycle(T instance)
         {
             return TryRecycleInternal(instance, false);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 判断对象是否已注册到当前对象池。
+        /// </summary>
+        /// <param name="instance">待检查的对象实例。</param>
+        /// <returns>对象已注册返回 true，否则返回 false。</returns>
         public bool Contains(T instance)
         {
             return instance != null && _all.ContainsKey(instance);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 向对象池注册外部对象，并指定初始取用与锁定状态。
+        /// </summary>
+        /// <param name="instance">需要注册的对象实例。</param>
+        /// <param name="spawned">是否初始视为已取出。</param>
+        /// <param name="locked">是否锁定，锁定对象不会被自动释放。</param>
         public void Register(T instance, bool spawned = false, bool locked = false)
         {
             if (instance == null)
@@ -177,7 +214,11 @@ namespace EF.ObjectPool
             EnsureCapacity();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 设置已注册对象的锁定状态，锁定对象不会被自动释放。
+        /// </summary>
+        /// <param name="instance">目标对象实例。</param>
+        /// <param name="locked">是否锁定该对象。</param>
         public void SetLocked(T instance, bool locked)
         {
             if (!_all.TryGetValue(instance, out PooledObject<T> entry))
@@ -188,7 +229,10 @@ namespace EF.ObjectPool
             entry.Locked = locked;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 按条件释放空闲且未锁定的对象。
+        /// </summary>
+        /// <param name="predicate">释放筛选条件，返回 true 表示可以释放。</param>
         public void Release(Func<T, bool> predicate)
         {
             if (predicate == null)
@@ -208,7 +252,10 @@ namespace EF.ObjectPool
             ReleaseCandidates();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 使用默认工厂预创建指定数量的空闲对象。
+        /// </summary>
+        /// <param name="count">需要预创建的对象数量。</param>
         public void Prewarm(int count)
         {
             if (count <= 0)
@@ -237,7 +284,11 @@ namespace EF.ObjectPool
             EnsureCapacity();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 推进对象池时间，并按配置自动释放过期的空闲对象。
+        /// </summary>
+        /// <param name="elapseSeconds">逻辑流逝时间（秒）。</param>
+        /// <param name="realElapseSeconds">真实流逝时间（秒），当前实现未使用。</param>
         public void Update(float elapseSeconds, float realElapseSeconds)
         {
             _time += elapseSeconds;
@@ -271,7 +322,10 @@ namespace EF.ObjectPool
             ReleaseCandidates();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 按最近使用时间优先释放指定数量的空闲对象。
+        /// </summary>
+        /// <param name="releaseCount">最多需要释放的对象数量。</param>
         public void Release(int releaseCount)
         {
             if (releaseCount <= 0)
@@ -303,7 +357,9 @@ namespace EF.ObjectPool
             ReleaseCandidates();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 释放所有空闲且未锁定的对象。
+        /// </summary>
         public void ReleaseAll()
         {
             _candidates.Clear();
@@ -318,7 +374,9 @@ namespace EF.ObjectPool
             ReleaseCandidates();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 清空对象池并销毁全部对象，包含正在使用的对象。
+        /// </summary>
         public void Clear()
         {
             foreach (PooledObject<T> entry in _all.Values)
@@ -331,7 +389,9 @@ namespace EF.ObjectPool
             _candidates.Clear();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 关闭对象池并清空全部对象。
+        /// </summary>
         public void Shutdown()
         {
             Clear();

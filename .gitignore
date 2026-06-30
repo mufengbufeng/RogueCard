@@ -30,6 +30,7 @@ Desktop.ini
 .mempalace/
 .mempalace_local/
 .mcp_data/
+.codedb-mcp/
 
 # Python
 __pycache__/

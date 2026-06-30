@@ -157,7 +157,9 @@ namespace GameLogic
             _model.SetMonsters(monsters);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 处理战斗参与者死亡通知；若死亡者是怪物，定位其索引并发布 MonsterDeathEvent。
+        /// </summary>
         public void OnActorDied(IBattleActor actor)
         {
             if (actor is MonsterRuntime monster)

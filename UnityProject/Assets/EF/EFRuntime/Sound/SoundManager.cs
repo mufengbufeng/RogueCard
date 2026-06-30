@@ -39,10 +39,14 @@ namespace EF.Sound
             _typeVolumes[SoundType.Ambient] = 1f;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 当前音频代理池中的活跃音频数量；代理池未创建时为 0。
+        /// </summary>
         public int ActiveSoundCount => _agentPool?.ActiveCount ?? 0;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 全局主音量（0.0 ~ 1.0），设置后会刷新所有活跃音频的最终音量。
+        /// </summary>
         public float MasterVolume
         {
             get => _masterVolume;
@@ -53,7 +57,9 @@ namespace EF.Sound
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 背景音乐类型音量（0.0 ~ 1.0），设置后会刷新正在播放的音乐音频。
+        /// </summary>
         public float MusicVolume
         {
             get => _typeVolumes[SoundType.Music];
@@ -64,7 +70,9 @@ namespace EF.Sound
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 音效类型音量（0.0 ~ 1.0），设置后会刷新正在播放的音效音频。
+        /// </summary>
         public float SoundEffectVolume
         {
             get => _typeVolumes[SoundType.SoundEffect];
@@ -75,7 +83,9 @@ namespace EF.Sound
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 语音类型音量（0.0 ~ 1.0），设置后会刷新正在播放的语音音频。
+        /// </summary>
         public float VoiceVolume
         {
             get => _typeVolumes[SoundType.Voice];
@@ -86,7 +96,9 @@ namespace EF.Sound
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 环境音类型音量（0.0 ~ 1.0），设置后会刷新正在播放的环境音频。
+        /// </summary>
         public float AmbientVolume
         {
             get => _typeVolumes[SoundType.Ambient];
@@ -105,7 +117,11 @@ namespace EF.Sound
             _resourceManager = resourceManager ?? throw new ArgumentNullException(nameof(resourceManager));
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 启动一次音频播放请求，并以异步方式加载和播放资源。
+        /// </summary>
+        /// <param name="args">播放参数，必须包含有效的音频资源名称。</param>
+        /// <returns>同步入口返回临时标识 -1；实际音频标识由异步播放完成后生成。</returns>
         public int Play(SoundPlayArgs args)
         {
             if (args == null)
@@ -158,7 +174,11 @@ namespace EF.Sound
             return agent.SoundId;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 停止指定音频实例，可按指定时长淡出。
+        /// </summary>
+        /// <param name="soundId">音频实例标识。</param>
+        /// <param name="fadeOutDuration">淡出时长（秒），为 0 时立即停止。</param>
         public void Stop(int soundId, float fadeOutDuration = 0f)
         {
             if (_agentPool == null)
@@ -170,7 +190,10 @@ namespace EF.Sound
             agent?.Stop(fadeOutDuration);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 暂停指定音频实例；实例不存在时不执行操作。
+        /// </summary>
+        /// <param name="soundId">音频实例标识。</param>
         public void Pause(int soundId)
         {
             if (_agentPool == null)
@@ -182,7 +205,10 @@ namespace EF.Sound
             agent?.Pause();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 恢复指定音频实例；实例不存在时不执行操作。
+        /// </summary>
+        /// <param name="soundId">音频实例标识。</param>
         public void Resume(int soundId)
         {
             if (_agentPool == null)
@@ -194,7 +220,11 @@ namespace EF.Sound
             agent?.Resume();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 停止指定类型的所有活跃音频，可按指定时长淡出。
+        /// </summary>
+        /// <param name="soundType">需要停止的音频类型。</param>
+        /// <param name="fadeOutDuration">淡出时长（秒），为 0 时立即停止。</param>
         public void StopAll(SoundType soundType, float fadeOutDuration = 0f)
         {
             if (_agentPool == null)
@@ -209,7 +239,10 @@ namespace EF.Sound
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 停止所有活跃音频，可按指定时长淡出。
+        /// </summary>
+        /// <param name="fadeOutDuration">淡出时长（秒），为 0 时立即停止。</param>
         public void StopAll(float fadeOutDuration = 0f)
         {
             if (_agentPool == null)
@@ -224,7 +257,10 @@ namespace EF.Sound
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 暂停指定类型的所有活跃音频。
+        /// </summary>
+        /// <param name="soundType">需要暂停的音频类型。</param>
         public void PauseAll(SoundType soundType)
         {
             if (_agentPool == null)
@@ -239,7 +275,9 @@ namespace EF.Sound
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 暂停所有活跃音频。
+        /// </summary>
         public void PauseAll()
         {
             if (_agentPool == null)
@@ -254,7 +292,10 @@ namespace EF.Sound
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 恢复指定类型的所有活跃音频。
+        /// </summary>
+        /// <param name="soundType">需要恢复的音频类型。</param>
         public void ResumeAll(SoundType soundType)
         {
             if (_agentPool == null)
@@ -269,7 +310,9 @@ namespace EF.Sound
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 恢复所有活跃音频。
+        /// </summary>
         public void ResumeAll()
         {
             if (_agentPool == null)
@@ -284,7 +327,11 @@ namespace EF.Sound
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 设置指定音频实例的独立音量；实例不存在时不执行操作。
+        /// </summary>
+        /// <param name="soundId">音频实例标识。</param>
+        /// <param name="volume">音量（0.0 ~ 1.0）。</param>
         public void SetVolume(int soundId, float volume)
         {
             if (_agentPool == null)
@@ -296,7 +343,11 @@ namespace EF.Sound
             agent?.SetVolume(volume);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 判断指定音频实例当前是否正在播放。
+        /// </summary>
+        /// <param name="soundId">音频实例标识。</param>
+        /// <returns>音频存在且正在播放时返回 true，否则返回 false。</returns>
         public bool IsPlaying(int soundId)
         {
             if (_agentPool == null)
@@ -308,7 +359,11 @@ namespace EF.Sound
             return agent != null && agent.IsPlaying;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取指定音频实例的播放进度。
+        /// </summary>
+        /// <param name="soundId">音频实例标识。</param>
+        /// <returns>播放进度（0.0 ~ 1.0）；实例不存在时返回 0。</returns>
         public float GetProgress(int soundId)
         {
             if (_agentPool == null)

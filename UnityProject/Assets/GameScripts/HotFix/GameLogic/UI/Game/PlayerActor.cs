@@ -21,28 +21,44 @@ namespace GameLogic
             _buffs = model.PlayerBuffs;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 玩家当前血量。
+        /// </summary>
         public int Hp => _model.PlayerHp;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 玩家最大血量。
+        /// </summary>
         public int MaxHp => _model.PlayerMaxHp;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 玩家当前护甲。
+        /// </summary>
         public int Armor => _model.PlayerArmor;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 玩家当前能量。
+        /// </summary>
         public int CurrentEnergy => _model.CurrentEnergy;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 玩家最大能量。
+        /// </summary>
         public int MaxEnergy => _model.MaxEnergy;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 玩家身上的 Buff 列表。
+        /// </summary>
         public IList<BuffRuntime> Buffs => _buffs;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 玩家是否已死亡。
+        /// </summary>
         public bool IsDead => _model.PlayerHp <= 0;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 让玩家受到伤害，优先扣除护甲，再扣除血量。
+        /// </summary>
         public void TakeDamage(int amount)
         {
             if (amount <= 0) return;
@@ -62,21 +78,27 @@ namespace GameLogic
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 修改玩家护甲。
+        /// </summary>
         public void AddArmor(int amount)
         {
             if (amount == 0) return;
             _model.ModifyPlayerArmor(amount);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取本回合能量，允许临时超过最大能量。
+        /// </summary>
         public void GainEnergy(int amount)
         {
             if (amount == 0) return;
             _model.GainEnergy(amount);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 为玩家添加一条 Buff。
+        /// </summary>
         public void AddBuff(BuffRuntime buff)
         {
             if (buff == null) return;

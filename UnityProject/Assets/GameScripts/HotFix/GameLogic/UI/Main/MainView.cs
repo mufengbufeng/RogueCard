@@ -1,5 +1,5 @@
-using System;
 using EF.Debugger;
+using EF.Event;
 using EF.UI;
 using TMPro;
 using UnityEngine;
@@ -12,7 +12,7 @@ namespace GameLogic
     /// </summary>
     public class MainView : UIView
     {
-                #region 自动生成
+        #region 自动生成
         [UHubBind("FeedbackText")] private TextMeshProUGUI _feedbackText;
         [UHubBind("LevelDescriptionText")] private TextMeshProUGUI _levelDescriptionText;
         [UHubBind("LevelNameText")] private TextMeshProUGUI _levelNameText;
@@ -26,9 +26,9 @@ namespace GameLogic
         // public TextMeshProUGUI _feedbackText;
 
         /// <summary>
-        /// 主界面按钮点击事件。
+        /// 主界面开始按钮点击事件通道。
         /// </summary>
-        public event Action OnStartGameRequested;
+        public EventChannel<MainStartGameRequestedEvent> StartGameRequestedEvent { get; } = new EventChannel<MainStartGameRequestedEvent>();
 
         /// <summary>
         /// 初始化主界面视图。
@@ -108,14 +108,14 @@ namespace GameLogic
         /// </summary>
         protected override void OnRelease()
         {
-            OnStartGameRequested = null;
+            StartGameRequestedEvent.Clear();
             base.OnRelease();
         }
 
         private void OnStartGameButtonClicked()
         {
             Log.Info("[MainView] 主界面开始按钮被点击");
-            OnStartGameRequested?.Invoke();
+            StartGameRequestedEvent.Publish(new MainStartGameRequestedEvent());
         }
 
         /// <summary>
@@ -123,7 +123,7 @@ namespace GameLogic
         /// </summary>
         internal void NotifyStartGameRequestedForTests()
         {
-            OnStartGameRequested?.Invoke();
+            StartGameRequestedEvent.Publish(new MainStartGameRequestedEvent());
         }
 
         private void EnsureRuntimeTextComponents()
@@ -133,11 +133,6 @@ namespace GameLogic
             {
                 return;
             }
-
-            _levelNameText ??= CreateRuntimeText(root, "LevelNameTextRuntime", new Vector2(0f, 170f), new Vector2(720f, 64f), 38, Color.white);
-            _levelDescriptionText ??= CreateRuntimeText(root, "LevelDescriptionTextRuntime", new Vector2(0f, 105f), new Vector2(760f, 56f), 26, new Color(0.86f, 0.86f, 0.86f, 1f));
-            // _statusText ??= CreateRuntimeText(root, "StatusTextRuntime", new Vector2(0f, 45f), new Vector2(600f, 52f), 28, Color.white);
-            _feedbackText ??= CreateRuntimeText(root, "FeedbackTextRuntime", new Vector2(0f, 120f), new Vector2(760f, 48f), 26, new Color(0.9f, 0.9f, 0.9f, 1f));
         }
 
         private static TextMeshProUGUI CreateRuntimeText(RectTransform parent, string objectName, Vector2 anchoredPosition, Vector2 sizeDelta, float fontSize, Color color)

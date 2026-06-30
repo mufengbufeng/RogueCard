@@ -45,7 +45,9 @@ namespace EF.UI
         /// </summary>
         public ReactiveProperty(T initialValue = default) => _value = initialValue;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 清理当前响应式属性的所有值变化监听者。
+        /// </summary>
         public override void ClearListeners() => Changed = null;
     }
 }

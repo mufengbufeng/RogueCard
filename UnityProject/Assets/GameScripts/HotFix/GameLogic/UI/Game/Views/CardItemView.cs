@@ -168,19 +168,29 @@ namespace GameLogic
             _owner = owner;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 处理指针按下并转发给所属卡牌视图。
+        /// </summary>
         public void OnPointerDown(PointerEventData eventData) => _owner?.NotifyPointerDown(eventData);
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 处理指针拖动并转发给所属卡牌视图。
+        /// </summary>
         public void OnDrag(PointerEventData eventData) => _owner?.NotifyPointerMove(eventData);
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 处理指针抬起并转发给所属卡牌视图。
+        /// </summary>
         public void OnPointerUp(PointerEventData eventData) => _owner?.NotifyPointerUp(eventData);
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 处理指针移入并通知所属卡牌视图。
+        /// </summary>
         public void OnPointerEnter(PointerEventData eventData) => _owner?.NotifyPointerEnter();
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 处理指针移出并通知所属卡牌视图。
+        /// </summary>
         public void OnPointerExit(PointerEventData eventData) => _owner?.NotifyPointerExit();
     }
 }

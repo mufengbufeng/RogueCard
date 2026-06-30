@@ -180,7 +180,9 @@ namespace GameLogic
             _events?.GetChannel<CardPlayFailedEvent>().Publish(new CardPlayFailedEvent(reason));
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 接收战斗参与者死亡通知；若死亡对象是当前怪物列表中的怪物，则发布 <see cref="MonsterDeathEvent"/>。
+        /// </summary>
         public void OnActorDied(IBattleActor actor)
         {
             if (actor is MonsterRuntime monster)

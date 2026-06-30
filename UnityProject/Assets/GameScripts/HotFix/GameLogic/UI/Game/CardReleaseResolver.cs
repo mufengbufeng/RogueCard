@@ -22,7 +22,9 @@ namespace GameLogic
     {
         private readonly Random _random = new();
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 返回 [0, maxExclusive) 范围内的默认随机整数。
+        /// </summary>
         public int Next(int maxExclusive) => _random.Next(maxExclusive);
     }
 

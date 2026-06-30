@@ -31,19 +31,29 @@ namespace EF.Event
             _handlerNames = handlerNames ?? Array.Empty<string>();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 快照记录的事件类型名称。
+        /// </summary>
         public string EventName { get; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 快照记录的订阅者数量。
+        /// </summary>
         public int HandlerCount { get; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 快照记录的待分发事件数量。
+        /// </summary>
         public int PendingCount { get; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 快照记录的事件 Channel 生命周期状态。
+        /// </summary>
         public EventChannelLifecycleState State { get; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 获取快照保存的订阅者名称列表。
+        /// </summary>
         public string[] GetHandlerNames()
         {
             return _handlerNames;

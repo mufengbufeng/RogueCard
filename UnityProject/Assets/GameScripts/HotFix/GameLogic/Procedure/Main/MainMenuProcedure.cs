@@ -15,15 +15,21 @@ namespace GameLogic
         private IUIManager _uiManager;
         private ProcedureOwner _procedureOwner;
 
-        /// <inheritdoc />
-        protected internal override void OnInit(ProcedureOwner procedureOwner)
+        /// <summary>
+        /// 初始化主菜单流程并记录初始化日志。
+        /// </summary>
+        /// <param name="procedureOwner">流程持有者。</param>
+        protected override void OnInit(ProcedureOwner procedureOwner)
         {
             base.OnInit(procedureOwner);
             Log.Info("[MainMenuProcedure] OnInit");
         }
 
-        /// <inheritdoc />
-        protected internal override void OnEnter(ProcedureOwner procedureOwner)
+        /// <summary>
+        /// 进入主菜单流程，缓存流程持有者和 UI 管理器，订阅开始关卡事件并异步打开主界面。
+        /// </summary>
+        /// <param name="procedureOwner">流程持有者。</param>
+        protected override void OnEnter(ProcedureOwner procedureOwner)
         {
             base.OnEnter(procedureOwner);
             _procedureOwner = procedureOwner;
@@ -53,8 +59,12 @@ namespace GameLogic
             }
         }
 
-        /// <inheritdoc />
-        protected internal override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
+        /// <summary>
+        /// 离开主菜单流程，关闭主界面并清理事件订阅和缓存引用。
+        /// </summary>
+        /// <param name="procedureOwner">流程持有者。</param>
+        /// <param name="isShutdown">是否因状态机关闭而离开。</param>
+        protected override void OnLeave(ProcedureOwner procedureOwner, bool isShutdown)
         {
             base.OnLeave(procedureOwner, isShutdown);
             _uiManager?.CloseWindowAsync(nameof(MainView)).Forget();
@@ -62,8 +72,11 @@ namespace GameLogic
             Log.Info("[MainMenuProcedure] OnLeave");
         }
 
-        /// <inheritdoc />
-        protected internal override void OnDestroy(ProcedureOwner procedureOwner)
+        /// <summary>
+        /// 销毁主菜单流程时清理事件订阅和缓存引用。
+        /// </summary>
+        /// <param name="procedureOwner">流程持有者。</param>
+        protected override void OnDestroy(ProcedureOwner procedureOwner)
         {
             Cleanup();
             base.OnDestroy(procedureOwner);

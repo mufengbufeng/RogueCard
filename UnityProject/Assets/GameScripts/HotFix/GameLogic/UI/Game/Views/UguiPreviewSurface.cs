@@ -23,7 +23,9 @@ namespace GameLogic
             _cardItems = cardItems;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 克隆源卡牌为不可交互的预览对象，并关闭射线响应与指针转发。
+        /// </summary>
         public GameObject ClonePreviewElement(CardItemView source)
         {
             if (source == null || source.Root == null || _previewLayer == null)
@@ -47,7 +49,9 @@ namespace GameLogic
             return clone;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 将预览对象移动到 preview-layer，并置于最上层显示。
+        /// </summary>
         public void AddToPreviewLayer(GameObject element)
         {
             if (element == null || _previewLayer == null)
@@ -59,13 +63,17 @@ namespace GameLogic
             element.transform.SetAsLastSibling();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 销毁预览对象以从 preview-layer 移除。
+        /// </summary>
         public void RemoveFromPreviewLayer(GameObject element)
         {
             UguiViewUtil.DestroyObject(element);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 计算源卡牌顶部中心在 hand-fan 本地坐标中的位置。
+        /// </summary>
         public Vector2 GetSourceTopCenterInHandFanLocal(CardItemView source)
         {
             if (source == null || source.RectTransform == null || _handFan == null)
@@ -79,7 +87,9 @@ namespace GameLogic
             return _handFan.InverseTransformPoint(topCenterWorld);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 将 hand-fan 本地坐标经世界坐标转换为 preview-layer 本地坐标。
+        /// </summary>
         public Vector2 ConvertHandFanLocalToPreviewLocal(Vector2 sourceTopCenterInHandFan)
         {
             if (_handFan == null || _previewLayer == null)
@@ -91,7 +101,9 @@ namespace GameLogic
             return _previewLayer.InverseTransformPoint(world);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 将预览对象放在源卡顶部上方，并应用尺寸、复位旋转和放大缩放。
+        /// </summary>
         public void ApplyPreviewTransform(GameObject element, Vector2 topCenterInPreviewLayer, HandFanLayoutOptions options)
         {
             if (element == null)
@@ -110,7 +122,9 @@ namespace GameLogic
             rect.sizeDelta = new Vector2(options.CardWidth, options.CardHeight);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 关闭当前手牌列表中所有卡牌的 hover 视觉状态。
+        /// </summary>
         public void ClearAllHoverState()
         {
             if (_cardItems == null)

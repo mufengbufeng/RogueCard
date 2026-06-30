@@ -59,34 +59,52 @@ namespace GameLogic
             _canvas = _dropZone != null ? _dropZone.GetComponentInParent<Canvas>() : null;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 当前手牌列表中的卡牌视图数量。
+        /// </summary>
         public int CardCount => _cardItems.Count;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 出牌区域在屏幕坐标中的命中矩形。
+        /// </summary>
         public Rect DropZoneWorldBound => ToScreenRect(_dropZone);
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 手牌扇形容器在屏幕坐标中的命中矩形。
+        /// </summary>
         public Rect HandFanWorldBound => ToScreenRect(_handFan);
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 出牌区域是否存在且处于激活层级中。
+        /// </summary>
         public bool DropZoneAvailable => _dropZone != null && _dropZone.gameObject.activeInHierarchy;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 手牌扇形容器宽度，未就绪时使用默认宽度。
+        /// </summary>
         public float HandFanWidth => _handFan != null && _handFan.rect.width > 0f ? _handFan.rect.width : 800f;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 手牌扇形容器高度，未就绪时使用默认高度。
+        /// </summary>
         public float HandFanHeight => _handFan != null && _handFan.rect.height > 0f ? _handFan.rect.height : 280f;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 拖拽控制器向上层 UI 派发事件的回调桥。
+        /// </summary>
         public IDragHostCallbacks Callbacks => _callbacks;
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 取得指定卡牌视图在屏幕坐标中的命中矩形。
+        /// </summary>
         public Rect GetCardWorldBound(int cardIdx)
         {
             return cardIdx >= 0 && cardIdx < _cardItems.Count ? ToScreenRect(_cardItems[cardIdx].RectTransform) : Rect.zero;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 将扇形布局槽位应用到指定卡牌的锚点、位置、旋转和尺寸。
+        /// </summary>
         public void ApplyFanTransform(int cardIdx, FanSlotAssignment slot)
         {
             if (!TryGetCard(cardIdx, out CardItemView card))
@@ -102,7 +120,9 @@ namespace GameLogic
             card.RectTransform.sizeDelta = new Vector2(_options.CardWidth, _options.CardHeight);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 设置指定卡牌视图的透明度。
+        /// </summary>
         public void SetCardOpacity(int cardIdx, float opacity)
         {
             if (TryGetCard(cardIdx, out CardItemView card))
@@ -111,10 +131,14 @@ namespace GameLogic
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 将指定卡牌视图的透明度恢复为完全不透明。
+        /// </summary>
         public void ResetCardOpacity(int cardIdx) => SetCardOpacity(cardIdx, 1f);
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 设置指定卡牌视图是否接收指针射线。
+        /// </summary>
         public void SetCardPickingMode(int cardIdx, bool pickable)
         {
             if (TryGetCard(cardIdx, out CardItemView card))
@@ -123,7 +147,9 @@ namespace GameLogic
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 在卡牌根对象名称中记录过渡时长标记。
+        /// </summary>
         public void SetCardTransitionDuration(int cardIdx, float seconds)
         {
             if (TryGetCard(cardIdx, out CardItemView card))
@@ -132,7 +158,9 @@ namespace GameLogic
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 清除卡牌根对象名称中的过渡时长标记。
+        /// </summary>
         public void ClearCardTransitionDuration(int cardIdx)
         {
             if (TryGetCard(cardIdx, out CardItemView card))
@@ -141,7 +169,9 @@ namespace GameLogic
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 调整手牌视图列表顺序，并同步 Transform sibling 顺序。
+        /// </summary>
         public void ReorderCardItem(int from, int to)
         {
             int count = _cardItems.Count;
@@ -157,7 +187,9 @@ namespace GameLogic
             SyncSiblingOrder();
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 按手牌视图列表顺序刷新卡牌在手牌容器中的 sibling 索引。
+        /// </summary>
         public void SyncSiblingOrder()
         {
             for (int i = 0; i < _cardItems.Count; i++)
@@ -166,7 +198,9 @@ namespace GameLogic
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 切换出牌区域的拖拽高亮透明度。
+        /// </summary>
         public void SetDropZoneActive(bool active)
         {
             if (_dropZone == null)
@@ -183,7 +217,9 @@ namespace GameLogic
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 克隆源卡牌到预览层，创建半透明且不接收射线的拖拽 ghost。
+        /// </summary>
         public void CreateGhost(int sourceCardIdx, Vector2 pos)
         {
             DestroyGhost();
@@ -208,7 +244,9 @@ namespace GameLogic
             UpdateGhostPosition(pos);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 将拖拽 ghost 移动到指针在预览层中的本地坐标。
+        /// </summary>
         public void UpdateGhostPosition(Vector2 pos)
         {
             if (_ghost == null)
@@ -228,14 +266,18 @@ namespace GameLogic
             }
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 销毁当前拖拽 ghost，并清空引用。
+        /// </summary>
         public void DestroyGhost()
         {
             UguiViewUtil.DestroyObject(_ghost);
             _ghost = null;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 克隆源卡牌到手牌容器，创建半透明且不接收射线的插入占位卡。
+        /// </summary>
         public void CreateInsertSlot(int sourceCardIdx)
         {
             DestroyInsertSlot();
@@ -250,14 +292,18 @@ namespace GameLogic
             EnsureCanvasGroup(_insertSlot).alpha = 0.35f;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 销毁当前插入占位卡，并清空引用。
+        /// </summary>
         public void DestroyInsertSlot()
         {
             UguiViewUtil.DestroyObject(_insertSlot);
             _insertSlot = null;
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 将扇形布局槽位应用到插入占位卡的锚点、位置、旋转和尺寸。
+        /// </summary>
         public void ApplyInsertSlotTransform(FanSlotAssignment slot)
         {
             if (_insertSlot == null)
@@ -274,18 +320,24 @@ namespace GameLogic
             rect.sizeDelta = new Vector2(_options.CardWidth, _options.CardHeight);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 使用注入的调度器延迟执行指定操作。
+        /// </summary>
         public void Schedule(Action action, long delayMs)
         {
             _scheduleAction(action, delayMs);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// UGUI 适配层不需要显式捕获指针，此方法保留为空实现。
+        /// </summary>
         public void CapturePointer(int cardIdx, int pointerId)
         {
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// UGUI 适配层不需要显式释放指针，此方法保留为空实现。
+        /// </summary>
         public void ReleasePointer(int cardIdx, int pointerId)
         {
         }

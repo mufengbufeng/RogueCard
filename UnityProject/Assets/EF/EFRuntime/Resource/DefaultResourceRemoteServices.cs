@@ -17,7 +17,11 @@ namespace EF.Resource
             _fallbackServer = Normalize(fallbackServer);
         }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// 根据文件名生成远端资源候选地址，优先使用主服务器，其次使用备用服务器。
+        /// </summary>
+        /// <param name="fileName">资源文件名或相对路径。</param>
+        /// <returns>按主服务器、备用服务器顺序排列的候选地址；未配置服务器时返回原始文件名。</returns>
         public IReadOnlyList<string> GetRemoteUrls(string fileName)
         {
             var urls = new List<string>(2);
